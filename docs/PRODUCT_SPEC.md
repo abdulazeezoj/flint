@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
+**Last updated:** 2026-08-12 (v0.8: Flask enabled — `hello-world` + `rest-api`)
 
 ## 1. Vision
 
@@ -99,8 +99,8 @@ Explicitly out of scope for the first release (candidates for later
 already stubbed as disabled/"coming soon" entries so the roadmap is
 visible in the wizard):
 
-- Frameworks other than FastAPI (Flask is stubbed disabled — next on
-  the roadmap, see §11)
+- Frameworks other than FastAPI and Flask (both are enabled as of v0.8;
+  no other framework is stubbed on the roadmap yet, see §11)
 - Templates other than `hello-world` and `rest-api`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
@@ -222,6 +222,14 @@ hold for every project shape a generated app might end up living in
   Dockerfile per template is a safe default, a generated
   `docker-compose.yml` bakes in a container-topology opinion that
   doesn't fit every project, e.g. a monorepo.)
+- `v0.8.0` — Flask is enabled as a second framework, with `hello-world`
+  and `rest-api` templates matching FastAPI's shape option-for-option
+  (`rest-api`'s worker choice is Celery-only — Taskiq is async-first and
+  doesn't fit Flask's sync/WSGI model). Each framework now declares its
+  own dev-server `run_command` in `template.json`, so the "Next steps"
+  summary prints the right command (`uv run flask --app
+  src/{package}/main.py run` vs. `uv run fastapi dev
+  src/{package}/main.py`) instead of always assuming FastAPI.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

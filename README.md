@@ -95,10 +95,21 @@ whatever the chosen template's `template.json` declares. Today:
   - Tests always run against an isolated SQLite database, whatever
     production database was configured — `uv run pytest` never needs a
     real Postgres.
+- **`flask/hello-world`** — the same shape as `fastapi/hello-world`,
+  built on a WSGI `Flask(__name__)` app instead. `-o config=true` and
+  `--docker` behave identically.
+- **`flask/rest-api`** — the sync counterpart to `fastapi/rest-api`,
+  using an application-factory (`create_app()`) so importing the app
+  module never opens a database connection:
+  - `-o database=none|sqlite|postgres` (default: `sqlite`)
+  - `-o orm=flask-sqlalchemy|sqlalchemy` (only asked with a database; default: `flask-sqlalchemy`)
+  - `-o migrations=true|false` — Flask-Migrate (flask-sqlalchemy) or bare Alembic (sqlalchemy) (default: `true` with a database)
+  - `-o worker=none|celery`, with a demo `/tasks/add` endpoint (Taskiq is async-only, so it's FastAPI-exclusive)
+  - `-o broker=redis|rabbitmq` (only asked with a worker; default: `redis`)
+  - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
+  - Tests always run against an isolated SQLite database, same guarantee as `fastapi/rest-api`.
 
-Flask is next on the roadmap; the wizard already lists it as
-"coming soon". See `docs/PRODUCT_SPEC.md` for full v0
-scope and non-goals.
+See `docs/PRODUCT_SPEC.md` for full v0 scope and non-goals.
 
 ## Docs
 

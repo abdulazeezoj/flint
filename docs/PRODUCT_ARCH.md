@@ -73,11 +73,25 @@ flint/
 │           │       ├── worker-taskiq/                   # rendered iff worker == taskiq; worker.py (broker-aware) + tasks/example.py
 │           │       ├── worker-celery/                   # rendered iff worker == celery; same shape, Celery, same broker-awareness
 │           │       └── redis/                            # rendered iff redis is true (requested, or implied when broker == "redis"); core/redis.py
-│           └── flask/template.json                  # disabled stub — next up on the roadmap
+│           └── flask/
+│               ├── template.json                  # framework metadata
+│               ├── hello-world/                    # same shape as fastapi/hello-world, on a WSGI Flask(__name__) app
+│               └── rest-api/                       # sync counterpart to fastapi/rest-api — application-factory (create_app()), Celery-only (no Taskiq: async-first, doesn't fit WSGI)
+│                   ├── template.json               # options: [database, orm, migrations, worker, broker, redis]
+│                   ├── files/                       # main.py (create_app factory), core/config.py, schemas.py, routes/items.py (in-memory), env.jinja (-> .env + .env.example)
+│                   ├── docker/                       # rendered iff --docker
+│                   ├── db-flask-sqlalchemy/           # rendered iff orm == flask-sqlalchemy; overrides routes/items.py, adds core/db.py + models.py
+│                   ├── db-sqlalchemy/                 # rendered iff orm == sqlalchemy; same shape, manual SQLAlchemy Core/ORM
+│                   ├── migrations-flask-sqlalchemy/    # rendered iff migrations && orm == flask-sqlalchemy; Flask-Migrate (needs a Flask-SQLAlchemy db object)
+│                   ├── migrations-sqlalchemy/          # rendered iff migrations && orm == sqlalchemy; bare Alembic
+│                   ├── worker-celery/                   # rendered iff worker == celery; worker.py + tasks/example.py
+│                   └── redis/                            # rendered iff redis is true; core/redis.py
 ├── tests/
 │   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
 │   ├── test_naming.py
 │   ├── test_generator.py
+│   ├── test_flask_hello_world.py
+│   ├── test_flask_rest_api.py
 │   ├── test_prompts.py
 │   ├── test_cli.py
 │   ├── test_postgen.py
@@ -93,15 +107,38 @@ flint/
 
 Templates are organized two levels deep: `templates/<framework>/<template>/`
 (PRODUCT_SPEC §3 defines the framework/template/option distinction). A
-**framework** directory (`templates/fastapi/`) has its own
-`template.json` and one subdirectory per **template** variant
-(`hello-world/`, `rest-api/`), each with its own `template.json`. A
-disabled framework (`flask`, for now) is a stub — just a `template.json`
-with `"enabled": false`, no `files/` — that exists purely so the
-wizard/CLI can list it as "coming soon" (PRODUCT_FLOW §2 step 3) without
-any code changes.
+**framework** directory (`templates/fastapi/`, `templates/flask/`) has
+its own `template.json` and one subdirectory per **template** variant
+(`hello-world/`, `rest-api/`), each with its own `template.json`. Both
+shipped frameworks are enabled as of v0.8. Any future framework ships
+the same way FastAPI/Flask did before their content existed: a stub —
+just a framework-level `template.json` with `"enabled": false`, no
+template subdirectories — that exists purely so the wizard/CLI can list
+it as "coming soon" (PRODUCT_FLOW §2 step 3) without any code changes,
+until it's filled in and flipped to `"enabled": true`.
 
-### `template.json` schema
+### Framework `template.json` schema
+
+```json
+{
+  "id": "flask",
+  "label": "Flask",
+  "description": "Flask — a lightweight WSGI web framework.",
+  "enabled": true,
+  "run_command": "uv run flask --app src/{package_name}/main.py run"
+}
+```
+
+- **`run_command`** — the dev-server command shown on the generated
+  project's "Next steps" line (PRODUCT_FLOW §5 step 11), templated with
+  plain `str.format(package_name=...)` (not Jinja — it's resolved in
+  `cli.py` after generation, not during rendering). This is what lets
+  `postgen.print_summary` show the right command per framework instead
+  of assuming FastAPI's `fastapi dev`; `FrameworkMeta.run_command`
+  defaults to `""` for forward-compatibility with a disabled stub that
+  hasn't declared one yet.
+
+### Template `template.json` schema
 
 ```json
 {
@@ -231,9 +268,9 @@ class Answers(BaseModel):
 
 This keeps "add a new template" to: add a directory + `template.json`
 (+ optional layer directories), no changes to `generator.py`. Adding a
-new *framework* is the same, one level up. Adding Flask for real is
-purely a content change (swap `enabled: false` → `true` and fill in
-`files/`), not an architecture change.
+new *framework* is the same, one level up — Flask shipped this way in
+v0.8: fill in `hello-world/`/`rest-api/` content, set a `run_command`,
+flip `enabled: false` → `true`, no architecture change.
 
 ### 4.1 A worked example: rest-api's `broker`/`redis` options
 
@@ -580,15 +617,21 @@ the gate temporarily.
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
   plus a plain `import flint.__main__` to cover the guard's not-taken
   branch.
+- `test_flask_hello_world.py` / `test_flask_rest_api.py` — Flask's
+  mirror of the FastAPI hello-world/rest-api coverage above (rendered
+  combinations, `ast.parse()`/`tomllib.loads()` checks). Kept as
+  standalone files rather than folded into `test_generator.py`, since
+  they exist purely to cover a second framework's content, not the
+  generator engine itself.
 - **Live end-to-end verification (manual, done before every template
   change ships — not part of the automated suite or the coverage
   gate)**: actually run generated output through `uv sync && uv run
-  pytest` for representative combinations; run real Alembic migrations
-  against real SQLite *and* real PostgreSQL; boot the generated app plus
-  a real Taskiq and a real Celery worker against real Redis and enqueue/
-  execute an actual task end-to-end; `docker build`/`docker run` +a live
-  request. This is what caught the bugs in §7.1 below — `ast.parse()`
-  and `uv sync` alone did not.
+  pytest` for representative combinations; run real Alembic/Flask-Migrate
+  migrations against real SQLite *and* real PostgreSQL; boot the
+  generated app plus a real Taskiq/Celery worker against real Redis and
+  enqueue/execute an actual task end-to-end; `docker build`/`docker run`
+  + a live request. This is what caught the bugs in §7.1 below —
+  `ast.parse()` and `uv sync` alone did not.
 
 ### 7.1 Bugs this level of verification caught (and why lighter checks missed them)
 
@@ -630,6 +673,33 @@ surfaced by actually running the generated tooling:
   actually running `pytest` inside a `database=postgres` project — a
   postgres-flavored `ast.parse()`/`tomllib` check has no way to know the
   test suite needs a package the production code doesn't.
+- **Flask's module-level `app = Flask(__name__)` opens a DB connection at
+  import time**: FastAPI's rest-api never had this problem (it builds
+  the app once, inside `main.py`, with `init_db()` only called from an
+  `async` startup hook). A naive Flask port that assigned `app =
+  Flask(__name__)` at module scope and built the DB engine right there
+  would run that code the instant `pytest`/`flask db ...`/`alembic`
+  merely *imported* the module — meaning every test run and every
+  migration command would try to reach the real `.env`-configured
+  database, violating the "tests never touch the configured production
+  database" guarantee (FR10) the moment `database=postgres` was chosen
+  without a reachable Postgres. Fixed with an application-factory
+  pattern (`create_app(*, database_url=None, testing=False)`, never
+  called at module scope) — `flask run`/`flask db ...` auto-detect the
+  factory from `--app`, the Dockerfile's `gunicorn` points at
+  `{{ package_name }}.main:create_app()`, and tests call the factory
+  directly with an isolated `sqlite:///:memory:` URL. Only surfaced by
+  actually running `flask db migrate`/`pytest` against a
+  `database=postgres` project with no Postgres reachable — an
+  `ast.parse()` check has no way to know an import has a side effect.
+- **Flask-Migrate needs a Flask-SQLAlchemy `db` object**, so it can't
+  share `db.py` with the manual-SQLAlchemy ORM choice the way FastAPI's
+  `db-sqlmodel`/`db-sqlalchemy` migrations layers do (both wrap the same
+  Alembic). Flask's `orm=flask-sqlalchemy` uses `flask db migrate/
+  upgrade` (Flask-Migrate, registers a CLI command group via
+  `migrate.init_app(app, db)`); `orm=sqlalchemy` uses bare Alembic
+  instead (`migrations-sqlalchemy` layer, same shape as FastAPI's) —
+  two separate migrations layers rather than one shared implementation.
 
 ## 8. Versioning & release mechanics
 

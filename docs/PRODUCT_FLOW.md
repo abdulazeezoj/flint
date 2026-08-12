@@ -52,10 +52,12 @@ falls back to.
 3. Framework
    ? Which framework? › (Use arrow keys)
      ❯ FastAPI
-       Flask (coming soon)
-   - v0 ships FastAPI only. Other entries are shown but disabled/greyed
-     to signal the roadmap (create-next-app does the same for future
-     options) — selecting one prints "coming soon" and re-prompts.
+       Flask
+   - v0.8 ships both FastAPI and Flask, fully enabled. Any future
+     framework ships the same way FastAPI/Flask did while unfinished:
+     listed but disabled/greyed (create-next-app does the same for
+     future options) — selecting a disabled entry prints "coming soon"
+     and re-prompts.
    - Preselected entry: the remembered last framework (§6), if it's
      still enabled; otherwise the first enabled entry.
 
@@ -139,6 +141,12 @@ falls back to.
    Then open http://127.0.0.1:8000 — plus a migrate command, a worker
    command, and/or Docker commands, whichever apply to what was chosen.
 ```
+
+   The run command on that "Next steps" line is framework-specific —
+   each framework declares its own `run_command` in `template.json`
+   (see PRODUCT_ARCH.md §4.1), so a Flask project prints `uv run flask
+   --app src/my_api/main.py run` instead of the FastAPI command shown
+   above.
 
 ## 3. Validation rules (project name → package name)
 

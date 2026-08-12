@@ -7,6 +7,32 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.8.0 — 2026-08-12
+
+### Added
+
+- **Flask is enabled as a second framework**, with both templates
+  live-verified end-to-end:
+  - **`flask/hello-world`** — the same shape as `fastapi/hello-world`,
+    on a WSGI `Flask(__name__)` app. `-o config=true` and `--docker`
+    behave identically.
+  - **`flask/rest-api`** — the sync counterpart to `fastapi/rest-api`:
+    `database` (none/sqlite/postgres), `orm`
+    (flask-sqlalchemy/sqlalchemy), `migrations` (Flask-Migrate for
+    flask-sqlalchemy, bare Alembic for sqlalchemy), `worker`
+    (none/celery — Taskiq is async-first and doesn't fit Flask's sync
+    model, so it's FastAPI-exclusive), `broker` (redis/rabbitmq), and
+    `redis` (caching, independent of `broker` — same decoupling as
+    `fastapi/rest-api`). Built on an application-factory pattern
+    (`create_app()`, never instantiated at module scope), so importing
+    the app module — which `pytest`/`flask db ...`/`alembic` all do —
+    never opens a connection to the configured production database.
+- **Per-framework `run_command`**: each framework's `template.json` now
+  declares its own dev-server command, so the generated project's "Next
+  steps" line prints the right one (`uv run flask --app
+  src/{package}/main.py run` vs. `uv run fastapi dev
+  src/{package}/main.py`) instead of always assuming FastAPI.
+
 ## v0.7.0 — 2026-08-12
 
 ### Added
