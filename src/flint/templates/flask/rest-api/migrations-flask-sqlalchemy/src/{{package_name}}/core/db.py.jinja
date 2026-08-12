@@ -1,0 +1,31 @@
+from flask import Flask
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+migrate = Migrate()
+
+
+def init_db(app: Flask) -> None:
+    database_url = app.config["SQLALCHEMY_DATABASE_URI"]
+    if database_url.startswith("sqlite"):
+        # A SQLite `:memory:` database only exists for the lifetime of a
+        # single connection — the default pool hands out a *new* one per
+        # checkout, silently losing everything written in a previous
+        # request. `StaticPool` keeps one connection alive for the app's
+        # lifetime instead. This only ever triggers for `:memory:` (used
+        # by the test suite, see tests/conftest.py); a real file-based
+        # SQLite database doesn't need it.
+        engine_options = {"connect_args": {"check_same_thread": False}}
+        if ":memory:" in database_url:
+            from sqlalchemy.pool import StaticPool
+
+            engine_options["poolclass"] = StaticPool
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
+
+    db.init_app(app)
+    # `migrate.init_app` is what registers the `flask db ...` CLI command
+    # group at all — without it `flask db migrate`/`upgrade` don't exist.
+    migrate.init_app(app, db)
+    with app.app_context():
+        db.create_all()

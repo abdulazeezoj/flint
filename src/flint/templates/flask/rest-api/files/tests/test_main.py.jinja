@@ -1,0 +1,30 @@
+from {{ package_name }}.main import create_app
+
+app = create_app(testing=True)
+client = app.test_client()
+
+
+def test_read_root() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.get_json() == {"message": "Hello, World!"}
+
+
+def test_item_crud() -> None:
+    create_response = client.post("/items/", json={"name": "Widget", "description": "A thing"})
+    assert create_response.status_code == 201
+    item = create_response.get_json()
+    assert item["name"] == "Widget"
+
+    list_response = client.get("/items/")
+    assert list_response.status_code == 200
+    assert len(list_response.get_json()) == 1
+
+    get_response = client.get(f"/items/{item['id']}")
+    assert get_response.status_code == 200
+
+    delete_response = client.delete(f"/items/{item['id']}")
+    assert delete_response.status_code == 204
+
+    missing_response = client.get(f"/items/{item['id']}")
+    assert missing_response.status_code == 404

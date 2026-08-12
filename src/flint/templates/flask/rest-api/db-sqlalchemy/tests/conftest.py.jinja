@@ -1,0 +1,13 @@
+import pytest
+
+from {{ package_name }}.main import create_app
+
+# Tests always run against an isolated in-memory SQLite database, regardless
+# of the database configured in .env — no external database needed to run
+# the suite (see README.md's "Test" section).
+
+
+@pytest.fixture
+def client():
+    app = create_app(database_url="sqlite:///:memory:", testing=True)
+    return app.test_client()

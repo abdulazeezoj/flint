@@ -1,0 +1,50 @@
+from flask import Flask, jsonify
+{% if worker == "celery" %}
+from flask import request
+{% endif %}
+
+from {{ package_name }}.core.config import settings
+{% if database != "none" %}
+from {{ package_name }}.core.db import init_db
+{% endif %}
+from {{ package_name }}.routes.items import bp as items_bp
+{% if worker == "celery" %}
+from {{ package_name }}.tasks.example import add
+{% endif %}
+
+
+def create_app(*, database_url: str | None = None, testing: bool = False) -> Flask:
+    """Application factory. Deliberately not called at import time (no
+    module-level `app = create_app()`): building the app is what opens a
+    database connection, and merely *importing* this module — which
+    `flask db ...`/`pytest`/`alembic` all do — must never require the
+    production database in `.env` to be reachable. `flask run`/`flask db
+    ...` auto-detect this `create_app` factory from `--app`; the
+    Dockerfile's `gunicorn` points at `{{ package_name }}.main:create_app()`;
+    tests call it directly with an isolated `database_url` (see
+    tests/conftest.py) so the suite never touches the configured database."""
+    app = Flask(__name__)
+    app.config["APP_NAME"] = settings.app_name
+    app.config["DEBUG"] = settings.debug
+    app.config["TESTING"] = testing
+{% if database != "none" %}
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url or settings.database_url
+    init_db(app)
+{% endif %}
+
+    app.register_blueprint(items_bp)
+
+    @app.get("/")
+    def read_root() -> dict[str, str]:
+        return jsonify({"message": "Hello, World!"})
+{% if worker == "celery" %}
+
+    @app.post("/tasks/add")
+    def enqueue_add():
+        a = int(request.args["a"])
+        b = int(request.args["b"])
+        task = add.delay(a, b)
+        return jsonify({"task_id": task.id})
+{% endif %}
+
+    return app

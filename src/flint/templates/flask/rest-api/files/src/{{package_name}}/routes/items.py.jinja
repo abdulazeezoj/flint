@@ -1,0 +1,46 @@
+"""In-memory Item store — swapped for a real database when one is chosen
+at generation time (see {{ package_name }}/core/db.py)."""
+
+from flask import Blueprint, jsonify, request
+from pydantic import ValidationError
+
+from {{ package_name }}.schemas import ItemCreate, ItemRead
+
+bp = Blueprint("items", __name__, url_prefix="/items")
+
+_items: dict[int, ItemRead] = {}
+_next_id = 1
+
+
+@bp.get("/")
+def list_items():
+    return jsonify([item.model_dump() for item in _items.values()])
+
+
+@bp.post("/")
+def create_item():
+    global _next_id
+    try:
+        payload = ItemCreate.model_validate(request.get_json(force=True, silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"detail": exc.errors()}), 422
+    created = ItemRead(id=_next_id, **payload.model_dump())
+    _items[_next_id] = created
+    _next_id += 1
+    return jsonify(created.model_dump()), 201
+
+
+@bp.get("/<int:item_id>")
+def get_item(item_id: int):
+    item = _items.get(item_id)
+    if item is None:
+        return jsonify({"detail": "Item not found"}), 404
+    return jsonify(item.model_dump())
+
+
+@bp.delete("/<int:item_id>")
+def delete_item(item_id: int):
+    if item_id not in _items:
+        return jsonify({"detail": "Item not found"}), 404
+    del _items[item_id]
+    return "", 204
