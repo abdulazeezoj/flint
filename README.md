@@ -61,9 +61,8 @@ flint --help
 Every prompt has a matching flag: `--framework`, `--template`,
 `--option`/`-o key=value` (repeatable — one per template-specific
 choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
---no-docker`, `--compose/--no-compose` (needs `--docker`), `--git/
---no-git`, `--install/--no-install`, `--yes` (accept all defaults),
-`--force` (generate into a non-empty dir).
+--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
+(accept all defaults), `--force` (generate into a non-empty dir).
 
 Flint remembers your last framework/template and per-template choices in
 `~/.flint/last.json`, and uses them as the new default the next time you
@@ -85,8 +84,7 @@ whatever the chosen template's `template.json` declares. Today:
   with a passing test and an `AGENTS.md`, ready to run with no edits.
   `-o config=true` adds `pydantic-settings`-based configuration (`.env`
   + a checked-in `.env.example`). `--docker` adds a `Dockerfile` +
-  `.dockerignore`; `--compose` (needs `--docker`) adds a
-  `docker-compose.yml`.
+  `.dockerignore`.
 - **`fastapi/rest-api`** — the same, plus real head-start choices:
   - `-o database=none|sqlite|postgres` (default: `sqlite`)
   - `-o orm=sqlmodel|sqlalchemy` (only asked with a database; default: `sqlmodel`)
@@ -94,8 +92,6 @@ whatever the chosen template's `template.json` declares. Today:
   - `-o worker=none|taskiq|celery`, with a demo `/tasks/add` endpoint
   - `-o broker=redis|rabbitmq` (only asked with a worker; default: `redis`)
   - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
-  - `--compose` generates a `docker-compose.yml` wiring up whichever of
-    Postgres/Redis/RabbitMQ/the worker were actually configured
   - Tests always run against an isolated SQLite database, whatever
     production database was configured — `uv run pytest` never needs a
     real Postgres.

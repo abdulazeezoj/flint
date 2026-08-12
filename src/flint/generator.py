@@ -80,7 +80,6 @@ class Answers(BaseModel):
     git_init: bool
     install: bool
     docker: bool
-    compose: bool
     options: dict[str, Any] = {}
 
     def context(self) -> dict[str, Any]:
@@ -144,10 +143,6 @@ class TemplateMeta:
     @property
     def supports_docker(self) -> bool:
         return any(layer.dir == "docker" for layer in self.layers)
-
-    @property
-    def supports_compose(self) -> bool:
-        return any(layer.dir == "compose" for layer in self.layers)
 
 
 def when_matches(when: dict[str, list[Any]], values: dict[str, Any]) -> bool:

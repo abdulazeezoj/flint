@@ -28,7 +28,6 @@ def make_answers(**overrides) -> Answers:
         git_init=False,
         install=False,
         docker=False,
-        compose=False,
     )
     defaults.update(overrides)
     return Answers(**defaults)
@@ -105,7 +104,6 @@ def test_rest_api_declares_expected_options_and_layers():
     layer_dirs = {layer.dir for layer in template.layers}
     assert layer_dirs == {
         "docker",
-        "compose",
         "db-sqlmodel",
         "db-sqlalchemy",
         "migrations-sqlmodel",
@@ -154,28 +152,6 @@ def test_render_without_docker_omits_dockerfile(tmp_path: Path):
     assert Path("Dockerfile") not in created
     assert not (target / "Dockerfile").exists()
     assert "docker build" not in (target / "README.md").read_text()
-
-
-def test_render_with_compose_adds_compose_file(tmp_path: Path):
-    target = tmp_path / "my-api"
-    created = render(
-        "fastapi", "hello-world", target, make_answers(docker=True, compose=True)
-    )
-
-    assert Path("docker-compose.yml") in created
-    compose = (target / "docker-compose.yml").read_text()
-    assert "build: ." in compose
-    assert '"8000:8000"' in compose
-
-
-def test_render_without_compose_omits_compose_file(tmp_path: Path):
-    target = tmp_path / "my-api"
-    created = render(
-        "fastapi", "hello-world", target, make_answers(docker=True, compose=False)
-    )
-
-    assert Path("docker-compose.yml") not in created
-    assert not (target / "docker-compose.yml").exists()
 
 
 def test_render_substitutes_package_name(tmp_path: Path):
@@ -556,85 +532,6 @@ def test_rest_api_worker_celery_rabbitmq_broker(tmp_path: Path):
     assert "RABBITMQ_URL=amqp://" in env_file
     assert "REDIS_URL" not in env_file
     _assert_all_python_files_parse(target)
-
-
-def test_rest_api_compose_full_stack(tmp_path: Path):
-    target = tmp_path / "api"
-    answers = make_answers(
-        template="rest-api",
-        docker=True,
-        compose=True,
-        options=dict(
-            database="postgres",
-            orm="sqlmodel",
-            migrations=True,
-            worker="taskiq",
-            broker="rabbitmq",
-            redis=True,
-        ),
-    )
-    created = render("fastapi", "rest-api", target, answers)
-
-    assert Path("docker-compose.yml") in created
-    compose = (target / "docker-compose.yml").read_text()
-    assert "app:" in compose
-    assert "worker:" in compose
-    assert "db:" in compose
-    assert "redis:" in compose
-    assert "rabbitmq:" in compose
-    assert "postgres:16-alpine" in compose
-    assert "redis:7-alpine" in compose
-    assert "rabbitmq:3-management-alpine" in compose
-    assert "DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/my_api" in compose
-    assert "REDIS_URL: redis://redis:6379/0" in compose
-    assert "RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//" in compose
-    assert "PYTHONPATH: src" not in compose  # taskiq worker, not celery
-    assert "db-data:" in compose
-
-
-def test_rest_api_compose_worker_never_depends_on_absent_redis_service(tmp_path: Path):
-    # An explicit `-o broker=redis -o redis=false` is a self-contradictory
-    # combo (broker=redis normally implies redis=true via skip_value, but
-    # an explicit override always wins per-option) — the worker service
-    # must not `depends_on` a `redis` service that was never generated,
-    # or `docker compose up` fails outright on an unresolvable reference.
-    target = tmp_path / "api"
-    answers = make_answers(
-        template="rest-api",
-        docker=True,
-        compose=True,
-        options=dict(
-            database="none", orm="none", migrations=False,
-            worker="taskiq", broker="redis", redis=False,
-        ),
-    )
-    created = render("fastapi", "rest-api", target, answers)
-
-    compose = (target / "docker-compose.yml").read_text()
-    assert "redis:" not in compose
-    worker_section = compose.split("worker:", 1)[1]
-    assert "- redis" not in worker_section
-
-
-def test_rest_api_compose_minimal_no_extra_services(tmp_path: Path):
-    target = tmp_path / "api"
-    answers = make_answers(
-        template="rest-api",
-        docker=True,
-        compose=True,
-        options=dict(
-            database="none", orm="none", migrations=False, worker="none",
-            broker="none", redis=False,
-        ),
-    )
-    created = render("fastapi", "rest-api", target, answers)
-
-    compose = (target / "docker-compose.yml").read_text()
-    assert "app:" in compose
-    assert "worker:" not in compose
-    assert "db:" not in compose
-    assert "redis:" not in compose
-    assert "rabbitmq:" not in compose
 
 
 def test_rest_api_rabbitmq_broker_with_redis_caching_still_independent(tmp_path: Path):

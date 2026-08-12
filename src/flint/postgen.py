@@ -110,8 +110,3 @@ def print_summary(
         console.print("Or with Docker:")
         console.print(f"  docker build -t {slug} .")
         console.print(f"  docker run -p 8000:8000 {slug}")
-
-    if Path("docker-compose.yml") in created:
-        console.print()
-        console.print("Or with Docker Compose:")
-        console.print("  docker compose up --build")

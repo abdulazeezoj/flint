@@ -69,7 +69,6 @@
   ],
   "layers": [
     { "dir": "docker", "when": { "docker": [true] } },
-    { "dir": "compose", "when": { "compose": [true] } },
     { "dir": "db-sqlmodel", "when": { "orm": ["sqlmodel"] } },
     { "dir": "db-sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
     { "dir": "migrations-sqlmodel", "when": { "orm": ["sqlmodel"], "migrations": [true] } },

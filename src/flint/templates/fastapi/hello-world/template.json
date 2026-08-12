@@ -13,7 +13,6 @@
   ],
   "layers": [
     { "dir": "docker", "when": { "docker": [true] } },
-    { "dir": "compose", "when": { "compose": [true] } },
     { "dir": "config", "when": { "config": [true] } }
   ]
 }

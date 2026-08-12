@@ -41,7 +41,6 @@ def root(
             template=None,
             option=[],
             docker=None,
-            compose=None,
             git=None,
             install=None,
             yes=False,
@@ -77,13 +76,6 @@ def new(
     docker: Annotated[
         Optional[bool],
         typer.Option("--docker/--no-docker", help="Add a Dockerfile."),
-    ] = None,
-    compose: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--compose/--no-compose",
-            help="Add a docker-compose.yml (needs --docker).",
-        ),
     ] = None,
     git: Annotated[
         Optional[bool],
@@ -125,7 +117,6 @@ def new(
         template=template,
         option=option,
         docker=docker,
-        compose=compose,
         git=git,
         install=install,
         yes=yes,
@@ -141,7 +132,6 @@ def _run_new(
     template: Optional[str],
     option: list[str],
     docker: Optional[bool],
-    compose: Optional[bool],
     git: Optional[bool],
     install: Optional[bool],
     yes: bool,
@@ -195,21 +185,6 @@ def _run_new(
             )
             docker_requested = False
 
-        compose_requested = prompts.prompt_compose(
-            compose, docker_requested, interactive, remembered=remembered["compose"]
-        )
-        if compose_requested and not docker_requested:
-            console.print(
-                "[yellow]![/yellow] --compose needs --docker — skipping docker-compose.yml."
-            )
-            compose_requested = False
-        elif compose_requested and not chosen_template.supports_compose:
-            console.print(
-                f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
-                "--compose yet — skipping docker-compose.yml."
-            )
-            compose_requested = False
-
         if interactive:
             console.print("Using uv to manage dependencies.")
 
@@ -225,7 +200,6 @@ def _run_new(
             git_init=git_init,
             install=install_now,
             docker=docker_requested,
-            compose=compose_requested,
             options=resolved_options,
         )
         created = generator.render(framework_id, template_id, target_dir, answers, force=force)
@@ -239,7 +213,6 @@ def _run_new(
                     full_id=chosen_template.full_id,
                     options=resolved_options,
                     docker=docker_requested,
-                    compose=compose_requested,
                     git_init=git_init,
                     install=install_now,
                 )

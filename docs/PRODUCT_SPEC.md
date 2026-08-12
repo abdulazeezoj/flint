@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
 
 ## 1. Vision
 
@@ -104,15 +104,19 @@ visible in the wizard):
 - Templates other than `hello-world` and `rest-api`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
-- Auth scaffolding, CI workflow templates
+- Auth scaffolding, Docker Compose, CI workflow templates
 - `.agents/skills/<framework>` — see §12 Open Questions
 - A GUI or web-based wizard
 
 Database/ORM/migrations/worker selection — a v0.1/v0.2 non-goal — is now
-in scope as of v0.3, scoped specifically to the `rest-api` template.
-Docker Compose generation and a RabbitMQ broker choice — both v0.1–v0.6
-non-goals — are in scope as of v0.7, also scoped to the templates that
-declare support for them.
+in scope as of v0.3, scoped specifically to the `rest-api` template. A
+RabbitMQ broker choice — a v0.1–v0.6 non-goal — is in scope as of v0.7.
+Docker Compose was briefly added and then deliberately removed within
+v0.7 itself (see §11) — one Dockerfile per template is a reasonable
+default, but a generated `docker-compose.yml` bakes in an
+opinion about container topology (one service per app) that doesn't
+hold for every project shape a generated app might end up living in
+(e.g. a monorepo with its own compose setup already).
 
 ## 6. Personas
 
@@ -148,13 +152,13 @@ declare support for them.
 
 | ID | Requirement |
 |----|-------------|
-| FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → add Docker Compose? (default no; only asked if a Dockerfile was added) → initialize git repo? (default yes) → install dependencies now? (default yes) |
+| FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → initialize git repo? (default yes) → install dependencies now? (default yes) |
 | FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force` |
-| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--compose/--no-compose`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
-| FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run`, `docker compose up` — whichever apply) |
+| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
+| FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run` — whichever apply) |
 | FR5 | `flint --version` prints the current version |
 | FR6 | Exit codes: `0` success, `1` user/input error (e.g. bad name, existing dir, disabled framework/template, unknown/invalid `--option`), `2` unexpected/internal error |
-| FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; `--compose` additionally adds a `docker-compose.yml` wiring up whichever services the chosen options actually need (database, Redis, RabbitMQ, worker); `--compose` without `--docker`, or either flag against a template that doesn't support it yet, warns and continues rather than failing the whole generation |
+| FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; if the chosen template doesn't support it yet, warn and continue rather than failing the whole generation |
 | FR8 | Every generated project includes an `AGENTS.md` with run/test commands, layout, and conventions — no flag, always on |
 | FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
@@ -212,8 +216,12 @@ declare support for them.
   (Flask is the committed next framework, not Django); `rest-api` gains
   a `broker` choice (Redis/RabbitMQ) for the background worker, `redis`
   becomes an independent caching add-on rather than always implied by a
-  worker; optional Docker Compose generation; `.env.example` ships
-  alongside `.env` wherever a template writes one.
+  worker; `.env.example` ships alongside `.env` wherever a template
+  writes one. (Docker Compose generation was briefly added and then
+  deliberately removed within this same release — see §5: one
+  Dockerfile per template is a safe default, a generated
+  `docker-compose.yml` bakes in a container-topology opinion that
+  doesn't fit every project, e.g. a monorepo.)
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

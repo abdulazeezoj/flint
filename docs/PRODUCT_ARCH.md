@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -57,17 +57,15 @@ flint/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
 │           │   ├── hello-world/
-│           │   │   ├── template.json               # options: [config]; layers: [docker, compose, config]
+│           │   │   ├── template.json               # options: [config]; layers: [docker, config]
 │           │   │   ├── README.md                   # maintainer docs (not rendered)
 │           │   │   ├── files/                      # always rendered
 │           │   │   ├── docker/                     # rendered iff --docker
-│           │   │   ├── compose/                    # rendered iff --compose (needs --docker)
 │           │   │   └── config/                     # rendered iff config option is true
 │           │   └── rest-api/
 │           │       ├── template.json               # options: [database, orm, migrations, worker, broker, redis]
 │           │       ├── files/                       # always rendered — main.py, core/config.py, schemas.py, routes/items.py (in-memory), env.jinja (-> .env + .env.example)
 │           │       ├── docker/                       # rendered iff --docker
-│           │       ├── compose/                       # rendered iff --compose (needs --docker)
 │           │       ├── db-sqlmodel/                   # rendered iff orm == sqlmodel; overrides routes/items.py, adds core/db.py + models.py
 │           │       ├── db-sqlalchemy/                 # rendered iff orm == sqlalchemy; same shape, SQLAlchemy Core/ORM
 │           │       ├── migrations-sqlmodel/            # rendered iff migrations && orm == sqlmodel
@@ -209,7 +207,6 @@ class Answers(BaseModel):
     git_init: bool
     install: bool
     docker: bool
-    compose: bool            # needs docker; see §4.5 for why it's fixed, not a template option
     options: dict[str, Any]  # e.g. {"database": "sqlite", "orm": "sqlmodel", ...}
 ```
 
@@ -282,23 +279,9 @@ One consequence worth naming: because `redis` and `broker` are
 independent options, an explicit `-o broker=redis -o redis=false` is a
 legal (if self-contradictory) combination — explicit `--option` values
 always win over `when`/`skip_value` resolution, per option, with no
-cross-option consistency check. `compose/docker-compose.yml.jinja` has
-to defend against this specific case (§4.1.1 below) rather than assume
-`redis` is always `true` whenever `broker == "redis"`.
-
-#### 4.1.1 Compose gotcha: don't `depends_on` a service that isn't there
-
-`compose/docker-compose.yml.jinja`'s `worker` service originally gated
-its `depends_on: redis` line on `broker == "redis"` alone. That's wrong:
-the compose file's `redis` *service* is gated on the `redis` variable
-(so it lines up with the `app` service's own `environment`/`depends_on`,
-and with the `redis/` layer's own gate above) — and per the
-self-contradictory case just described, `broker == "redis"` and `redis
-== true` aren't actually guaranteed to agree. `docker compose up` fails
-outright on config validation if a service's `depends_on` names a
-service that isn't defined in the file, so the fix is to gate that one
-line on `broker == "redis" and redis` together — both "this worker
-needs Redis" and "a Redis service actually exists to depend on."
+cross-option consistency check. Any future layer/content that assumes
+"broker == redis implies a Redis instance exists" needs to check the
+resolved `redis` value directly rather than inferring it from `broker`.
 
 ### 4.2 When to use a layer vs. an inline `{% if %}`
 
@@ -393,48 +376,6 @@ consistency (`core/config.py`, not top-level `config.py`) even though a
 one-endpoint template doesn't need the rest of the `core/`/`routes/`/
 `tasks/` structure — a developer who's used one flint template shouldn't
 have to relearn where config lives in another.
-
-### 4.5 Fixed CLI fields vs. template options — why `compose` can't be one
-
-`docker`/`git_init`/`install`/`compose` are fixed fields on `Answers`
-(§4, `Answers.context()`), resolved by their own `prompts.prompt_*`
-function and their own CLI flag — never a `template.json`-declared
-option. `database`/`orm`/`worker`/`broker`/`redis`/`config` all *are*
-template options. The line between the two isn't "which one is more
-important" — it's **when each is resolved**, and that's a hard
-constraint, not a style choice.
-
-`cli.py`'s `_run_new` resolves things in this order: template options
-(via `prompts.prompt_template_options`) → `docker` → `compose` → `git`
-→ `install`. A template option's `when` can only see *other template
-options* resolved earlier in the same `prompt_template_options` call
-(`when_matches` is checked against the `resolved` dict being built up
-inside that one function) — it has no visibility into `docker`, because
-`docker` doesn't exist yet at that point. So `compose` — which only
-makes sense once a Dockerfile exists — **cannot** be declared as
-`{"key": "compose", ..., "when": {"docker": [true]}}` the way e.g.
-`orm`'s `"when": {"database": [...]}` can reference `database`. The
-`when` would always evaluate against a missing key and never match.
-
-The fix is the one `prompt_compose(compose, docker, interactive,
-remembered)` takes: accept the already-resolved `docker` value as a
-plain parameter instead of reading it from an options dict, and skip
-prompting (resolve `False`) when it's falsy — the same *effect* as a
-`when`-gated option's skip, achieved outside the generic options engine
-because the timing doesn't allow using that engine here. `cli.py` then
-applies the same "requested but not supported/satisfied" downgrade-and-
-warn pattern already used for `--docker` on a template without a
-`docker` layer: `compose_requested and not docker_requested` and
-`compose_requested and not chosen_template.supports_compose` (mirroring
-`TemplateMeta.supports_docker`) both warn and downgrade to `False`
-rather than failing generation.
-
-The **layer** gate is unaffected by any of this: `{"dir": "compose",
-"when": {"compose": [true]}}` in `template.json` is evaluated by
-`generator.render` against `answers.context()`, built *after* every
-fixed field (including `compose`) and every template option is fully
-resolved — by then there's no ordering problem, which is exactly why
-`--docker`'s own layer gate has never needed special-casing either.
 
 ## 5. Remembered preferences (`prefs.py`)
 
@@ -559,14 +500,7 @@ resolves its options first, then calls `prompts.prompt_docker`, then —
 if docker was requested but `chosen_template.supports_docker` is false —
 downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
-matches what was actually generated. `--compose` follows immediately
-after, with two independent downgrade checks (both warn-and-continue,
-never fail generation): `compose_requested and not docker_requested`
-(compose without a Dockerfile makes no sense) and `compose_requested
-and not chosen_template.supports_compose` (mirrors the docker check,
-via `TemplateMeta.supports_compose`). See §4.5 for why `compose` has to
-be resolved this way — as a fixed field *after* `docker` — rather than
-as a `template.json` option with a `when` on `docker`.
+matches what was actually generated.
 
 ## 7. Testing strategy
 
@@ -595,38 +529,28 @@ the gate temporarily.
   skipped rather than failing. A dedicated block of `rest-api`-specific
   tests renders real combinations (in-memory, SQLite+SQLModel+migrations,
   Postgres+SQLAlchemy, Taskiq, Celery, Redis, Taskiq/Celery+RabbitMQ, the
-  `redis`/`broker` decoupling — including the self-contradictory
-  `broker=redis, redis=false` case (§4.1.1), Docker Compose content for
-  both a full stack and a minimal one, "all features combined") and
-  asserts the right files exist/don't, then runs every `.py` file
-  through `ast.parse()` and `pyproject.toml` through `tomllib.loads()` —
-  catches template bugs (like the whitespace ones in §4.3) that only a
+  `redis`/`broker` decoupling, "all features combined") and asserts the
+  right files exist/don't, then runs every `.py` file through
+  `ast.parse()` and `pyproject.toml` through `tomllib.loads()` — catches
+  template bugs (like the whitespace ones in §4.3) that only a
   rendered-output check would catch, without needing a live `uv sync`
-  for every combination. `docker-compose.yml`'s content is checked by
-  substring assertions (service names, image tags, env var lines,
-  `depends_on` entries) rather than a YAML parser — no new dependency
-  for one file, matching how `Dockerfile` content is already checked
-  the same way.
+  for every combination.
 - `test_prompts.py` — monkeypatches `questionary`'s `.ask()` calls (it
   drives a real TTY via `prompt_toolkit`, which can't be exercised
   through Typer's `CliRunner`) to cover the interactive branches for
-  every prompt function (including `prompt_compose`'s docker-dependency
-  skip and its own remembered-default/cancel branches), plus
-  `parse_option_flags` and `prompt_template_options` against both a
-  synthetic template (a `database`/`orm`/`migrations` option chain
-  mirroring rest-api's shape, for isolated `when`/`skip_value` testing)
-  and the real `rest-api` template (confirming its actual declared
-  defaults, that `worker` implies a `broker`, and that `broker`
-  decouples `redis` per §4.1).
+  every prompt function, plus `parse_option_flags` and
+  `prompt_template_options` against both a synthetic template (a
+  `database`/`orm`/`migrations` option chain mirroring rest-api's shape,
+  for isolated `when`/`skip_value` testing) and the real `rest-api`
+  template (confirming its actual declared defaults, that `worker`
+  implies a `broker`, and that `broker` decouples `redis` per §4.1).
 - `test_cli.py` — Typer's `CliRunner`, covering: full non-interactive
   happy path (with and without `--docker`), `--option` end-to-end for
   rest-api (and its "Options: ..." summary line), unknown/invalid
   `--option` values, a malformed `--option` (no `=`), `--version`,
   `--help`, existing-directory error, invalid name, unknown/disabled
-  framework/template, `--docker`/`--compose` requested against a
-  template that doesn't support it, `--compose` without `--docker`, a
-  successful `--compose` run (compose file present, "Or with Docker
-  Compose:" in the summary), a `typer.Exit` raised mid-flow passing
+  framework/template, `--docker` requested against a template that
+  doesn't support it, a `typer.Exit` raised mid-flow passing
   through unchanged, and an unexpected exception mapping to exit code 2.
   The fully-interactive path (including the "Using uv..." message) is
   exercised by calling `cli._run_new` directly with `sys.stdin` patched

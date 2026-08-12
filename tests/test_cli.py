@@ -94,82 +94,6 @@ def test_new_docker_unsupported_warns_and_continues(tmp_path: Path, monkeypatch)
     assert not (tmp_path / "my-api" / "Dockerfile").exists()
 
 
-def test_new_compose_without_docker_warns_and_continues(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(
-        app,
-        [
-            "new",
-            "my-api",
-            "--framework",
-            "fastapi",
-            "--template",
-            "hello-world",
-            "--compose",
-            "--no-docker",
-            "--no-git",
-            "--no-install",
-            "--yes",
-        ],
-    )
-    assert result.exit_code == 0, result.stdout
-    assert "--compose needs --docker" in result.stdout
-    assert not (tmp_path / "my-api" / "docker-compose.yml").exists()
-
-
-def test_new_compose_unsupported_warns_and_continues(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(
-        generator.TemplateMeta, "supports_compose", property(lambda self: False)
-    )
-
-    result = runner.invoke(
-        app,
-        [
-            "new",
-            "my-api",
-            "--framework",
-            "fastapi",
-            "--template",
-            "hello-world",
-            "--docker",
-            "--compose",
-            "--no-git",
-            "--no-install",
-            "--yes",
-        ],
-    )
-    assert result.exit_code == 0, result.stdout
-    assert "doesn't support --compose yet" in result.stdout
-    assert (tmp_path / "my-api" / "Dockerfile").is_file()
-    assert not (tmp_path / "my-api" / "docker-compose.yml").exists()
-
-
-def test_new_with_compose(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(
-        app,
-        [
-            "new",
-            "my-api",
-            "--framework",
-            "fastapi",
-            "--template",
-            "hello-world",
-            "--docker",
-            "--compose",
-            "--no-git",
-            "--no-install",
-            "--yes",
-        ],
-    )
-    assert result.exit_code == 0, result.stdout
-    compose_file = tmp_path / "my-api" / "docker-compose.yml"
-    assert compose_file.is_file()
-    assert "build: ." in compose_file.read_text()
-    assert "Or with Docker Compose:" in result.stdout
-
-
 def test_bare_invocation_defaults_to_new(tmp_path: Path, monkeypatch):
     # Bare `flint` defaults git-init and install to True (FR1); stub both
     # out so this test stays hermetic (no real subprocess/network calls)
@@ -219,7 +143,6 @@ def test_run_new_interactive_full_flow(tmp_path: Path, monkeypatch, capsys):
         template=None,
         option=[],
         docker=None,
-        compose=None,
         git=None,
         install=None,
         yes=False,

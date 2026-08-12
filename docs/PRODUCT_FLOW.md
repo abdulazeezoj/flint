@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -106,17 +106,6 @@ falls back to.
      this `<framework>/<template>` remembers a different value (§6). If
      yes, and the chosen framework/template doesn't have Docker support
      yet, Flint warns and continues without one rather than failing.
-
-7a. Add Docker Compose?
-   ? Add Docker Compose? (y/N) ›
-   - Only asked if step 7 was yes — a compose file with no Dockerfile to
-     build makes no sense, so this is skipped (resolves no) without
-     asking otherwise. Default **no**, unless remembered otherwise (§6).
-     Not a template option (see PRODUCT_ARCH.md §4.5 for why it can't
-     be one) — it's a fixed field resolved right after `docker`, same as
-     git/install below. Generates `docker-compose.yml` wiring up
-     whichever of the database/Redis/RabbitMQ/worker were actually
-     configured, alongside the app service itself.
 
 8. Initialize a git repository?
    ? Initialize a git repository? (Y/n) ›

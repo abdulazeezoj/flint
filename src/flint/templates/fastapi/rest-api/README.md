@@ -27,19 +27,6 @@ real database if one is chosen.
 | `broker` | select | `redis` | `worker != none` | `redis`, `rabbitmq`; skip_value `"none"` when no worker |
 | `redis` | confirm | `false` | `broker != redis` | skip_value `true` — implied whenever `broker == "redis"`; otherwise an independent "add Redis for caching" question, so `broker == "rabbitmq"` doesn't preclude also wanting Redis for caching |
 
-`compose` (add `docker-compose.yml`) is **not** in this table — unlike
-every option above, it isn't declared in `template.json` at all. It's a
-fixed CLI field (`Answers.compose`, alongside `docker`/`git_init`/
-`install`), resolved by `prompts.prompt_compose` *after* `docker` is
-asked. It has to work this way: `prompt_template_options` resolves all
-of the options above *before* `docker` is even asked (see `cli.py`'s
-`_run_new`), so a template option can't declare a `when` on `docker` —
-the value doesn't exist yet at that point. See PRODUCT_ARCH.md §4.5 for
-the full reasoning. The `compose` **layer** is still declared in
-`template.json`'s `layers` list like any other (gated on `{"compose":
-[true]}`), since by render time `compose` is a real resolved field in
-`Answers.context()`.
-
 ## Layout (of this template's directory, not the generated project)
 
 ```
@@ -49,7 +36,6 @@ files/                    always rendered — main.py, core/config.py, schemas.p
                           routes/items.py (in-memory), tests/test_main.py,
                           env.jinja (renders to both .env and .env.example)
 docker/                   iff --docker
-compose/                  iff --compose (needs --docker; see options table above)
 db-sqlmodel/              iff orm == sqlmodel — overrides routes/items.py,
                           adds core/db.py + top-level models.py
 db-sqlalchemy/            iff orm == sqlalchemy — same shape, SQLAlchemy Core/ORM
@@ -89,7 +75,7 @@ startup wiring (DB init, Taskiq's `broker.startup()`/`shutdown()` in a
 PRODUCT_ARCH.md §4.2 for why this file stays inline-conditional while
 `routes/items.py`, `core/db.py`, etc. are full layer overrides.
 
-## Five real gotchas baked into this template — don't regress them
+## Four real gotchas baked into this template — don't regress them
 
 See PRODUCT_ARCH.md §6.1 for the full incident write-ups; the short
 version, since it's easy to "fix" these back in accidentally:
@@ -114,43 +100,28 @@ version, since it's easy to "fix" these back in accidentally:
    domain content, not infrastructure) while still giving the session/
    engine setup a fixed, predictable home alongside `config.py`/
    `redis.py`.
-5. **`compose/docker-compose.yml.jinja`'s `worker` service must not
-   `depends_on: redis` just because `broker == "redis"`** — `broker` and
-   the standalone `redis` (caching) option are independent (an explicit
-   `-o broker=redis -o redis=false` is legal, if self-contradictory), and
-   the `redis` *service* in the compose file is only ever generated when
-   `redis` resolves true. `depends_on` referencing a service that isn't
-   in the file makes `docker compose up` fail outright on config
-   validation — gate that specific line on `broker == "redis" and redis`
-   together, not `broker == "redis"` alone.
 
 ## Testing this template
 
 `tests/test_generator.py` has a dedicated block of `rest-api`-specific
 tests: in-memory, SQLite+SQLModel+migrations, Postgres+SQLAlchemy,
-Taskiq, Celery, Taskiq/Celery+RabbitMQ, the `redis`/`broker` decoupling
-(including the self-contradictory `broker=redis, redis=false` case),
-Docker Compose content (full stack and minimal), and "all features
-combined." Each asserts the right files exist/don't (including the
-specific paths from gotcha #4 above) and runs every generated `.py`
-file through `ast.parse()` plus `pyproject.toml` through
-`tomllib.loads()`; `docker-compose.yml` content is checked by substring
-assertions (no YAML-parser dependency for one file).
+Taskiq, Celery, Taskiq/Celery+RabbitMQ, the `redis`/`broker` decoupling,
+and "all features combined." Each asserts the right files exist/don't
+(including the specific paths from gotcha #4 above) and runs every
+generated `.py` file through `ast.parse()` plus `pyproject.toml`
+through `tomllib.loads()`.
 
 That catches template bugs but **not** the gotchas above (imports
 succeed, syntax is valid, TOML parses — none of that exercises
-`fastapi_cli`'s path detection, a real Alembic run, a real worker
-process, or `docker compose`'s own config validation). Before shipping
-a change to this template, manually verify at least one combination
-end-to-end: `uv sync`, `uv run pytest`, and — if you touched migrations
-or the worker — a real `alembic revision --autogenerate` + `upgrade
-head`, and a real worker boot + task enqueue against **both** brokers.
-SQLite needs no external service and is enough for the DB/migrations
-check; the worker check needs a local Redis (`redis-server`) or
-RabbitMQ (`rabbitmq-server`), no Docker required for either. If you
-touched `compose/docker-compose.yml.jinja`, also run `docker compose
-config` (validates the file resolves without needing a build) and, disk
-and network permitting, a real `docker compose up --build`.
+`fastapi_cli`'s path detection, a real Alembic run, or a real worker
+process). Before shipping a change to this template, manually verify at
+least one combination end-to-end: `uv sync`, `uv run pytest`, and — if
+you touched migrations or the worker — a real `alembic revision
+--autogenerate` + `upgrade head`, and a real worker boot + task enqueue
+against **both** brokers. SQLite needs no external service and is
+enough for the DB/migrations check; the worker check needs a local
+Redis (`redis-server`) or RabbitMQ (`rabbitmq-server`), no Docker
+required for either.
 
 ## Adding a new option or layer
 

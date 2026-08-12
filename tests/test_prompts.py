@@ -191,39 +191,6 @@ def test_prompt_docker_no_remembered_value_defaults_false_non_interactive():
     assert prompts.prompt_docker(None, interactive=False, remembered=None) is False
 
 
-def test_prompt_compose_flag_skips_prompt(monkeypatch):
-    monkeypatch.setattr(questionary, "confirm", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not prompt")))
-    assert prompts.prompt_compose(True, docker=False, interactive=True) is True
-
-
-def test_prompt_compose_without_docker_defaults_false_without_prompting(monkeypatch):
-    monkeypatch.setattr(questionary, "confirm", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not prompt")))
-    assert prompts.prompt_compose(None, docker=False, interactive=True) is False
-
-
-def test_prompt_compose_non_interactive_defaults_false():
-    assert prompts.prompt_compose(None, docker=True, interactive=False) is False
-
-
-def test_prompt_compose_remembered_default_used_non_interactive():
-    assert prompts.prompt_compose(None, docker=True, interactive=False, remembered=True) is True
-
-
-def test_prompt_compose_interactive(monkeypatch):
-    monkeypatch.setattr(
-        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: True})()
-    )
-    assert prompts.prompt_compose(None, docker=True, interactive=True) is True
-
-
-def test_prompt_compose_cancelled_raises(monkeypatch):
-    monkeypatch.setattr(
-        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
-    )
-    with pytest.raises(FlintUserError):
-        prompts.prompt_compose(None, docker=True, interactive=True)
-
-
 def test_prompt_git_init_interactive(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: False})()
