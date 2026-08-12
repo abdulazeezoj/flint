@@ -54,6 +54,7 @@ def _select_enabled(
     entries: list[FrameworkMeta] | list[TemplateMeta],
     interactive: bool,
     not_found_label: str,
+    default_id: str | None = None,
 ) -> str:
     by_id = {e.id: e for e in entries}
 
@@ -68,8 +69,10 @@ def _select_enabled(
         return value
 
     enabled = [e for e in entries if e.enabled]
+    default = default_id if default_id in {e.id for e in enabled} else enabled[0].id
+
     if not interactive:
-        return enabled[0].id
+        return default
 
     choices = [
         questionary.Choice(
@@ -79,57 +82,72 @@ def _select_enabled(
         )
         for e in entries
     ]
-    answer = questionary.select(question, choices=choices).ask()
+    answer = questionary.select(question, choices=choices, default=default).ask()
     if answer is None:
         raise FlintUserError("Cancelled.")
     return answer
 
 
 def prompt_framework(
-    framework: str | None, frameworks: list[FrameworkMeta], interactive: bool
+    framework: str | None,
+    frameworks: list[FrameworkMeta],
+    interactive: bool,
+    default_id: str | None = None,
 ) -> str:
     return _select_enabled(
-        "Which framework?", framework, frameworks, interactive, "--framework"
+        "Which framework?", framework, frameworks, interactive, "--framework", default_id
     )
 
 
 def prompt_template(
-    template: str | None, templates: list[TemplateMeta], interactive: bool
+    template: str | None,
+    templates: list[TemplateMeta],
+    interactive: bool,
+    default_id: str | None = None,
 ) -> str:
     return _select_enabled(
-        "Which template?", template, templates, interactive, "--template"
+        "Which template?", template, templates, interactive, "--template", default_id
     )
 
 
-def prompt_docker(docker: bool | None, interactive: bool) -> bool:
+def prompt_docker(
+    docker: bool | None, interactive: bool, remembered: bool | None = None
+) -> bool:
     if docker is not None:
         return docker
+    default = remembered if remembered is not None else False
     if not interactive:
-        return False
-    answer = questionary.confirm("Add a Dockerfile?", default=False).ask()
+        return default
+    answer = questionary.confirm("Add a Dockerfile?", default=default).ask()
     if answer is None:
         raise FlintUserError("Cancelled.")
     return answer
 
 
-def prompt_git_init(git_init: bool | None, interactive: bool) -> bool:
+def prompt_git_init(
+    git_init: bool | None, interactive: bool, remembered: bool | None = None
+) -> bool:
     if git_init is not None:
         return git_init
+    default = remembered if remembered is not None else True
     if not interactive:
-        return True
-    answer = questionary.confirm("Initialize a git repository?", default=True).ask()
+        return default
+    answer = questionary.confirm("Initialize a git repository?", default=default).ask()
     if answer is None:
         raise FlintUserError("Cancelled.")
     return answer
 
 
-def prompt_install(install: bool | None, interactive: bool) -> bool:
+def prompt_install(
+    install: bool | None, interactive: bool, remembered: bool | None = None
+) -> bool:
     if install is not None:
         return install
+    default = remembered if remembered is not None else True
     if not interactive:
-        return True
+        return default
     answer = questionary.confirm(
-        "Install dependencies with uv now?", default=True
+        "Install dependencies with uv now?", default=default
     ).ask()
     if answer is None:
         raise FlintUserError("Cancelled.")
@@ -157,13 +175,23 @@ def _parse_bool_flag(key: str, raw: str) -> bool:
 
 
 def prompt_template_options(
-    template: TemplateMeta, provided: dict[str, str], interactive: bool
+    template: TemplateMeta,
+    provided: dict[str, str],
+    interactive: bool,
+    last: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve every option a template declares, in declared order.
 
     Declared order matters: a later option's ``when`` can only see
     already-resolved earlier options (PRODUCT_ARCH.md documents this as a
     template-authoring requirement).
+
+    ``last`` is a remembered ``{key: value}`` map (PRODUCT_FLOW.md §2/§4)
+    used as the fallback default in place of the template's own
+    ``default`` — for both the interactive prompt's preselection and the
+    non-interactive fallback value. A remembered value that's no longer
+    valid for this option (stale choice, wrong type) is silently ignored
+    in favor of the template's own default.
     """
     unknown = set(provided) - {option.key for option in template.options}
     if unknown:
@@ -171,6 +199,7 @@ def prompt_template_options(
             f"Unknown option(s) for {template.full_id}: {', '.join(sorted(unknown))}."
         )
 
+    last = last or {}
     resolved: dict[str, Any] = {}
     for option in template.options:
         if option.key in provided:
@@ -191,19 +220,26 @@ def prompt_template_options(
             resolved[option.key] = option.resolved_skip_value
             continue
 
+        remembered = last.get(option.key)
+        if option.type == "confirm":
+            default = remembered if isinstance(remembered, bool) else bool(option.default)
+        else:
+            valid_values = {choice["value"] for choice in option.choices}
+            default = remembered if remembered in valid_values else option.default
+
         if not interactive:
-            resolved[option.key] = option.default
+            resolved[option.key] = default
             continue
 
         if option.type == "confirm":
-            answer = questionary.confirm(option.label, default=bool(option.default)).ask()
+            answer = questionary.confirm(option.label, default=default).ask()
         else:
             choices = [
                 questionary.Choice(title=choice["label"], value=choice["value"])
                 for choice in option.choices
             ]
             answer = questionary.select(
-                option.label, choices=choices, default=option.default
+                option.label, choices=choices, default=default
             ).ask()
         if answer is None:
             raise FlintUserError("Cancelled.")

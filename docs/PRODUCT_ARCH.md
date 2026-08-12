@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.4: opinionated, Next.js-inspired generated-project layout)
+**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -51,6 +51,7 @@ flint/
 │       ├── naming.py            # project name -> slug/package_name validation
 │       ├── generator.py         # template renderer: options, layers, Jinja2
 │       ├── postgen.py           # git init, uv sync, summary printing
+│       ├── prefs.py             # ~/.flint/last.json — best-effort read/write
 │       ├── errors.py            # FlintError and friends -> exit codes
 │       └── templates/
 │           ├── fastapi/
@@ -75,11 +76,13 @@ flint/
 │           ├── flask/template.json                  # disabled stub — roadmap
 │           └── django/template.json                 # disabled stub — roadmap
 ├── tests/
+│   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
 │   ├── test_naming.py
 │   ├── test_generator.py
 │   ├── test_prompts.py
 │   ├── test_cli.py
 │   ├── test_postgen.py
+│   ├── test_prefs.py
 │   └── test_main.py
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -138,7 +141,7 @@ changes.
 
 - **`options`** (optional, template-scoped) — extra interactive prompts
   the template declares, resolved by `prompts.prompt_template_options`
-  (§5) in the order listed. Each is `type: "select"` (needs `choices`,
+  (§6) in the order listed. Each is `type: "select"` (needs `choices`,
   a list of `{value, label}`) or `type: "confirm"` (a y/n). `when` makes
   an option depend on an **earlier** option's resolved value — declaration
   order matters, since a `when` can only see already-resolved keys.
@@ -342,13 +345,114 @@ one-endpoint template doesn't need the rest of the `core/`/`routes/`/
 `tasks/` structure — a developer who's used one flint template shouldn't
 have to relearn where config lives in another.
 
-## 5. CLI flow → code mapping
+## 5. Remembered preferences (`prefs.py`)
+
+`~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
+thing that could work: one flat JSON file, no schema/migration
+machinery, best-effort I/O.
+
+```python
+PREFS_DIR = Path.home() / ".flint"
+PREFS_FILE = PREFS_DIR / "last.json"
+```
+
+Shape:
+
+```json
+{
+  "last_framework": "fastapi",
+  "last_templates": { "fastapi": "restapi" },
+  "templates": {
+    "fastapi/restapi": {
+      "options": { "database": "postgres", "orm": "sqlmodel", "...": "..." },
+      "docker": true,
+      "git_init": false,
+      "install": true
+    }
+  }
+}
+```
+
+- `last_framework` — the single most-recently-used framework.
+- `last_templates` — one entry per framework, so switching frameworks
+  and switching back doesn't lose what was last picked in each.
+- `templates` — keyed by `full_id` (`<framework>/<template>`, matching
+  `TemplateMeta.full_id`), holding everything specific to that exact
+  template: its resolved options plus `docker`/`git_init`/`install`.
+  Two different templates never share a bucket, so restapi's remembered
+  `database` choice can't leak into hello-world's option set (which
+  doesn't even have a `database` key).
+
+`prefs.py`'s public surface is five pure-ish functions, all defensive by
+construction rather than by caller-side checking:
+
+- `load_prefs() -> dict` / `save_prefs(prefs: dict) -> None` — the only
+  two functions that touch disk. `load_prefs` returns `{}` on *any*
+  failure (missing file, unreadable, invalid JSON, valid JSON that isn't
+  an object); `save_prefs` swallows any `OSError` (read-only home
+  directory, out of disk, etc.). Neither ever raises — a broken prefs
+  file must never be the reason `flint new` fails.
+- `get_last_framework(prefs)`, `get_last_template(prefs, framework_id)`,
+  `get_template_prefs(prefs, full_id)` — read accessors that double as
+  sanitizers: each validates the type of what it reads (e.g. a
+  hand-edited `"last_framework": 123` is treated as absent, not passed
+  through and crashing something downstream) so every *caller* gets
+  back either a well-typed value or `None`/`{}`, never has to
+  type-check itself. `get_template_prefs` in particular always returns
+  the full `{options, docker, git_init, install}` shape with `None`/`{}`
+  for anything missing or malformed — `cli.py` never branches on
+  whether a key exists.
+- `record_run(prefs, *, framework_id, template_id, full_id, options,
+  docker, git_init, install) -> dict` — pure function, returns an
+  *updated copy* (doesn't mutate its input) with `last_framework`/
+  `last_templates[framework_id]`/`templates[full_id]` all set; every
+  other framework/template's remembered data passes through untouched.
+
+**Staleness, not validation, is the operative concept.** There's no
+"is this remembered value still valid" check inside `prefs.py` itself —
+that's the caller's job, and it's the same job the caller already does
+for the template's own `default`:
+
+- `prompts._select_enabled(..., default_id)` — a remembered framework/
+  template id is used only if it's still present *and* `enabled`;
+  otherwise it falls back to the first enabled entry, exactly as if
+  nothing had been remembered.
+- `prompts.prompt_template_options(..., last)` — for a `select` option,
+  a remembered value is used only if it's still among `option.choices`;
+  for a `confirm` option, only if it's actually a `bool`. Otherwise, the
+  template's own `option.default` is used, same as no `last` at all.
+- `prompts.prompt_docker/prompt_git_init/prompt_install(..., remembered)`
+  — `None` (never recorded, or the whole `templates` entry is missing)
+  falls back to the existing hardcoded default (`False`/`True`/`True`
+  respectively); any actual `bool` is used as-is.
+
+This means a template's schema can change across Flint versions — an
+option removed, a select's choices narrowed — and an old `last.json`
+entry just silently stops applying to the parts that no longer make
+sense, without any version field or migration step.
+
+**Wiring, in `cli.py._run_new`:** `stored_prefs = prefs.load_prefs()` if
+`remember` (the `--remember/--no-remember` flag, default `True`) else
+`{}` — reusing the same "nothing remembered" path either way, so
+`remember=False` needs no separate code path through `prompts.py`.
+Every prompt call receives its slice of `stored_prefs` up front, resolved
+*before* prompting (so both the interactive default and the
+non-interactive fallback come from one lookup, per PRODUCT_FLOW.md §6).
+After `generator.render` succeeds, `prefs.record_run(...)` builds the
+updated dict and `prefs.save_prefs(...)` writes it — deliberately placed
+after rendering (so a failed/rolled-back generation never gets
+remembered) but before the git-init/install steps (whose success/failure
+doesn't change what was actually *requested*, which is what's worth
+remembering).
+
+## 6. CLI flow → code mapping
 
 | PRODUCT_FLOW step | Module |
 |---|---|
 | Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `flint` invokes `new` via Typer's default-command pattern) |
 | Interactive prompts | `prompts.py` — one function per step, each accepting a pre-supplied flag value and skipping its own prompt if set or if `--yes`/non-TTY. `prompt_framework`/`prompt_template` share a `_select_enabled` helper. |
-| Template option resolution | `prompts.prompt_template_options(template, provided, interactive)` — walks `template.options` in order, honoring an explicit `--option`/`-o key=value` override first (validated against the option's `type`/`choices`), else `when`-gating (§4), else prompting or defaulting. `cli.py` parses the repeatable `--option` flag into a `dict[str, str]` via `prompts.parse_option_flags` and rejects unknown keys before resolution. |
+| Template option resolution | `prompts.prompt_template_options(template, provided, interactive, last)` — walks `template.options` in order, honoring an explicit `--option`/`-o key=value` override first (validated against the option's `type`/`choices`), else `when`-gating (§4), else a remembered value (§5) if still valid, else prompting or defaulting. `cli.py` parses the repeatable `--option` flag into a `dict[str, str]` via `prompts.parse_option_flags` and rejects unknown keys before resolution. |
+| Remembered preferences | `prefs.py` (§5) — `cli.py` loads once per run and passes slices into each `prompts.*` call; records once, after a successful render. |
 | Name validation | `naming.py` — pure functions, no I/O, exhaustively unit tested |
 | Directory existence check | `generator.py` (single source of truth, both interactive and non-interactive paths call it) |
 | File generation | `generator.py` |
@@ -366,7 +470,7 @@ downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
 matches what was actually generated.
 
-## 6. Testing strategy
+## 7. Testing strategy
 
 `pytest` runs with `--cov=flint --cov-report=term-missing
 --cov-fail-under=100` by default (`[tool.pytest.ini_options]` in
@@ -425,6 +529,20 @@ the gate temporarily.
   `subprocess.run` monkeypatched: binary-not-found, success, and
   `CalledProcessError` for each; `print_summary`'s options-line
   presence/absence.
+- `test_prefs.py` — `load_prefs`/`save_prefs` round-tripping, a missing/
+  corrupt/non-object prefs file resolving to `{}`, an unwritable
+  `PREFS_DIR` not raising, every accessor's type-guarding (wrong type at
+  each level of the JSON → `None`/`{}`, not a crash), and `record_run`
+  both merging correctly and not mutating its input. `conftest.py`'s
+  `isolated_prefs_dir` autouse fixture monkeypatches `prefs.PREFS_DIR`/
+  `prefs.PREFS_FILE` to a per-test `tmp_path` subdirectory — this is what
+  keeps every test in the suite (not just `test_prefs.py`) from ever
+  touching the real `~/.flint`, and from leaking remembered state between
+  tests. `test_cli.py` layers end-to-end coverage on top: a full
+  remember → next-run-uses-it round trip through `CliRunner`,
+  `--no-remember` skipping both the read and the write, an explicit flag
+  still winning over a remembered value, and a stale remembered option
+  value falling back to the template's own default.
 - `test_main.py` — covers the `python -m flint` / `python -m flint.cli`
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
   plus a plain `import flint.__main__` to cover the guard's not-taken
@@ -436,10 +554,10 @@ the gate temporarily.
   against real SQLite *and* real PostgreSQL; boot the generated app plus
   a real Taskiq and a real Celery worker against real Redis and enqueue/
   execute an actual task end-to-end; `docker build`/`docker run` +a live
-  request. This is what caught the bugs in §6.1 below — `ast.parse()`
+  request. This is what caught the bugs in §7.1 below — `ast.parse()`
   and `uv sync` alone did not.
 
-### 6.1 Bugs this level of verification caught (and why lighter checks missed them)
+### 7.1 Bugs this level of verification caught (and why lighter checks missed them)
 
 Worth recording — each was invisible to `uv sync && pytest`, only
 surfaced by actually running the generated tooling:
@@ -480,7 +598,7 @@ surfaced by actually running the generated tooling:
   postgres-flavored `ast.parse()`/`tomllib` check has no way to know the
   test suite needs a package the production code doesn't.
 
-## 7. Versioning & release mechanics
+## 8. Versioning & release mechanics
 
 - `src/flint/__init__.py` holds `__version__`, single source of truth;
   `pyproject.toml`'s `version` is kept in sync manually for v0 (a
@@ -493,7 +611,7 @@ surfaced by actually running the generated tooling:
   manual `uv build` + tag, documented in the CHANGELOG's Unreleased →
   version-heading workflow.
 
-## 8. Explicitly deferred (tracked, not forgotten)
+## 9. Explicitly deferred (tracked, not forgotten)
 
 - Remote/pluggable template sources (would live behind the same
   `generator.render(framework_id, template_id, ...)` interface — the ids

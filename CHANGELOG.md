@@ -7,6 +7,30 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.5.0 — 2026-08-12
+
+### Added
+
+- **Remembered preferences** (`~/.flint/last.json`): after a successful
+  generation, Flint saves the last framework, the last template picked
+  per framework, and — per `<framework>/<template>` — the resolved
+  options plus `docker`/`git`/`install`. The next run uses these as the
+  new default: the interactive wizard preselects them, and a flagless
+  `--yes`/non-TTY run falls back to them instead of the template's own
+  hardcoded defaults. An explicit flag or `--option` always wins
+  regardless of what's remembered, and a stale remembered value (a
+  choice no longer valid for the current template) is silently ignored
+  in favor of the template's own default rather than erroring.
+- `--remember/--no-remember` flag (default on) to opt a single run out
+  of both reading and writing `~/.flint/last.json` — for anyone who
+  wants a fully stateless run.
+
+### Changed
+
+- Reading/writing `~/.flint/last.json` is entirely best-effort: a
+  missing, corrupt, or unwritable prefs file never fails or warns during
+  generation — it's silently treated as "nothing remembered yet."
+
 ## v0.4.0 — 2026-08-12
 
 ### Changed

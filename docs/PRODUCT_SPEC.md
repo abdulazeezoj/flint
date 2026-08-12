@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.4: opinionated, Next.js-inspired generated-project layout)
+**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
 
 ## 1. Vision
 
@@ -155,6 +155,7 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
 | FR8 | Every generated project includes an `AGENTS.md` with run/test commands, layout, and conventions — no flag, always on |
 | FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
+| FR11 | After a successful generation, Flint remembers the chosen framework, the chosen template per framework, and — per `<framework>/<template>` — the resolved options plus docker/git/install, in `~/.flint/last.json`. The next run uses these as the new default (both for what the wizard preselects and what a flagless non-interactive run falls back to); an explicit flag or `--option` always overrides a remembered value, and a stale remembered value (no longer valid for the current template) is silently ignored in favor of the template's own default. `--remember/--no-remember` (default on) opts a single run out of reading and writing this file |
 
 ## 9. Non-Functional Requirements
 
@@ -198,6 +199,10 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
   `tasks/` as "one file per resource/job" folders, `core/` for shared
   infrastructure (config, db session, redis client) — applied
   consistently to both `restapi` and `hello-world`'s optional config.
+- `v0.5.0` — remembered preferences: `~/.flint/last.json` persists the
+  last framework/template and per-template resolved options/docker/git/
+  install, used as the new default for both the wizard and non-interactive
+  runs; `--remember/--no-remember` opts out.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

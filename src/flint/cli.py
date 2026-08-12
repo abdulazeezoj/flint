@@ -16,7 +16,7 @@ import typer
 from rich.console import Console
 
 from flint import __version__
-from flint import generator, postgen, prompts
+from flint import generator, postgen, prefs, prompts
 from flint.errors import FlintUserError
 
 app = typer.Typer(add_completion=False, no_args_is_help=False)
@@ -45,6 +45,7 @@ def root(
             install=None,
             yes=False,
             force=False,
+            remember=True,
         )
 
 
@@ -96,6 +97,18 @@ def new(
             "--force", help="Generate even if the target directory already exists."
         ),
     ] = False,
+    remember: Annotated[
+        bool,
+        typer.Option(
+            "--remember/--no-remember",
+            help=(
+                "Remember these choices in ~/.flint/last.json as the "
+                "default for next time (framework/template + per-template "
+                "options, docker, git, install). Explicit flags/--option "
+                "always win regardless."
+            ),
+        ),
+    ] = True,
 ) -> None:
     """Generate a new project."""
     _run_new(
@@ -108,6 +121,7 @@ def new(
         install=install,
         yes=yes,
         force=force,
+        remember=remember,
     )
 
 
@@ -122,8 +136,10 @@ def _run_new(
     install: Optional[bool],
     yes: bool,
     force: bool,
+    remember: bool,
 ) -> None:
     interactive = sys.stdin.isatty() and not yes
+    stored_prefs = prefs.load_prefs() if remember else {}
 
     try:
         project_name, slug, package_name = prompts.prompt_project_name(name, interactive)
@@ -136,19 +152,32 @@ def _run_new(
             )
 
         frameworks = generator.list_frameworks()
-        framework_id = prompts.prompt_framework(framework, frameworks, interactive)
+        framework_id = prompts.prompt_framework(
+            framework,
+            frameworks,
+            interactive,
+            default_id=prefs.get_last_framework(stored_prefs),
+        )
 
         templates = generator.list_templates(framework_id)
-        template_id = prompts.prompt_template(template, templates, interactive)
+        template_id = prompts.prompt_template(
+            template,
+            templates,
+            interactive,
+            default_id=prefs.get_last_template(stored_prefs, framework_id),
+        )
 
         chosen_template = generator.get_template(framework_id, template_id)
+        remembered = prefs.get_template_prefs(stored_prefs, chosen_template.full_id)
 
         provided_options = prompts.parse_option_flags(option)
         resolved_options = prompts.prompt_template_options(
-            chosen_template, provided_options, interactive
+            chosen_template, provided_options, interactive, last=remembered["options"]
         )
 
-        docker_requested = prompts.prompt_docker(docker, interactive)
+        docker_requested = prompts.prompt_docker(
+            docker, interactive, remembered=remembered["docker"]
+        )
         if docker_requested and not chosen_template.supports_docker:
             console.print(
                 f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
@@ -159,8 +188,8 @@ def _run_new(
         if interactive:
             console.print("Using uv to manage dependencies.")
 
-        git_init = prompts.prompt_git_init(git, interactive)
-        install_now = prompts.prompt_install(install, interactive)
+        git_init = prompts.prompt_git_init(git, interactive, remembered=remembered["git_init"])
+        install_now = prompts.prompt_install(install, interactive, remembered=remembered["install"])
 
         answers = generator.Answers(
             project_name=project_name,
@@ -174,6 +203,20 @@ def _run_new(
             options=resolved_options,
         )
         created = generator.render(framework_id, template_id, target_dir, answers, force=force)
+
+        if remember:
+            prefs.save_prefs(
+                prefs.record_run(
+                    stored_prefs,
+                    framework_id=framework_id,
+                    template_id=template_id,
+                    full_id=chosen_template.full_id,
+                    options=resolved_options,
+                    docker=docker_requested,
+                    git_init=git_init,
+                    install=install_now,
+                )
+            )
 
         git_ok = postgen.git_init(target_dir) if git_init else False
         installed_ok = postgen.install_dependencies(target_dir) if install_now else False

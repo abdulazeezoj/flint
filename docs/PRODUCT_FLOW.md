@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.4: opinionated generated-project layout)
+**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -15,6 +15,7 @@ flow depends on.
 | `uvx flint` / `flint` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
 | `flint new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
 | `flint new NAME --framework fastapi --template restapi -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
+| `flint new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.flint/last.json` for this run (§6). |
 | `flint --version` | Prints version, exits. |
 | `flint --help` / `flint new --help` | Prints usage, exits. |
 
@@ -26,6 +27,13 @@ flow depends on.
 The wizard is a short, linear sequence. Each step shows a default in
 brackets; pressing Enter accepts it. Arrow-key select lists are used for
 choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
+
+Where noted below, a step's default isn't always the template's own
+hardcoded default — if `~/.flint/last.json` remembers a value for that
+step (from a previous successful run) and it's still valid, that
+remembered value is preselected instead. See §6 for the full mechanism.
+This never changes what gets *asked*, only what's pre-highlighted/
+falls back to.
 
 ```
 1. Project name
@@ -49,6 +57,8 @@ choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
    - v0 ships FastAPI only. Other entries are shown but disabled/greyed
      to signal the roadmap (create-next-app does the same for future
      options) — selecting one prints "coming soon" and re-prompts.
+   - Preselected entry: the remembered last framework (§6), if it's
+     still enabled; otherwise the first enabled entry.
 
 4. Template (scoped to the chosen framework)
    ? Which template? › (Use arrow keys)
@@ -58,6 +68,9 @@ choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
      any future disabled template — both currently ship enabled. Each
      framework has its own template list — picking a different
      framework in step 3 changes what shows up here.
+   - Preselected entry: the remembered last template *for the chosen
+     framework* (§6), if still enabled; otherwise the first enabled
+     entry.
 
 5. Template options — declared by the chosen template, asked in the
    order it declares them; entirely different per template (Flint's own
@@ -65,7 +78,11 @@ choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
    Some options depend on an earlier one and are silently skipped
    (resolved to a documented value) rather than asked when their
    dependency isn't satisfied — e.g. restapi's ORM prompt never appears
-   if "no database" was chosen.
+   if "no database" was chosen. Each option's default below is the
+   template's own declared default; a remembered value for this
+   `<framework>/<template>` (§6) is preselected instead when one exists
+   and is still valid for that option (e.g. still among a select's
+   choices).
 
    For restapi:
    ? Database? › None / SQLite / PostgreSQL           (default: SQLite)
@@ -85,22 +102,24 @@ choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
 7. Add a Dockerfile?
    ? Add a Dockerfile? (y/N) ›
    - Default **no** (unlike git/install below, this one opts in rather
-     than out — most quick scaffolds don't need a container). If yes,
-     and the chosen framework/template doesn't have Docker support yet,
-     Flint warns and continues without one rather than failing.
+     than out — most quick scaffolds don't need a container), unless
+     this `<framework>/<template>` remembers a different value (§6). If
+     yes, and the chosen framework/template doesn't have Docker support
+     yet, Flint warns and continues without one rather than failing.
 
 8. Initialize a git repository?
    ? Initialize a git repository? (Y/n) ›
-   - Default yes. If yes: `git init` + initial commit after files are
-     written. If git is not installed/available, warn and continue
-     (non-fatal).
+   - Default yes, unless remembered otherwise (§6). If yes: `git init` +
+     initial commit after files are written. If git is not installed/
+     available, warn and continue (non-fatal).
 
 9. Install dependencies now?
    ? Install dependencies with uv now? (Y/n) ›
-   - Default yes. If yes: runs `uv sync` in the generated directory
-     after writing files, with a spinner. If uv is unavailable or the
-     install fails, the project is still left in a valid, runnable state
-     (user can `uv sync` manually) — this never rolls back generation.
+   - Default yes, unless remembered otherwise (§6). If yes: runs `uv
+     sync` in the generated directory after writing files, with a
+     spinner. If uv is unavailable or the install fails, the project is
+     still left in a valid, runnable state (user can `uv sync`
+     manually) — this never rolls back generation.
 
 10. Generation
    - Renders the template to disk (see PRODUCT_ARCH.md for the
@@ -138,11 +157,14 @@ Triggered by either passing `--yes`, or by Flint detecting stdin is not a
 TTY (e.g. running in CI). In that mode:
 
 - Every prompt above becomes: use the flag/`--option` if given, else use
-  the documented default, **never block on input**.
+  the remembered value if one exists and is still valid (§6), else use
+  the documented default — **never block on input**.
 - Framework defaults to the first enabled framework; template defaults to
   the first enabled template within it; each template option defaults to
   its own declared default (or its `skip_value`, if its dependency isn't
-  satisfied — same rule as interactive mode, just without the prompt).
+  satisfied — same rule as interactive mode, just without the prompt) —
+  each of these is superseded by a remembered value first, per the rule
+  above.
 - If a required decision has no safe default and no flag was given (there
   are none in v0 — every prompt has a default), Flint would exit `1` with
   an actionable error rather than hang. This rule exists for future
@@ -166,7 +188,46 @@ TTY (e.g. running in CI). In that mode:
 | `git` not found, git-init requested | Warn, skip git step, still exit 0. |
 | Unexpected exception during generation | Roll back (delete partially-written target directory) and exit 2 with the error. Generation is all-or-nothing from the user's perspective. |
 
-## 6. Post-generation experience
+## 6. Remembered preferences (`~/.flint/last.json`)
+
+After a **successful** generation (files written; git/install steps can
+still fail independently without affecting this), Flint records:
+
+- The chosen framework, as the new "last framework."
+- The chosen template, as the new "last template" *for that framework*
+  specifically (picking `fastapi` again later remembers `restapi`
+  independently of whatever's remembered for a future `flask`).
+- For that exact `<framework>/<template>`: every resolved template
+  option, plus whether `--docker`/`--git`/`--install` were used.
+
+This is stored in `~/.flint/last.json`. On the *next* run:
+
+- The wizard preselects the remembered framework/template/options/docker/
+  git/install wherever noted in §2 above, instead of the template's own
+  hardcoded defaults.
+- A flagless non-interactive run (§4) falls back to the same remembered
+  values instead of the hardcoded defaults.
+- An explicit flag or `--option` **always** wins over a remembered value,
+  same as it always wins over a hardcoded default — remembering only
+  changes what happens when nothing else specifies a value.
+- A remembered value that's no longer valid (e.g. a select option whose
+  choices changed, or a stale key from an older Flint version) is
+  silently ignored in favor of the template's own default — never an
+  error, never a crash.
+
+`--remember/--no-remember` (default **on**) controls this per run: with
+`--no-remember`, Flint neither reads nor writes `~/.flint/last.json` for
+that invocation, as if the file didn't exist.
+
+Reading and writing this file is entirely best-effort: if it's missing,
+unreadable, not valid JSON, or the directory can't be created/written to
+(e.g. a read-only home directory), Flint silently proceeds as if nothing
+were remembered — this never fails or warns during generation. There is
+no version/schema field; an entry from an older Flint that no longer
+makes sense for the current template just falls through the same
+staleness handling as any other invalid remembered value.
+
+## 7. Post-generation experience
 
 The generated project's own README (written by the template, not typed
 by the user) always contains, at minimum:
@@ -182,7 +243,7 @@ regardless of which options were chosen. This is the same information
 printed in the CLI summary, so the user never has to re-discover it
 later.
 
-## 7. Example transcript (interactive, restapi with a real stack)
+## 8. Example transcript (interactive, restapi with a real stack)
 
 ```
 $ uvx flint
@@ -238,7 +299,7 @@ Next steps:
 Then open http://127.0.0.1:8000
 ```
 
-## 8. Example transcript (non-interactive / CI, hello-world)
+## 9. Example transcript (non-interactive / CI, hello-world)
 
 ```
 $ flint new my-api --framework fastapi --template hello-world --git --install --yes

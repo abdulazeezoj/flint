@@ -105,6 +105,51 @@ def test_prompt_template_non_interactive_picks_first_enabled():
     assert result == "hello-world"
 
 
+def test_prompt_framework_remembered_default_used_interactive(monkeypatch):
+    seen = {}
+
+    def fake_select(question, choices, default):
+        seen["default"] = default
+        return type("Q", (), {"ask": lambda self: default})()
+
+    monkeypatch.setattr(questionary, "select", fake_select)
+    result = prompts.prompt_framework(
+        None, [FASTAPI, FLASK_SOON], interactive=True, default_id="fastapi"
+    )
+    assert result == "fastapi"
+    assert seen["default"] == "fastapi"
+
+
+def test_prompt_framework_remembered_default_used_non_interactive():
+    result = prompts.prompt_framework(
+        None, [FASTAPI, FLASK_SOON], interactive=False, default_id="fastapi"
+    )
+    assert result == "fastapi"
+
+
+def test_prompt_framework_stale_remembered_default_falls_back_to_first_enabled():
+    # "flask" is remembered but disabled — must not be selectable just
+    # because it was the last choice.
+    result = prompts.prompt_framework(
+        None, [FASTAPI, FLASK_SOON], interactive=False, default_id="flask"
+    )
+    assert result == "fastapi"
+
+
+def test_prompt_framework_unknown_remembered_default_falls_back_to_first_enabled():
+    result = prompts.prompt_framework(
+        None, [FASTAPI, FLASK_SOON], interactive=False, default_id="does-not-exist"
+    )
+    assert result == "fastapi"
+
+
+def test_prompt_template_remembered_default_used_non_interactive():
+    result = prompts.prompt_template(
+        None, [HELLO_WORLD, SOON_TEMPLATE], interactive=False, default_id="hello-world"
+    )
+    assert result == "hello-world"
+
+
 def test_prompt_docker_interactive_default_false(monkeypatch):
     seen = {}
 
@@ -126,6 +171,26 @@ def test_prompt_docker_non_interactive_defaults_false():
     assert prompts.prompt_docker(None, interactive=False) is False
 
 
+def test_prompt_docker_remembered_default_used_interactive(monkeypatch):
+    seen = {}
+
+    def fake_confirm(question, default):
+        seen["default"] = default
+        return type("Q", (), {"ask": lambda self: default})()
+
+    monkeypatch.setattr(questionary, "confirm", fake_confirm)
+    assert prompts.prompt_docker(None, interactive=True, remembered=True) is True
+    assert seen["default"] is True
+
+
+def test_prompt_docker_remembered_default_used_non_interactive():
+    assert prompts.prompt_docker(None, interactive=False, remembered=True) is True
+
+
+def test_prompt_docker_no_remembered_value_defaults_false_non_interactive():
+    assert prompts.prompt_docker(None, interactive=False, remembered=None) is False
+
+
 def test_prompt_git_init_interactive(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: False})()
@@ -133,11 +198,23 @@ def test_prompt_git_init_interactive(monkeypatch):
     assert prompts.prompt_git_init(None, interactive=True) is False
 
 
+def test_prompt_git_init_remembered_default_used_non_interactive():
+    assert prompts.prompt_git_init(None, interactive=False, remembered=False) is False
+
+
+def test_prompt_git_init_no_remembered_value_defaults_true_non_interactive():
+    assert prompts.prompt_git_init(None, interactive=False, remembered=None) is True
+
+
 def test_prompt_install_interactive(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: True})()
     )
     assert prompts.prompt_install(None, interactive=True) is True
+
+
+def test_prompt_install_remembered_default_used_non_interactive():
+    assert prompts.prompt_install(None, interactive=False, remembered=False) is False
 
 
 def test_prompt_cancelled_raises(monkeypatch):
@@ -325,6 +402,57 @@ def test_prompt_template_options_cancelled_raises(monkeypatch):
     )
     with pytest.raises(FlintUserError):
         prompts.prompt_template_options(WIDGET_TEMPLATE, {}, interactive=True)
+
+
+def test_prompt_template_options_remembered_value_used_non_interactive():
+    resolved = prompts.prompt_template_options(
+        WIDGET_TEMPLATE, {}, interactive=False, last={"database": "none"}
+    )
+    # database's remembered "none" is used, which then makes orm/migrations
+    # resolve to their skip_value rather than sqlite's own defaults.
+    assert resolved == {"database": "none", "orm": "none", "migrations": False}
+
+
+def test_prompt_template_options_remembered_confirm_value_used_non_interactive():
+    resolved = prompts.prompt_template_options(
+        WIDGET_TEMPLATE,
+        {},
+        interactive=False,
+        last={"database": "sqlite", "orm": "sqlmodel", "migrations": False},
+    )
+    assert resolved["migrations"] is False
+
+
+def test_prompt_template_options_stale_remembered_value_falls_back_to_default():
+    resolved = prompts.prompt_template_options(
+        WIDGET_TEMPLATE, {}, interactive=False, last={"database": "mysql"}
+    )
+    assert resolved["database"] == "sqlite"
+
+
+def test_prompt_template_options_remembered_value_used_as_interactive_default(monkeypatch):
+    seen = {}
+
+    def fake_select(question, choices, default):
+        seen["default"] = default
+        return type("Q", (), {"ask": lambda self: default})()
+
+    monkeypatch.setattr(questionary, "select", fake_select)
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: k["default"]})()
+    )
+    resolved = prompts.prompt_template_options(
+        WIDGET_TEMPLATE, {}, interactive=True, last={"database": "none"}
+    )
+    assert seen["default"] == "none"
+    assert resolved["database"] == "none"
+
+
+def test_prompt_template_options_explicit_flag_wins_over_remembered():
+    resolved = prompts.prompt_template_options(
+        WIDGET_TEMPLATE, {"database": "sqlite"}, interactive=False, last={"database": "none"}
+    )
+    assert resolved["database"] == "sqlite"
 
 
 def test_prompt_template_options_real_restapi_template_default_flow():

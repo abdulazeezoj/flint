@@ -5,7 +5,7 @@ import questionary
 import typer
 from typer.testing import CliRunner
 
-from flint import __version__, cli, generator, postgen
+from flint import __version__, cli, generator, postgen, prefs
 from flint.cli import app
 
 runner = CliRunner()
@@ -147,6 +147,7 @@ def test_run_new_interactive_full_flow(tmp_path: Path, monkeypatch, capsys):
         install=None,
         yes=False,
         force=False,
+        remember=True,
     )
 
     out = capsys.readouterr().out
@@ -335,6 +336,142 @@ def test_new_option_malformed_flag_errors(tmp_path: Path, monkeypatch):
     )
     assert result.exit_code == 1
     assert "key=value" in result.stdout
+
+
+def test_new_remembers_choices_across_runs(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "first-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "-o",
+            "database=postgres",
+            "-o",
+            "orm=sqlalchemy",
+            "--docker",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert prefs.PREFS_FILE.is_file()
+
+    # Second run supplies no framework/template/options at all — should
+    # fall back to what was just remembered, not the template's own
+    # hardcoded defaults (sqlite/sqlmodel/no docker).
+    result2 = runner.invoke(
+        app, ["new", "second-api", "--no-git", "--no-install", "--yes"]
+    )
+    assert result2.exit_code == 0, result2.stdout
+    assert "Options: database=postgres, orm=sqlalchemy" in result2.stdout
+    assert (tmp_path / "second-api" / "Dockerfile").is_file()
+
+
+def test_new_no_remember_does_not_persist_or_read(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "first-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "-o",
+            "database=postgres",
+            "--no-git",
+            "--no-install",
+            "--yes",
+            "--no-remember",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert not prefs.PREFS_FILE.exists()
+
+    result2 = runner.invoke(
+        app,
+        [
+            "new",
+            "second-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert "Options: database=sqlite" in result2.stdout
+
+
+def test_new_remembered_defaults_never_override_explicit_flags(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(
+        app,
+        [
+            "new",
+            "first-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "-o",
+            "database=postgres",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    result2 = runner.invoke(
+        app,
+        [
+            "new",
+            "second-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "-o",
+            "database=sqlite",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result2.exit_code == 0, result2.stdout
+    assert "Options: database=sqlite" in result2.stdout
+
+
+def test_new_stale_remembered_option_falls_back_to_template_default(tmp_path: Path, monkeypatch):
+    # A remembered value that's no longer valid for an option (e.g. hand-
+    # edited or from a since-changed template) must be ignored rather
+    # than raising or silently corrupting generation.
+    monkeypatch.chdir(tmp_path)
+    prefs.save_prefs(
+        {
+            "last_framework": "fastapi",
+            "last_templates": {"fastapi": "restapi"},
+            "templates": {
+                "fastapi/restapi": {
+                    "options": {"database": "mysql"},
+                    "docker": False,
+                    "git_init": False,
+                    "install": False,
+                }
+            },
+        }
+    )
+    result = runner.invoke(app, ["new", "my-api", "--no-git", "--no-install", "--yes"])
+    assert result.exit_code == 0, result.stdout
+    assert "Options: database=sqlite" in result.stdout
 
 
 def test_new_prints_options_summary_line(tmp_path: Path, monkeypatch):

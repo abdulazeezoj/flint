@@ -64,6 +64,13 @@ choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
 --no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
 (accept all defaults), `--force` (generate into a non-empty dir).
 
+Flint remembers your last framework/template and per-template choices in
+`~/.flint/last.json`, and uses them as the new default the next time you
+run it — both for what the wizard preselects and for what a flagless
+`--yes`/CI run falls back to. An explicit flag or `--option` always wins
+regardless of what's remembered. Pass `--no-remember` to opt a single run
+out of both reading and writing that file.
+
 ## What v0 ships
 
 A project is always generated from a `<framework>/<template>` pair — the
