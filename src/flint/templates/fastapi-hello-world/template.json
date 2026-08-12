@@ -1,0 +1,6 @@
+{
+  "id": "fastapi-hello-world",
+  "label": "FastAPI — Hello World",
+  "description": "A minimal FastAPI app with a single Hello World endpoint, managed with uv.",
+  "enabled": true
+}
