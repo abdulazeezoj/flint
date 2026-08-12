@@ -19,8 +19,8 @@ uv run pytest
 ## Configuration
 
 Settings are loaded from `.env` via `pydantic-settings` (see
-`src/{{ package_name }}/core/config.py`). Copy `.env` and adjust values
-as needed — it's already git-ignored.
+`src/{{ package_name }}/core/config.py`). `.env` is already git-ignored;
+`.env.example` is the checked-in reference of what vars exist.
 {% endif %}
 {% if docker %}
 ## Docker
@@ -38,6 +38,7 @@ tests/                    tests
 AGENTS.md                 project context for AI coding agents
 {% if config %}
 .env                      local configuration (git-ignored)
+.env.example              checked-in reference of what vars exist
 {% endif %}
 {% if docker %}
 Dockerfile                container build

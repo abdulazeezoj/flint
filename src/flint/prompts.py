@@ -124,6 +124,27 @@ def prompt_docker(
     return answer
 
 
+def prompt_compose(
+    compose: bool | None, docker: bool, interactive: bool, remembered: bool | None = None
+) -> bool:
+    """``docker`` is the already-resolved value of ``--docker`` — Compose
+    only makes sense on top of a Dockerfile, and by the time this runs
+    that's been decided (see PRODUCT_ARCH.md §5 for why this can't be a
+    template-declared option with a `when` on `docker`: template options
+    resolve *before* `docker` is even asked)."""
+    if compose is not None:
+        return compose
+    if not docker:
+        return False
+    default = remembered if remembered is not None else False
+    if not interactive:
+        return default
+    answer = questionary.confirm("Add Docker Compose?", default=default).ask()
+    if answer is None:
+        raise FlintUserError("Cancelled.")
+    return answer
+
+
 def prompt_git_init(
     git_init: bool | None, interactive: bool, remembered: bool | None = None
 ) -> bool:

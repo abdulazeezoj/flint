@@ -1,7 +1,7 @@
 {
   "id": "rest-api",
   "label": "REST API",
-  "description": "A layered FastAPI REST API with pydantic-settings, and your choice of database/ORM, migrations, background worker, and Redis.",
+  "description": "A layered FastAPI REST API with pydantic-settings, and your choice of database/ORM, migrations, background worker (Redis or RabbitMQ), and Redis caching.",
   "enabled": true,
   "options": [
     {
@@ -47,16 +47,29 @@
       ]
     },
     {
+      "key": "broker",
+      "label": "Message broker",
+      "type": "select",
+      "default": "redis",
+      "choices": [
+        { "value": "redis", "label": "Redis" },
+        { "value": "rabbitmq", "label": "RabbitMQ" }
+      ],
+      "when": { "worker": ["taskiq", "celery"] },
+      "skip_value": "none"
+    },
+    {
       "key": "redis",
       "label": "Add Redis (caching)?",
       "type": "confirm",
       "default": false,
-      "when": { "worker": ["none"] },
+      "when": { "broker": ["rabbitmq", "none"] },
       "skip_value": true
     }
   ],
   "layers": [
     { "dir": "docker", "when": { "docker": [true] } },
+    { "dir": "compose", "when": { "compose": [true] } },
     { "dir": "db-sqlmodel", "when": { "orm": ["sqlmodel"] } },
     { "dir": "db-sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
     { "dir": "migrations-sqlmodel", "when": { "orm": ["sqlmodel"], "migrations": [true] } },

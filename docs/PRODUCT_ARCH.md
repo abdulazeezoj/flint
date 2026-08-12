@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -57,24 +57,25 @@ flint/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
 │           │   ├── hello-world/
-│           │   │   ├── template.json               # options: [config]; layers: [docker, config]
+│           │   │   ├── template.json               # options: [config]; layers: [docker, compose, config]
 │           │   │   ├── README.md                   # maintainer docs (not rendered)
 │           │   │   ├── files/                      # always rendered
 │           │   │   ├── docker/                     # rendered iff --docker
+│           │   │   ├── compose/                    # rendered iff --compose (needs --docker)
 │           │   │   └── config/                     # rendered iff config option is true
 │           │   └── rest-api/
-│           │       ├── template.json               # options: [database, orm, migrations, worker, redis]
-│           │       ├── files/                       # always rendered — main.py, core/config.py, schemas.py, routes/items.py (in-memory)
+│           │       ├── template.json               # options: [database, orm, migrations, worker, broker, redis]
+│           │       ├── files/                       # always rendered — main.py, core/config.py, schemas.py, routes/items.py (in-memory), env.jinja (-> .env + .env.example)
 │           │       ├── docker/                       # rendered iff --docker
+│           │       ├── compose/                       # rendered iff --compose (needs --docker)
 │           │       ├── db-sqlmodel/                   # rendered iff orm == sqlmodel; overrides routes/items.py, adds core/db.py + models.py
 │           │       ├── db-sqlalchemy/                 # rendered iff orm == sqlalchemy; same shape, SQLAlchemy Core/ORM
 │           │       ├── migrations-sqlmodel/            # rendered iff migrations && orm == sqlmodel
 │           │       ├── migrations-sqlalchemy/          # rendered iff migrations && orm == sqlalchemy
-│           │       ├── worker-taskiq/                   # rendered iff worker == taskiq; worker.py + tasks/example.py
-│           │       ├── worker-celery/                   # rendered iff worker == celery; same shape, Celery
-│           │       └── redis/                            # rendered iff redis is true (requested or implied); core/redis.py
-│           ├── flask/template.json                  # disabled stub — roadmap
-│           └── django/template.json                 # disabled stub — roadmap
+│           │       ├── worker-taskiq/                   # rendered iff worker == taskiq; worker.py (broker-aware) + tasks/example.py
+│           │       ├── worker-celery/                   # rendered iff worker == celery; same shape, Celery, same broker-awareness
+│           │       └── redis/                            # rendered iff redis is true (requested, or implied when broker == "redis"); core/redis.py
+│           └── flask/template.json                  # disabled stub — next up on the roadmap
 ├── tests/
 │   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
 │   ├── test_naming.py
@@ -96,11 +97,11 @@ Templates are organized two levels deep: `templates/<framework>/<template>/`
 (PRODUCT_SPEC §3 defines the framework/template/option distinction). A
 **framework** directory (`templates/fastapi/`) has its own
 `template.json` and one subdirectory per **template** variant
-(`hello-world/`, `rest-api/`), each with its own `template.json`. Disabled
-frameworks (`flask`, `django`) are stubs — just a `template.json` with
-`"enabled": false`, no `files/` — that exist purely so the wizard/CLI can
-list them as "coming soon" (PRODUCT_FLOW §2 step 3) without any code
-changes.
+(`hello-world/`, `rest-api/`), each with its own `template.json`. A
+disabled framework (`flask`, for now) is a stub — just a `template.json`
+with `"enabled": false`, no `files/` — that exists purely so the
+wizard/CLI can list it as "coming soon" (PRODUCT_FLOW §2 step 3) without
+any code changes.
 
 ### `template.json` schema
 
@@ -150,9 +151,12 @@ changes.
   back to `default` if `skip_value` is omitted). This is how rest-api's
   `orm`/`migrations` collapse to `"none"`/`false` when no database was
   chosen, and how `redis` resolves to `true` — implied, not asked — the
-  moment a worker is chosen (its `when` is `{"worker": ["none"]}`; picking
-  any other worker makes that not match, triggering `skip_value: true`).
-  `generator.when_matches(when, values)` implements the predicate itself,
+  moment `broker` resolves to `"redis"` (its `when` is `{"broker":
+  ["rabbitmq", "none"]}`; `broker` itself resolving to `"redis"` means
+  that `when` doesn't match, triggering `skip_value: true`). §4.1 works
+  through this exact chain in full, including why it's gated on `broker`
+  rather than `worker`. `generator.when_matches(when, values)` implements
+  the predicate itself,
   shared between option resolution and layer gating below — an empty/
   absent `when` always matches.
 - **`layers`** (optional) — extra directories rendered *in addition to*
@@ -205,6 +209,7 @@ class Answers(BaseModel):
     git_init: bool
     install: bool
     docker: bool
+    compose: bool            # needs docker; see §4.5 for why it's fixed, not a template option
     options: dict[str, Any]  # e.g. {"database": "sqlite", "orm": "sqlmodel", ...}
 ```
 
@@ -229,27 +234,71 @@ class Answers(BaseModel):
 
 This keeps "add a new template" to: add a directory + `template.json`
 (+ optional layer directories), no changes to `generator.py`. Adding a
-new *framework* is the same, one level up. Adding Flask/Django for real
-is purely a content change (swap `enabled: false` → `true` and fill in
+new *framework* is the same, one level up. Adding Flask for real is
+purely a content change (swap `enabled: false` → `true` and fill in
 `files/`), not an architecture change.
 
-### 4.1 A worked example: rest-api's `redis` option
+### 4.1 A worked example: rest-api's `broker`/`redis` options
 
-Three moving pieces, all data-driven:
+Four moving pieces, all data-driven, and a chain that's worth tracing in
+full since it's the least obvious `when`/`skip_value` interaction in the
+codebase:
 
-1. `template.json`'s `redis` option: `"when": {"worker": ["none"]},
-   "skip_value": true`. Read as: *ask about Redis only if no worker was
-   chosen; if a worker **was** chosen, Redis is implied — resolve to
-   `true` without asking.*
-2. `template.json`'s `redis` **layer**: `{"dir": "redis", "when":
-   {"redis": [true]}}`. Once the option above resolves (asked or
-   implied), the layer gate just checks the final value — it doesn't
-   care *why* `redis` ended up `true`.
-3. `redis/src/{{package_name}}/core/redis.py.jinja` — the one new file
+1. `template.json`'s `broker` option: `"when": {"worker": ["taskiq",
+   "celery"]}, "skip_value": "none"`. Read as: *ask which broker only if
+   a worker was chosen; with no worker there's nothing to broker,
+   resolve to `"none"` without asking.*
+2. `template.json`'s `redis` option: `"when": {"broker": ["rabbitmq",
+   "none"]}, "skip_value": true`. Read as: *ask about Redis (for
+   caching) whenever the broker is **not** `"redis"` — i.e. either no
+   worker was chosen (`broker` resolved to `"none"`) or RabbitMQ was
+   picked. The moment `broker` resolves to `"redis"`, a Redis instance
+   is already needed for the worker, so the caching question is skipped
+   and implied `true`.* This is deliberately **not** `"when": {"worker":
+   ["none"]}` (the v0.3–v0.6 shape) — that older rule conflated "a
+   worker was chosen" with "the worker uses Redis," which broke the
+   moment RabbitMQ became a second broker choice: picking RabbitMQ would
+   have silently implied Redis too, for no reason. Gating on `broker`
+   instead of `worker` is what lets `redis` mean exactly one thing:
+   *is there a Redis instance this app can reach*, however that came to
+   be true.
+3. `template.json`'s `redis` **layer**: `{"dir": "redis", "when":
+   {"redis": [true]}}` — unchanged by the above. Once the `redis` option
+   resolves (asked or implied), the layer gate just checks the final
+   value; it doesn't care *why* `redis` ended up `true`.
+4. `redis/src/{{package_name}}/core/redis.py.jinja` — the one new file
    that layer adds (an async Redis client). It doesn't touch `main.py`,
    deliberately, so it can't conflict with the `worker-*` layers, which
    *do* override `main.py` (to add lifespan wiring and a demo
-   task-enqueue endpoint).
+   task-enqueue endpoint). There's no equivalent `broker-rabbitmq/`
+   layer/client — RabbitMQ has no app-level use the way Redis does for
+   caching, it's purely internal to `worker.py` (`taskiq-aio-pika` /
+   Celery's built-in AMQP transport), so the RabbitMQ-specific content
+   is just a few `{% if broker == "rabbitmq" %}` branches inside
+   `worker.py.jinja`/`config.py.jinja`/`env.jinja`/`pyproject.toml.jinja`
+   — not enough surface to justify a layer.
+
+One consequence worth naming: because `redis` and `broker` are
+independent options, an explicit `-o broker=redis -o redis=false` is a
+legal (if self-contradictory) combination — explicit `--option` values
+always win over `when`/`skip_value` resolution, per option, with no
+cross-option consistency check. `compose/docker-compose.yml.jinja` has
+to defend against this specific case (§4.1.1 below) rather than assume
+`redis` is always `true` whenever `broker == "redis"`.
+
+#### 4.1.1 Compose gotcha: don't `depends_on` a service that isn't there
+
+`compose/docker-compose.yml.jinja`'s `worker` service originally gated
+its `depends_on: redis` line on `broker == "redis"` alone. That's wrong:
+the compose file's `redis` *service* is gated on the `redis` variable
+(so it lines up with the `app` service's own `environment`/`depends_on`,
+and with the `redis/` layer's own gate above) — and per the
+self-contradictory case just described, `broker == "redis"` and `redis
+== true` aren't actually guaranteed to agree. `docker compose up` fails
+outright on config validation if a service's `depends_on` names a
+service that isn't defined in the file, so the fix is to gate that one
+line on `broker == "redis" and redis` together — both "this worker
+needs Redis" and "a Redis service actually exists to depend on."
 
 ### 4.2 When to use a layer vs. an inline `{% if %}`
 
@@ -344,6 +393,48 @@ consistency (`core/config.py`, not top-level `config.py`) even though a
 one-endpoint template doesn't need the rest of the `core/`/`routes/`/
 `tasks/` structure — a developer who's used one flint template shouldn't
 have to relearn where config lives in another.
+
+### 4.5 Fixed CLI fields vs. template options — why `compose` can't be one
+
+`docker`/`git_init`/`install`/`compose` are fixed fields on `Answers`
+(§4, `Answers.context()`), resolved by their own `prompts.prompt_*`
+function and their own CLI flag — never a `template.json`-declared
+option. `database`/`orm`/`worker`/`broker`/`redis`/`config` all *are*
+template options. The line between the two isn't "which one is more
+important" — it's **when each is resolved**, and that's a hard
+constraint, not a style choice.
+
+`cli.py`'s `_run_new` resolves things in this order: template options
+(via `prompts.prompt_template_options`) → `docker` → `compose` → `git`
+→ `install`. A template option's `when` can only see *other template
+options* resolved earlier in the same `prompt_template_options` call
+(`when_matches` is checked against the `resolved` dict being built up
+inside that one function) — it has no visibility into `docker`, because
+`docker` doesn't exist yet at that point. So `compose` — which only
+makes sense once a Dockerfile exists — **cannot** be declared as
+`{"key": "compose", ..., "when": {"docker": [true]}}` the way e.g.
+`orm`'s `"when": {"database": [...]}` can reference `database`. The
+`when` would always evaluate against a missing key and never match.
+
+The fix is the one `prompt_compose(compose, docker, interactive,
+remembered)` takes: accept the already-resolved `docker` value as a
+plain parameter instead of reading it from an options dict, and skip
+prompting (resolve `False`) when it's falsy — the same *effect* as a
+`when`-gated option's skip, achieved outside the generic options engine
+because the timing doesn't allow using that engine here. `cli.py` then
+applies the same "requested but not supported/satisfied" downgrade-and-
+warn pattern already used for `--docker` on a template without a
+`docker` layer: `compose_requested and not docker_requested` and
+`compose_requested and not chosen_template.supports_compose` (mirroring
+`TemplateMeta.supports_docker`) both warn and downgrade to `False`
+rather than failing generation.
+
+The **layer** gate is unaffected by any of this: `{"dir": "compose",
+"when": {"compose": [true]}}` in `template.json` is evaluated by
+`generator.render` against `answers.context()`, built *after* every
+fixed field (including `compose`) and every template option is fully
+resolved — by then there's no ordering problem, which is exactly why
+`--docker`'s own layer gate has never needed special-casing either.
 
 ## 5. Remembered preferences (`prefs.py`)
 
@@ -468,7 +559,14 @@ resolves its options first, then calls `prompts.prompt_docker`, then —
 if docker was requested but `chosen_template.supports_docker` is false —
 downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
-matches what was actually generated.
+matches what was actually generated. `--compose` follows immediately
+after, with two independent downgrade checks (both warn-and-continue,
+never fail generation): `compose_requested and not docker_requested`
+(compose without a Dockerfile makes no sense) and `compose_requested
+and not chosen_template.supports_compose` (mirrors the docker check,
+via `TemplateMeta.supports_compose`). See §4.5 for why `compose` has to
+be resolved this way — as a fixed field *after* `docker` — rather than
+as a `template.json` option with a `when` on `docker`.
 
 ## 7. Testing strategy
 
@@ -496,30 +594,41 @@ the gate temporarily.
   `template.json`; a declared layer with a missing directory being
   skipped rather than failing. A dedicated block of `rest-api`-specific
   tests renders real combinations (in-memory, SQLite+SQLModel+migrations,
-  Postgres+SQLAlchemy, Taskiq, Celery, Redis, "all features combined")
-  and asserts the right files exist/don't, then runs every `.py` file
+  Postgres+SQLAlchemy, Taskiq, Celery, Redis, Taskiq/Celery+RabbitMQ, the
+  `redis`/`broker` decoupling — including the self-contradictory
+  `broker=redis, redis=false` case (§4.1.1), Docker Compose content for
+  both a full stack and a minimal one, "all features combined") and
+  asserts the right files exist/don't, then runs every `.py` file
   through `ast.parse()` and `pyproject.toml` through `tomllib.loads()` —
   catches template bugs (like the whitespace ones in §4.3) that only a
   rendered-output check would catch, without needing a live `uv sync`
-  for every combination.
+  for every combination. `docker-compose.yml`'s content is checked by
+  substring assertions (service names, image tags, env var lines,
+  `depends_on` entries) rather than a YAML parser — no new dependency
+  for one file, matching how `Dockerfile` content is already checked
+  the same way.
 - `test_prompts.py` — monkeypatches `questionary`'s `.ask()` calls (it
   drives a real TTY via `prompt_toolkit`, which can't be exercised
   through Typer's `CliRunner`) to cover the interactive branches for
-  every prompt function, plus `parse_option_flags` and
-  `prompt_template_options` against both a synthetic template (a
-  `database`/`orm`/`migrations` option chain mirroring rest-api's shape,
-  for isolated `when`/`skip_value` testing) and the real `rest-api`
-  template (confirming its actual declared defaults and that `worker`
-  really does imply `redis`).
+  every prompt function (including `prompt_compose`'s docker-dependency
+  skip and its own remembered-default/cancel branches), plus
+  `parse_option_flags` and `prompt_template_options` against both a
+  synthetic template (a `database`/`orm`/`migrations` option chain
+  mirroring rest-api's shape, for isolated `when`/`skip_value` testing)
+  and the real `rest-api` template (confirming its actual declared
+  defaults, that `worker` implies a `broker`, and that `broker`
+  decouples `redis` per §4.1).
 - `test_cli.py` — Typer's `CliRunner`, covering: full non-interactive
   happy path (with and without `--docker`), `--option` end-to-end for
   rest-api (and its "Options: ..." summary line), unknown/invalid
   `--option` values, a malformed `--option` (no `=`), `--version`,
   `--help`, existing-directory error, invalid name, unknown/disabled
-  framework/template, `--docker` requested against a template that
-  doesn't support it, a `typer.Exit` raised mid-flow passing through
-  unchanged, and an unexpected exception mapping to exit code 2. The
-  fully-interactive path (including the "Using uv..." message) is
+  framework/template, `--docker`/`--compose` requested against a
+  template that doesn't support it, `--compose` without `--docker`, a
+  successful `--compose` run (compose file present, "Or with Docker
+  Compose:" in the summary), a `typer.Exit` raised mid-flow passing
+  through unchanged, and an unexpected exception mapping to exit code 2.
+  The fully-interactive path (including the "Using uv..." message) is
   exercised by calling `cli._run_new` directly with `sys.stdin` patched
   and `questionary` stubbed, rather than through `CliRunner` — Click's
   `CliRunner.invoke()` swaps `sys.stdin` out for its own stream for the

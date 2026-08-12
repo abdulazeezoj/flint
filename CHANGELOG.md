@@ -7,6 +7,52 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.7.0 — 2026-08-12
+
+### Added
+
+- **`rest-api`: RabbitMQ as a message broker choice.** New `broker`
+  option (`redis`/`rabbitmq`, default `redis`), asked whenever a worker
+  is chosen. `redis` (the caching add-on) is now a fully independent
+  question — previously it was always implied the moment *any* worker
+  was picked, which conflated "a worker exists" with "the worker uses
+  Redis." Now it's implied only when `broker == "redis"`; picking
+  RabbitMQ leaves the standalone Redis-for-caching question open.
+  Verified live end-to-end: real Taskiq (`taskiq-aio-pika`) and real
+  Celery (built-in AMQP transport + `rpc://` result backend) against a
+  real RabbitMQ broker, enqueue → execute round trip on both.
+- **Optional Docker Compose generation** (`--compose`, needs `--docker`)
+  for both `hello-world` and `rest-api`. Generates a `docker-compose.yml`
+  with the `app` service plus whichever of `db` (Postgres)/`redis`/
+  `rabbitmq`/`worker` the chosen options actually need — SQLite needs no
+  service (file-based), an unconfigured worker adds no `worker` service,
+  etc. `compose` is a fixed CLI field (like `docker`/`git`/`install`),
+  **not** a `template.json` option — see `docs/PRODUCT_ARCH.md` §4.5 for
+  why template options can't depend on `docker` (they resolve before
+  `docker` is even asked).
+- **`.env.example`**: wherever a template writes a `.env` (`rest-api`
+  always; `hello-world` with `-o config=true`), a `.env.example` with
+  identical content is written alongside it — `.env` stays git-ignored,
+  `.env.example` is the checked-in reference of what vars exist.
+
+### Changed
+
+- **Breaking (pre-1.0):** the `django` framework stub is removed from
+  the roadmap entirely (it was always a disabled "coming soon" stub with
+  no content). Flask remains the next committed framework — this isn't
+  a scope increase, just dropping a placeholder that was never going to
+  ship.
+
+### Fixed
+
+- A self-contradictory but legal input (`-o broker=redis -o
+  redis=false`, overriding both options explicitly against each other)
+  could make the generated `docker-compose.yml`'s `worker` service
+  `depends_on` a `redis` service that was never generated — `docker
+  compose up` fails outright on that kind of dangling reference. Fixed
+  by gating that one line on `broker == "redis" and redis` together
+  instead of `broker == "redis"` alone; see `docs/PRODUCT_ARCH.md` §4.1.1.
+
 ## v0.6.0 — 2026-08-12
 
 ### Changed

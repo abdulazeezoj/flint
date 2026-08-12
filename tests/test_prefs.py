@@ -80,6 +80,7 @@ def test_get_template_prefs_absent_returns_defaults():
     assert prefs.get_template_prefs({}, "fastapi/rest-api") == {
         "options": {},
         "docker": None,
+        "compose": None,
         "git_init": None,
         "install": None,
     }
@@ -87,14 +88,26 @@ def test_get_template_prefs_absent_returns_defaults():
 
 def test_get_template_prefs_wrong_container_type_ignored():
     result = prefs.get_template_prefs({"templates": "oops"}, "fastapi/rest-api")
-    assert result == {"options": {}, "docker": None, "git_init": None, "install": None}
+    assert result == {
+        "options": {},
+        "docker": None,
+        "compose": None,
+        "git_init": None,
+        "install": None,
+    }
 
 
 def test_get_template_prefs_wrong_entry_type_ignored():
     result = prefs.get_template_prefs(
         {"templates": {"fastapi/rest-api": "oops"}}, "fastapi/rest-api"
     )
-    assert result == {"options": {}, "docker": None, "git_init": None, "install": None}
+    assert result == {
+        "options": {},
+        "docker": None,
+        "compose": None,
+        "git_init": None,
+        "install": None,
+    }
 
 
 def test_get_template_prefs_present():
@@ -103,6 +116,7 @@ def test_get_template_prefs_present():
             "fastapi/rest-api": {
                 "options": {"database": "postgres"},
                 "docker": True,
+                "compose": True,
                 "git_init": False,
                 "install": True,
             }
@@ -111,6 +125,7 @@ def test_get_template_prefs_present():
     assert prefs.get_template_prefs(prefs_data, "fastapi/rest-api") == {
         "options": {"database": "postgres"},
         "docker": True,
+        "compose": True,
         "git_init": False,
         "install": True,
     }
@@ -122,6 +137,7 @@ def test_get_template_prefs_non_bool_flags_ignored():
             "fastapi/rest-api": {
                 "options": {},
                 "docker": "yes",
+                "compose": 1,
                 "git_init": 1,
                 "install": None,
             }
@@ -130,6 +146,7 @@ def test_get_template_prefs_non_bool_flags_ignored():
     assert prefs.get_template_prefs(prefs_data, "fastapi/rest-api") == {
         "options": {},
         "docker": None,
+        "compose": None,
         "git_init": None,
         "install": None,
     }
@@ -149,6 +166,7 @@ def test_record_run_from_empty():
         full_id="fastapi/rest-api",
         options={"database": "postgres"},
         docker=True,
+        compose=True,
         git_init=False,
         install=True,
     )
@@ -159,6 +177,7 @@ def test_record_run_from_empty():
             "fastapi/rest-api": {
                 "options": {"database": "postgres"},
                 "docker": True,
+                "compose": True,
                 "git_init": False,
                 "install": True,
             }
@@ -174,6 +193,7 @@ def test_record_run_preserves_other_frameworks_and_templates():
             "fastapi/hello-world": {
                 "options": {"config": True},
                 "docker": False,
+                "compose": False,
                 "git_init": True,
                 "install": True,
             }
@@ -186,6 +206,7 @@ def test_record_run_preserves_other_frameworks_and_templates():
         full_id="fastapi/rest-api",
         options={"database": "sqlite"},
         docker=False,
+        compose=False,
         git_init=True,
         install=True,
     )
@@ -205,6 +226,7 @@ def test_record_run_does_not_mutate_input():
         full_id="fastapi/rest-api",
         options={},
         docker=False,
+        compose=False,
         git_init=True,
         install=True,
     )

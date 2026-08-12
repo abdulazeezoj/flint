@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -53,7 +53,6 @@ falls back to.
    ? Which framework? › (Use arrow keys)
      ❯ FastAPI
        Flask (coming soon)
-       Django (coming soon)
    - v0 ships FastAPI only. Other entries are shown but disabled/greyed
      to signal the roadmap (create-next-app does the same for future
      options) — selecting one prints "coming soon" and re-prompts.
@@ -89,7 +88,8 @@ falls back to.
    ? ORM? › SQLModel / SQLAlchemy                       (skipped if no DB; default: SQLModel)
    ? Add Alembic migrations? (Y/n)                      (skipped if no DB; default: yes)
    ? Background worker? › None / Taskiq / Celery         (default: None)
-   ? Add Redis (caching)? (y/N)                          (skipped — forced yes — if a worker was chosen; default: no)
+   ? Message broker? › Redis / RabbitMQ                   (skipped — resolves to "none" — if no worker; default: Redis)
+   ? Add Redis (caching)? (y/N)                          (skipped — forced yes — if broker is Redis; default: no)
 
    For hello-world:
    ? Add configuration (pydantic-settings)? (y/N)        (default: no)
@@ -106,6 +106,17 @@ falls back to.
      this `<framework>/<template>` remembers a different value (§6). If
      yes, and the chosen framework/template doesn't have Docker support
      yet, Flint warns and continues without one rather than failing.
+
+7a. Add Docker Compose?
+   ? Add Docker Compose? (y/N) ›
+   - Only asked if step 7 was yes — a compose file with no Dockerfile to
+     build makes no sense, so this is skipped (resolves no) without
+     asking otherwise. Default **no**, unless remembered otherwise (§6).
+     Not a template option (see PRODUCT_ARCH.md §4.5 for why it can't
+     be one) — it's a fixed field resolved right after `docker`, same as
+     git/install below. Generates `docker-compose.yml` wiring up
+     whichever of the database/Redis/RabbitMQ/worker were actually
+     configured, alongside the app service itself.
 
 8. Initialize a git repository?
    ? Initialize a git repository? (Y/n) ›
@@ -126,7 +137,7 @@ falls back to.
      mechanism). Shows a live-ish summary of files created.
 
 11. Summary / next steps
-   Options: database=sqlite, orm=sqlmodel, migrations=True, worker=none, redis=False
+   Options: database=sqlite, orm=sqlmodel, migrations=True, worker=none, broker=none, redis=False
    Creating my-api/ from fastapi/rest-api...
      ✔ ...
    ✔ Initialized git repository
@@ -254,14 +265,17 @@ $ uvx flint
 ? ORM? SQLModel
 ? Add Alembic migrations? Yes
 ? Background worker? Taskiq
+? Message broker? RabbitMQ
+? Add Redis (caching)? No
 Using uv to manage dependencies.
 ? Add a Dockerfile? No
 ? Initialize a git repository? Yes
 ? Install dependencies with uv now? Yes
 
-Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, redis=True
+Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, broker=rabbitmq, redis=False
 Creating my-api/ from fastapi/rest-api...
   ✔ .env
+  ✔ .env.example
   ✔ .gitignore
   ✔ AGENTS.md
   ✔ README.md
@@ -274,7 +288,6 @@ Creating my-api/ from fastapi/rest-api...
   ✔ src/my_api/core/__init__.py
   ✔ src/my_api/core/config.py
   ✔ src/my_api/core/db.py
-  ✔ src/my_api/core/redis.py
   ✔ src/my_api/main.py
   ✔ src/my_api/models.py
   ✔ src/my_api/routes/__init__.py

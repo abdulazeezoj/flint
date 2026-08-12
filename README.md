@@ -22,7 +22,7 @@ Using uv to manage dependencies.
 ? Initialize a git repository? Yes
 ? Install dependencies with uv now? Yes
 
-Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, redis=True
+Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, broker=redis, redis=True
 Creating my-api/ from fastapi/rest-api...
   ✔ ...
 ✔ Initialized git repository
@@ -61,8 +61,9 @@ flint --help
 Every prompt has a matching flag: `--framework`, `--template`,
 `--option`/`-o key=value` (repeatable — one per template-specific
 choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
---no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
-(accept all defaults), `--force` (generate into a non-empty dir).
+--no-docker`, `--compose/--no-compose` (needs `--docker`), `--git/
+--no-git`, `--install/--no-install`, `--yes` (accept all defaults),
+`--force` (generate into a non-empty dir).
 
 Flint remembers your last framework/template and per-template choices in
 `~/.flint/last.json`, and uses them as the new default the next time you
@@ -82,20 +83,25 @@ whatever the chosen template's `template.json` declares. Today:
 
 - **`fastapi/hello-world`** — a `uv`-managed, `src/`-layout FastAPI app
   with a passing test and an `AGENTS.md`, ready to run with no edits.
-  `-o config=true` adds `pydantic-settings`-based configuration.
-  `--docker` adds a `Dockerfile` + `.dockerignore`.
+  `-o config=true` adds `pydantic-settings`-based configuration (`.env`
+  + a checked-in `.env.example`). `--docker` adds a `Dockerfile` +
+  `.dockerignore`; `--compose` (needs `--docker`) adds a
+  `docker-compose.yml`.
 - **`fastapi/rest-api`** — the same, plus real head-start choices:
   - `-o database=none|sqlite|postgres` (default: `sqlite`)
   - `-o orm=sqlmodel|sqlalchemy` (only asked with a database; default: `sqlmodel`)
   - `-o migrations=true|false` — async Alembic, autogenerate-ready (default: `true` with a database)
   - `-o worker=none|taskiq|celery`, with a demo `/tasks/add` endpoint
-  - `-o redis=true|false` — implied automatically the moment a worker is chosen
+  - `-o broker=redis|rabbitmq` (only asked with a worker; default: `redis`)
+  - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
+  - `--compose` generates a `docker-compose.yml` wiring up whichever of
+    Postgres/Redis/RabbitMQ/the worker were actually configured
   - Tests always run against an isolated SQLite database, whatever
     production database was configured — `uv run pytest` never needs a
     real Postgres.
 
-More frameworks (Flask, Django) are on the roadmap; the wizard already
-lists them as "coming soon". See `docs/PRODUCT_SPEC.md` for full v0
+Flask is next on the roadmap; the wizard already lists it as
+"coming soon". See `docs/PRODUCT_SPEC.md` for full v0
 scope and non-goals.
 
 ## Docs

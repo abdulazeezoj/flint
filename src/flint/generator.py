@@ -57,6 +57,15 @@ _RENAME_MAP = {
 _JINJA_SUFFIX = ".jinja"
 _BASE_LAYER = "files"
 
+# Wherever a template writes a `.env`, it also gets a `.env.example`
+# alongside it with identical content — `.env` itself is gitignored (a
+# developer's local overrides shouldn't get committed), `.env.example`
+# is the checked-in reference of what vars exist. Templates only author
+# one `env.jinja`; this mirrors it rather than requiring a second,
+# easily-drifting source file.
+_ENV_FILE = Path(".env")
+_ENV_EXAMPLE_FILE = Path(".env.example")
+
 _env = Environment(keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
 
 
@@ -71,6 +80,7 @@ class Answers(BaseModel):
     git_init: bool
     install: bool
     docker: bool
+    compose: bool
     options: dict[str, Any] = {}
 
     def context(self) -> dict[str, Any]:
@@ -134,6 +144,10 @@ class TemplateMeta:
     @property
     def supports_docker(self) -> bool:
         return any(layer.dir == "docker" for layer in self.layers)
+
+    @property
+    def supports_compose(self) -> bool:
+        return any(layer.dir == "compose" for layer in self.layers)
 
 
 def when_matches(when: dict[str, list[Any]], values: dict[str, Any]) -> bool:
@@ -292,8 +306,14 @@ def _render_layer(layer_root: Path, target_dir: Path, context: dict) -> list[Pat
         rel_target = _render_relative_path(rel_source, context)
         dest_path = target_dir / rel_target
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        dest_path.write_text(_render_content(source_path, context), encoding="utf-8")
+        rendered = _render_content(source_path, context)
+        dest_path.write_text(rendered, encoding="utf-8")
         created.append(rel_target)
+
+        if rel_target == _ENV_FILE:
+            example_target = rel_target.with_name(_ENV_EXAMPLE_FILE.name)
+            (target_dir / example_target).write_text(rendered, encoding="utf-8")
+            created.append(example_target)
     return created
 
 

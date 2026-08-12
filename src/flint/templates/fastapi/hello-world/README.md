@@ -10,17 +10,22 @@ A minimal, `uv`-managed FastAPI app: a `src/<package>/main.py` with one
 `pytest` test, an `AGENTS.md`, and:
 
 - with `--docker`: a `Dockerfile` + `.dockerignore`
+- with `--docker --compose`: also a `docker-compose.yml` (just the `app`
+  service — this template has no db/broker to wire up). `compose` isn't
+  a `template.json` option — see the rest-api README's options table for
+  why (fixed CLI field, resolved after `docker`).
 - with `-o config=true`: `pydantic-settings`-based config (`config.py`,
-  `.env`), and `main.py` reads the app name/debug flag from `Settings`
-  instead of hardcoding them
+  `.env` + `.env.example`), and `main.py` reads the app name/debug flag
+  from `Settings` instead of hardcoding them
 
 ## Layout
 
 ```
-template.json     id/label/description/enabled, options: [config], layers: [docker, config]
+template.json     id/label/description/enabled, options: [config], layers: [docker, compose, config]
 README.md         this file
 files/             always rendered — plain app, no config
 docker/            rendered in addition, only when --docker is passed
+compose/           rendered in addition, only when --compose is passed (needs --docker)
 config/            rendered in addition, only when -o config=true;
                    overrides files/'s main.py to wire up Settings
 ```
@@ -41,8 +46,8 @@ config/            rendered in addition, only when -o config=true;
 ## Available context (`Answers.context()`, see `generator.py`)
 
 Fixed fields: `project_name`, `slug`, `package_name`, `framework`,
-`template`, `git_init`, `install`, `docker`. Plus this template's own
-option: `config` (bool, default `false`).
+`template`, `git_init`, `install`, `docker`, `compose`. Plus this
+template's own option: `config` (bool, default `false`).
 
 ## Testing this template
 

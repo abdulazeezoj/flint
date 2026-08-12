@@ -2,7 +2,11 @@ from celery import Celery
 
 from {{ package_name }}.core.config import settings
 
+{% if broker == "rabbitmq" %}
+celery_app = Celery("{{ package_name }}", broker=settings.rabbitmq_url, backend="rpc://")
+{% else %}
 celery_app = Celery("{{ package_name }}", broker=settings.redis_url, backend=settings.redis_url)
+{% endif %}
 
 # Imported last, after `celery_app` exists: every module in tasks/ needs
 # `celery_app` to register its `@celery_app.task`-decorated functions,

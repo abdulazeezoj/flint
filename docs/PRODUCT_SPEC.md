@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
+**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, optional Docker Compose, .env.example, Django dropped)
 
 ## 1. Vision
 
@@ -47,8 +47,8 @@ follow-up choices — not one template trying to be everything.
 
 Three distinct concepts in the wizard — don't conflate them:
 
-- **Framework** — the underlying library, e.g. `fastapi`, `flask`,
-  `django`. Selected first.
+- **Framework** — the underlying library, e.g. `fastapi`, `flask`.
+  Selected first.
 - **Template** — a specific project shape built on that framework, e.g.
   `hello-world`, `rest-api`. Selected second, scoped to the chosen
   framework.
@@ -99,17 +99,20 @@ Explicitly out of scope for the first release (candidates for later
 already stubbed as disabled/"coming soon" entries so the roadmap is
 visible in the wizard):
 
-- Frameworks other than FastAPI (Flask, Django are stubbed disabled)
+- Frameworks other than FastAPI (Flask is stubbed disabled — next on
+  the roadmap, see §11)
 - Templates other than `hello-world` and `rest-api`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
-- Auth scaffolding, Docker Compose, CI workflow templates
-- Message brokers other than Redis (RabbitMQ, etc.) for the worker option
+- Auth scaffolding, CI workflow templates
 - `.agents/skills/<framework>` — see §12 Open Questions
 - A GUI or web-based wizard
 
 Database/ORM/migrations/worker selection — a v0.1/v0.2 non-goal — is now
 in scope as of v0.3, scoped specifically to the `rest-api` template.
+Docker Compose generation and a RabbitMQ broker choice — both v0.1–v0.6
+non-goals — are in scope as of v0.7, also scoped to the templates that
+declare support for them.
 
 ## 6. Personas
 
@@ -145,13 +148,13 @@ in scope as of v0.3, scoped specifically to the `rest-api` template.
 
 | ID | Requirement |
 |----|-------------|
-| FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → initialize git repo? (default yes) → install dependencies now? (default yes) |
+| FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → add Docker Compose? (default no; only asked if a Dockerfile was added) → initialize git repo? (default yes) → install dependencies now? (default yes) |
 | FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force` |
-| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
-| FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run` — whichever apply) |
+| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--compose/--no-compose`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
+| FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run`, `docker compose up` — whichever apply) |
 | FR5 | `flint --version` prints the current version |
 | FR6 | Exit codes: `0` success, `1` user/input error (e.g. bad name, existing dir, disabled framework/template, unknown/invalid `--option`), `2` unexpected/internal error |
-| FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; if the chosen template doesn't support it yet, warn and continue rather than failing the whole generation |
+| FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; `--compose` additionally adds a `docker-compose.yml` wiring up whichever services the chosen options actually need (database, Redis, RabbitMQ, worker); `--compose` without `--docker`, or either flag against a template that doesn't support it yet, warns and continues rather than failing the whole generation |
 | FR8 | Every generated project includes an `AGENTS.md` with run/test commands, layout, and conventions — no flag, always on |
 | FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
@@ -205,6 +208,12 @@ in scope as of v0.3, scoped specifically to the `rest-api` template.
   runs; `--remember/--no-remember` opts out.
 - `v0.6.0` — the `restapi` template is renamed to `rest-api`, matching
   the hyphenated id style `hello-world` already used.
+- `v0.7.0` — the `django` stub is dropped from the roadmap entirely
+  (Flask is the committed next framework, not Django); `rest-api` gains
+  a `broker` choice (Redis/RabbitMQ) for the background worker, `redis`
+  becomes an independent caching add-on rather than always implied by a
+  worker; optional Docker Compose generation; `.env.example` ships
+  alongside `.env` wherever a template writes one.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -227,11 +236,11 @@ in scope as of v0.3, scoped specifically to the `rest-api` template.
   to target, and is more provable now that `rest-api` gives more surface
   to differentiate against. Tracked as a roadmap item, not committed to
   a release yet.
-- **Message broker choice for the worker option**: v0.3 hardcodes Redis
-  as the broker for both Taskiq and Celery. RabbitMQ (a common Celery
-  broker) is a plausible follow-up if requested, but doubles the
-  worker×broker combinations to support and verify — deferred until
-  there's real demand.
+- **Message broker choice for the worker option**: resolved in v0.7 —
+  `rest-api` now offers Redis or RabbitMQ as the broker for both Taskiq
+  and Celery (`broker` option), decoupled from the standalone `redis`
+  caching option. No other brokers are planned; this was specifically
+  about not hardcoding Redis as the only option.
 - **`ai` template**: removed in v0.3 (was a disabled stub with no
   content). Revisit once there's a clear, minimal shape for it —
   research (see PM/engineering discussion prior to v0.3) pointed at "one

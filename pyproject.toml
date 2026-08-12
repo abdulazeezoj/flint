@@ -1,6 +1,6 @@
 [project]
 name = "flint-cli"
-version = "0.6.0"
+version = "0.7.0"
 description = "Interactive project scaffolding for Python frameworks — create-next-app, for FastAPI, Flask, and friends."
 readme = "README.md"
 license = "MIT"

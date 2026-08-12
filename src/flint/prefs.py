@@ -56,20 +56,27 @@ def get_last_template(prefs: dict[str, Any], framework_id: str) -> str | None:
 
 
 def get_template_prefs(prefs: dict[str, Any], full_id: str) -> dict[str, Any]:
-    """Return the remembered ``{options, docker, git_init, install}`` for
-    a `<framework>/<template>` id, sanitized so callers never have to
-    guard against a corrupt/hand-edited prefs file themselves."""
+    """Return the remembered ``{options, docker, compose, git_init,
+    install}`` for a `<framework>/<template>` id, sanitized so callers
+    never have to guard against a corrupt/hand-edited prefs file
+    themselves."""
     templates = prefs.get("templates")
     entry = templates.get(full_id) if isinstance(templates, dict) else None
     if not isinstance(entry, dict):
         entry = {}
 
     options = entry.get("options")
+
+    def _bool_or_none(key: str) -> bool | None:
+        value = entry.get(key)
+        return value if isinstance(value, bool) else None
+
     return {
         "options": options if isinstance(options, dict) else {},
-        "docker": entry.get("docker") if isinstance(entry.get("docker"), bool) else None,
-        "git_init": entry.get("git_init") if isinstance(entry.get("git_init"), bool) else None,
-        "install": entry.get("install") if isinstance(entry.get("install"), bool) else None,
+        "docker": _bool_or_none("docker"),
+        "compose": _bool_or_none("compose"),
+        "git_init": _bool_or_none("git_init"),
+        "install": _bool_or_none("install"),
     }
 
 
@@ -81,6 +88,7 @@ def record_run(
     full_id: str,
     options: dict[str, Any],
     docker: bool,
+    compose: bool,
     git_init: bool,
     install: bool,
 ) -> dict[str, Any]:
@@ -93,6 +101,7 @@ def record_run(
     templates[full_id] = {
         "options": dict(options),
         "docker": docker,
+        "compose": compose,
         "git_init": git_init,
         "install": install,
     }
