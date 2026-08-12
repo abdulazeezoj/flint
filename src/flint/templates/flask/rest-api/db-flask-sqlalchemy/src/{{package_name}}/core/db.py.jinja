@@ -4,7 +4,13 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 
-def init_db(app: Flask) -> None:
+def init_db(app: Flask, *, testing: bool = False) -> None:
+    # `testing` is unused here — this file is only ever rendered when
+    # migrations are disabled (see migrations-flask-sqlalchemy/ for the
+    # migrations-enabled variant), so the schema is always created
+    # directly from the models below, test or not. The parameter only
+    # exists so `main.py`'s `init_db(app, testing=testing)` call works
+    # the same regardless of which db.py variant got rendered.
     database_url = app.config["SQLALCHEMY_DATABASE_URI"]
     if database_url.startswith("sqlite"):
         # A SQLite `:memory:` database only exists for the lifetime of a

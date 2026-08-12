@@ -7,6 +7,32 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.8.1 — 2026-08-12
+
+### Fixed
+
+- **`rest-api`: migrations were decorative in both frameworks.**
+  `init_db()`/`create_app()` called `create_all()` on every app boot
+  regardless of the `migrations` option, so by the time `alembic
+  revision --autogenerate`/`flask db migrate` ran, the tables already
+  existed (created outside migration history) and matched the models
+  exactly — autogenerate always reported "No changes in schema
+  detected" instead of generating a real migration. Fixed by making the
+  eager `create_all()` conditional on `migrations`: FastAPI's `rest-api`
+  no longer calls `init_db()` at all when `migrations` is enabled
+  (schema comes solely from `alembic upgrade head`); Flask's `rest-api`
+  only auto-creates the schema for the isolated in-memory test database.
+  Verified live end-to-end: `alembic revision --autogenerate`/`flask db
+  migrate` now correctly detects and generates the initial `item`/
+  `items` table for all four database/ORM combinations (FastAPI
+  SQLModel + SQLAlchemy, Flask Flask-SQLAlchemy + SQLAlchemy), and
+  `alembic upgrade head`/`flask db upgrade` applies cleanly against a
+  real on-disk SQLite database. Both frameworks' generated README.md now
+  correctly say the database is **not** auto-created on startup when
+  migrations are enabled. This bug predates Flask — it was present in
+  `fastapi/rest-api` since migrations shipped in `v0.3.0` — and is fixed
+  in both places by this release.
+
 ## v0.8.0 — 2026-08-12
 
 ### Added

@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.8: Flask enabled — `hello-world` + `rest-api`)
+**Last updated:** 2026-08-12 (v0.8.1: migrations-vs-create_all bugfix in both frameworks' rest-api)
 
 ## 1. Vision
 
@@ -230,6 +230,11 @@ hold for every project shape a generated app might end up living in
   summary prints the right command (`uv run flask --app
   src/{package}/main.py run` vs. `uv run fastapi dev
   src/{package}/main.py`) instead of always assuming FastAPI.
+- `v0.8.1` — bugfix: `rest-api`'s `migrations` option was decorative in
+  both frameworks (`create_all()`/`db.create_all()` ran unconditionally
+  on every boot, so autogenerate never saw a real schema diff to
+  capture). Fixed in both `fastapi/rest-api` and `flask/rest-api` — see
+  PRODUCT_ARCH.md §7.1.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

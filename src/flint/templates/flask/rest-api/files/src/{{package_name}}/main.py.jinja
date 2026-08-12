@@ -29,7 +29,7 @@ def create_app(*, database_url: str | None = None, testing: bool = False) -> Fla
     app.config["TESTING"] = testing
 {% if database != "none" %}
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url or settings.database_url
-    init_db(app)
+    init_db(app, testing=testing)
 {% endif %}
 
     app.register_blueprint(items_bp)

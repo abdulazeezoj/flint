@@ -700,6 +700,37 @@ surfaced by actually running the generated tooling:
   `migrate.init_app(app, db)`); `orm=sqlalchemy` uses bare Alembic
   instead (`migrations-sqlalchemy` layer, same shape as FastAPI's) —
   two separate migrations layers rather than one shared implementation.
+- **`create_all()` unconditionally alongside migrations made the
+  migrations decorative, in *both* frameworks** (present since `rest-
+  api`'s original `v0.3.0` migrations support — not something the Flask
+  work introduced, just inherited and then noticed while building
+  Flask's mirror of it). `init_db()`/`create_app()` called
+  `Base.metadata.create_all()` (or `db.create_all()`) on every app boot
+  regardless of whether `migrations` was enabled — so by the time anyone
+  ran `alembic revision --autogenerate`/`flask db migrate`, the tables
+  already existed and matched the models exactly (created by the eager
+  `create_all()`, not by any migration), and autogenerate reported "No
+  changes in schema detected" instead of generating the real initial
+  migration. On a genuinely fresh database this doesn't just produce an
+  empty migration, it's a footgun waiting to fire: `alembic upgrade
+  head`/`flask db upgrade` would eventually try to create tables that
+  `create_all()` had already silently created outside migration history,
+  since `alembic_version` was never stamped. `uv sync && pytest` never
+  caught this because both frameworks' test fixtures build their own
+  schema directly (FastAPI: a separate `test_engine` + `create_all`/
+  `drop_all` in `conftest.py`, bypassing `init_db()` entirely; Flask:
+  `create_app(testing=True)` still needs *some* way to get a schema for
+  a throwaway in-memory database, since there's no migration history to
+  replay against it) — only actually running `alembic revision
+  --autogenerate`/`flask db migrate` against a fresh on-disk database and
+  checking whether it detected the model as new caught it. Fixed by
+  making `create_all()`/`db.create_all()` conditional on `migrations`:
+  FastAPI's `main.py` simply never calls `init_db()` when `migrations`
+  is true (schema comes solely from `alembic upgrade head`); Flask's
+  `init_db()` gained a `testing` parameter so it's *only* auto-created
+  for the isolated in-memory test database, never for a real one. Both
+  frameworks' README.md now say the database is **not** auto-created on
+  startup when `migrations` is enabled, and to run the migration first.
 
 ## 8. Versioning & release mechanics
 

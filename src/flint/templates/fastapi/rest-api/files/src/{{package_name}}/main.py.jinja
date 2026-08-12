@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from {{ package_name }}.core.config import settings
-{% if database != "none" %}
+{% if database != "none" and not migrations %}
 from {{ package_name }}.core.db import init_db
 {% endif %}
 from {{ package_name }}.routes.items import router as items_router
@@ -20,7 +20,7 @@ from {{ package_name }}.worker import broker
 {% if database != "none" or worker == "taskiq" %}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    {% if database != "none" %}
+    {% if database != "none" and not migrations %}
     await init_db()
     {% endif %}
     {% if worker == "taskiq" %}

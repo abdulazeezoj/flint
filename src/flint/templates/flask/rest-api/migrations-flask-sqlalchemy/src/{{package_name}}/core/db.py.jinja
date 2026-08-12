@@ -6,7 +6,7 @@ db = SQLAlchemy()
 migrate = Migrate()
 
 
-def init_db(app: Flask) -> None:
+def init_db(app: Flask, *, testing: bool = False) -> None:
     database_url = app.config["SQLALCHEMY_DATABASE_URI"]
     if database_url.startswith("sqlite"):
         # A SQLite `:memory:` database only exists for the lifetime of a
@@ -27,5 +27,13 @@ def init_db(app: Flask) -> None:
     # `migrate.init_app` is what registers the `flask db ...` CLI command
     # group at all — without it `flask db migrate`/`upgrade` don't exist.
     migrate.init_app(app, db)
-    with app.app_context():
-        db.create_all()
+    if testing:
+        # Tests run against an isolated in-memory database with no
+        # migration history to replay, so the schema is created directly
+        # from the models here instead. Real usage must NOT do this: it
+        # would leave `flask db migrate` permanently unable to detect a
+        # schema change, since the tables would already match the models
+        # before any migration ever ran. Real schema comes from `flask
+        # db upgrade` — see README.md's "Migrations" section.
+        with app.app_context():
+            db.create_all()
