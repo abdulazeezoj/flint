@@ -1,0 +1,6 @@
+{
+  "id": "fastapi",
+  "label": "FastAPI",
+  "description": "FastAPI — a modern, fast Python web framework.",
+  "enabled": true
+}

@@ -73,7 +73,7 @@ def print_summary(
     project_name: str,
     slug: str,
     package_name: str,
-    template_id: str,
+    template_full_id: str,
     target_dir: Path,
     created: list[Path],
     git_ok: bool,
@@ -81,7 +81,7 @@ def print_summary(
     installed_requested: bool,
 ) -> None:
     console.print()
-    console.print(f"Creating [bold]{slug}/[/bold] from {template_id}...")
+    console.print(f"Creating [bold]{slug}/[/bold] from {template_full_id}...")
     for path in created:
         console.print(f"  [green]✔[/green] {path.as_posix()}")
 
@@ -100,3 +100,9 @@ def print_summary(
     console.print(f"  uv run fastapi dev src/{package_name}/main.py")
     console.print()
     console.print("Then open [link]http://127.0.0.1:8000[/link]")
+
+    if Path("Dockerfile") in created:
+        console.print()
+        console.print("Or with Docker:")
+        console.print(f"  docker build -t {slug} .")
+        console.print(f"  docker run -p 8000:8000 {slug}")

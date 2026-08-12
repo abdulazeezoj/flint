@@ -1,0 +1,6 @@
+{
+  "id": "django",
+  "label": "Django",
+  "description": "Django — a batteries-included web framework. Coming soon.",
+  "enabled": false
+}

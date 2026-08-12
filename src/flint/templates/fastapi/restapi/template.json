@@ -1,0 +1,6 @@
+{
+  "id": "restapi",
+  "label": "REST API",
+  "description": "A FastAPI REST API with routers, Pydantic schemas, and CRUD scaffolding. Coming soon.",
+  "enabled": false
+}

@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-12 (v0.2: framework/template split, `--docker`, AGENTS.md)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -18,15 +18,15 @@ design for the `flint` CLI itself (not the projects it generates).
 | Packaging / env | [uv](https://docs.astral.sh/uv/) | Both: (a) how Flint itself is built/packaged/tested, and (b) the package manager wired into every generated project. |
 | Testing | pytest + Typer's `CliRunner` | Standard, integrates with `uv run pytest`. |
 
-No cookiecutter/copier dependency: v0 ships exactly one template, bundled
-in the package. Pulling in a full templating framework for one template
+No cookiecutter/copier dependency: v0 ships one framework/template pair,
+bundled in the package. Pulling in a full templating framework for that
 is unnecessary weight; the template *system* (§4) is still designed so
 that swapping in cookiecutter/copier — or a remote template registry —
 later is a contained change, not a rewrite.
 
 ## 2. Distribution
 
-- PyPI distribution name: `flint-cli` (see PRODUCT_SPEC §9 for why).
+- PyPI distribution name: `flint-cli` (see PRODUCT_SPEC §10 for why).
 - Console script entry point: `flint`.
 - Primary usage is via `uvx flint` (ephemeral run, no install) or
   `uv tool install flint-cli` (persistent `flint` on PATH) — mirrors how
@@ -53,21 +53,33 @@ flint/
 │       ├── postgen.py           # git init, uv sync, summary printing
 │       ├── errors.py            # FlintError and friends -> exit codes
 │       └── templates/
-│           └── fastapi_hello_world/
-│               ├── template.json                       # template metadata
-│               └── files/
-│                   ├── pyproject.toml.jinja
-│                   ├── README.md.jinja
-│                   ├── gitignore.jinja                  # -> .gitignore (dotfiles can't ship as literal dotfiles cleanly in all tooling)
-│                   ├── src/
-│                   │   └── {{package_name}}/
-│                   │       ├── __init__.py.jinja
-│                   │       └── main.py.jinja
-│                   └── tests/
-│                       └── test_main.py.jinja
+│           ├── fastapi/
+│           │   ├── template.json                # framework metadata
+│           │   ├── hello-world/
+│           │   │   ├── template.json             # variant metadata
+│           │   │   ├── README.md                 # maintainer docs (not rendered)
+│           │   │   ├── files/                    # always rendered
+│           │   │   │   ├── pyproject.toml.jinja
+│           │   │   │   ├── README.md.jinja
+│           │   │   │   ├── AGENTS.md.jinja
+│           │   │   │   ├── gitignore.jinja        # -> .gitignore
+│           │   │   │   ├── src/
+│           │   │   │   │   └── {{package_name}}/
+│           │   │   │   │       ├── __init__.py.jinja
+│           │   │   │   │       └── main.py.jinja
+│           │   │   │   └── tests/
+│           │   │   │       └── test_main.py.jinja
+│           │   │   └── docker/                   # only rendered if --docker
+│           │   │       ├── Dockerfile.jinja
+│           │   │       └── dockerignore.jinja     # -> .dockerignore
+│           │   ├── restapi/template.json          # disabled stub — roadmap
+│           │   └── ai/template.json                # disabled stub — roadmap
+│           ├── flask/template.json                  # disabled stub — roadmap
+│           └── django/template.json                 # disabled stub — roadmap
 ├── tests/
 │   ├── test_naming.py
 │   ├── test_generator.py
+│   ├── test_prompts.py
 │   └── test_cli.py
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -77,23 +89,41 @@ flint/
 
 ## 4. Template system design
 
-Each template is a directory under `src/flint/templates/<template_id>/`
-containing:
+Templates are organized two levels deep: `templates/<framework>/<template>/`
+(PRODUCT_SPEC §3 defines the framework-vs-template distinction). A
+**framework** directory (`templates/fastapi/`) has its own
+`template.json` and one subdirectory per **template** variant
+(`hello-world/`, `restapi/`, `ai/`), each with its own `template.json`.
+Disabled entries (`restapi`, `ai`, `flask`, `django`) are stubs — just a
+`template.json` with `"enabled": false`, no `files/` — that exist purely
+so the wizard/CLI can list them as "coming soon" (PRODUCT_FLOW §2 steps
+3–4) without any code changes.
 
-- `template.json` — metadata: `id`, `label`, `description`, `enabled`
-  (lets Flask/Django be *listed but disabled* per PRODUCT_FLOW §2 step 3
-  without any code beyond adding the JSON + a "coming soon" flag).
-- `files/` — the literal file tree to render. Both **file/directory
-  names** and **file contents** are run through Jinja2:
-  - A path segment literally named `{{package_name}}` becomes e.g.
-    `my_api`.
-  - `*.jinja` file extensions are stripped after rendering
-    (`main.py.jinja` → `main.py`); files without `.jinja` are copied
-    verbatim (for binary/static assets, none needed in v0).
-  - `gitignore.jinja` renders to `.gitignore` — an explicit rename table
-    in `generator.py` (`{"gitignore.jinja": ".gitignore"}`) sidesteps
-    packaging tools that mishandle literal leading-dot filenames in
-    source control / sdists.
+Each enabled template variant contains:
+
+- `template.json` — metadata: `id`, `label`, `description`, `enabled`.
+- `README.md` (optional) — maintainer-facing docs for the template
+  itself; lives at the template root (sibling to `files/`), so it is
+  **not** picked up by the renderer (only `files/` and `docker/` are
+  rendered) and never ships in a generated project.
+- `files/` — the base file tree, always rendered.
+- `docker/` (optional) — an extra layer rendered *in addition to*
+  `files/`, only when `Answers.docker` is true. If a template has no
+  `docker/` directory, `--docker` is a no-op warning rather than an
+  error (PRODUCT_FLOW §5) — `TemplateMeta.supports_docker` checks for
+  the directory's existence.
+
+Within any layer, both **file/directory names** and **file contents**
+are run through Jinja2:
+- A path segment literally named `{{package_name}}` becomes e.g.
+  `my_api`.
+- `*.jinja` file extensions are stripped after rendering
+  (`main.py.jinja` → `main.py`); files without `.jinja` are copied
+  verbatim (for binary/static assets, none needed in v0).
+- `gitignore.jinja` renders to `.gitignore`, `dockerignore.jinja` to
+  `.dockerignore` — an explicit rename table in `generator.py`
+  (`_RENAME_MAP`) sidesteps packaging tools that mishandle literal
+  leading-dot filenames in source control / sdists.
 
 Render context (the "answers" passed to every template):
 
@@ -103,32 +133,39 @@ class Answers(BaseModel):
     slug: str               # "my-api" — directory / distribution name
     package_name: str       # "my_api" — importable package name
     framework: str          # "fastapi"
+    template: str            # "hello-world"
     git_init: bool
     install: bool
+    docker: bool
 ```
 
-`generator.render(template_id, target_dir, answers)`:
-1. Resolve template directory, load `template.json`, verify `enabled`.
+`generator.render(framework_id, template_id, target_dir, answers, force=False)`:
+1. Resolve the framework, then the template within it; verify both
+   `enabled`.
 2. Refuse if `target_dir` exists and is non-empty, unless `force=True`.
-3. Walk `files/` (`os.walk`, deterministic sorted order).
-4. For each path: render the *path itself* through Jinja2, render
-   *contents* through Jinja2 (skip binary files by extension allowlist —
-   none in v0, forward-compatible), write to `target_dir`.
+3. Build the layer list: `["files"]`, plus `["docker"]` if
+   `answers.docker` and `template.supports_docker`.
+4. For each layer, walk its directory (`rglob`, deterministic sorted
+   order); for each file, render the *path itself* through Jinja2,
+   render *contents* through Jinja2, write to `target_dir`.
 5. On any exception: remove everything written so far under `target_dir`
    before re-raising (all-or-nothing generation, per PRODUCT_FLOW §5).
-6. Return the list of created paths (used for the CLI summary).
+6. Return the sorted list of created paths (used for the CLI summary;
+   `postgen.print_summary` checks for `Path("Dockerfile")` in it to
+   decide whether to print Docker next-steps).
 
-This keeps "add a new template" to: add a directory + `template.json`,
-no changes to `generator.py`. Adding Flask in `v0.x` is purely a content
-change, not an architecture change — satisfies the non-goal in the spec
-about not blocking future frameworks.
+This keeps "add a new template" to: add a directory + `template.json`
+(+ optionally `docker/`), no changes to `generator.py`. Adding a new
+*framework* is the same, one level up. Adding Flask/restapi/ai for real
+in `v0.x` is purely a content change (swap `enabled: false` → `true` and
+fill in `files/`), not an architecture change.
 
 ## 5. CLI flow → code mapping
 
 | PRODUCT_FLOW step | Module |
 |---|---|
 | Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `flint` invokes `new` via Typer's default-command pattern) |
-| Interactive prompts | `prompts.py` — one function per step, each accepting a pre-supplied flag value and skipping its own prompt if set or if `--yes`/non-TTY |
+| Interactive prompts | `prompts.py` — one function per step, each accepting a pre-supplied flag value and skipping its own prompt if set or if `--yes`/non-TTY. `prompt_framework`/`prompt_template` share a `_select_enabled` helper (identical shape: pick one enabled entry from a list, flag short-circuits, non-interactive picks the first enabled). |
 | Name validation | `naming.py` — pure functions, no I/O, exhaustively unit tested |
 | Directory existence check | `generator.py` (single source of truth, both interactive and non-interactive paths call it) |
 | File generation | `generator.py` |
@@ -139,25 +176,42 @@ about not blocking future frameworks.
 TTY detection for non-interactive mode: `sys.stdin.isatty()`, overridable
 by explicit `--yes`.
 
+`--docker` support-check ordering: `cli.py` picks the template first,
+then calls `prompts.prompt_docker`, then — if docker was requested but
+`chosen_template.supports_docker` is false — downgrades to
+`docker=False` with a warning *before* calling `generator.render`, so
+the render context (`Answers.docker`) always matches what was actually
+generated (a template's own `files/README.md.jinja` can safely branch on
+`{% if docker %}` without knowing about the fallback).
+
 ## 6. Testing strategy
 
 - `test_naming.py` — table-driven tests of the slugify/package-name
   rules (keywords, leading digits, unicode, empty string, etc.).
-- `test_generator.py` — renders the `fastapi_hello_world` template into a
-  `tmp_path`, asserts exact expected file set and spot-checks rendered
-  content (e.g. `package_name` substitution landed correctly); asserts
-  the non-empty-directory guard and the rollback-on-failure behavior.
+- `test_generator.py` — renders `fastapi/hello-world` into a `tmp_path`
+  (with and without `docker=True`), asserts exact expected file set and
+  spot-checks rendered content (e.g. `package_name` substitution landed
+  correctly, the README's Docker section only appears when requested);
+  asserts the non-empty-directory guard, disabled-framework/-template
+  rejection, and the rollback-on-failure behavior.
+- `test_prompts.py` — monkeypatches `questionary`'s `.ask()` calls (it
+  drives a real TTY via `prompt_toolkit`, which can't be exercised
+  through Typer's `CliRunner`) to cover the interactive branches:
+  select/confirm happy paths, re-prompt on invalid input, flag
+  short-circuiting, cancellation.
 - `test_cli.py` — Typer's `CliRunner`, covering: full non-interactive
-  happy path, `--version`, `--help`, existing-directory error, invalid
-  name error. Interactive-prompt paths are exercised by feeding
-  `questionary`'s prompt functions through monkeypatching rather than
-  driving a real TTY.
+  happy path (with and without `--docker`), `--version`, `--help`,
+  existing-directory error, invalid name, unknown/disabled
+  framework/template. The one test that exercises wizard *defaults*
+  (bare `flint` invocation) monkeypatches `postgen.git_init` /
+  `install_dependencies` so the test suite makes no real subprocess or
+  network calls.
 - End-to-end smoke test (manual for v0, candidate for CI later): actually
-  run generated output through `uv run pytest` inside the generated
-  project to confirm the *template* itself is a valid, passing project —
-  this is a property of the template content, not of Flint's own code,
-  but it's the ultimate acceptance check for the spec's "zero manual
-  edits" goal.
+  run generated output through `uv sync && uv run pytest`, and — with
+  `--docker` — `docker build`/`docker run` + a live request, to confirm
+  the *template* itself is a valid, passing, deployable project. This is
+  a property of the template content, not of Flint's own code, but it's
+  the ultimate acceptance check for the spec's "zero manual edits" goal.
 
 ## 7. Versioning & release mechanics
 
@@ -175,11 +229,16 @@ by explicit `--yes`.
 ## 8. Explicitly deferred (tracked, not forgotten)
 
 - Remote/pluggable template sources (would live behind the same
-  `generator.render(template_id, ...)` interface — `template_id` could
-  become a path/URL instead of a bundled-package lookup without changing
-  callers).
+  `generator.render(framework_id, template_id, ...)` interface — the ids
+  could become a path/URL instead of a bundled-package lookup without
+  changing callers).
 - Package-manager choice (pip/poetry) — `postgen.py`'s install step is
-  already isolated behind one function, swappable per `Answers.pm` if
-  that field is ever added.
+  already isolated behind one function, swappable per an `Answers.pm`
+  field if that's ever added.
+- `.agents/skills/<framework>` — a directory of framework-specific,
+  agent-consumable skills shipped into generated projects. Deferred per
+  PRODUCT_SPEC §12: needs real content and a target skill format/consumer
+  decided, not just plumbing. `AGENTS.md` (§4, always-on) ships now as
+  the lightweight version of "give agents context."
 - `--force` overwrite confirmation UX polish, `flint list-templates`
   introspection command.

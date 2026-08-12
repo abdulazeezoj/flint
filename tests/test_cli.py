@@ -28,7 +28,9 @@ def test_new_non_interactive_happy_path(tmp_path: Path, monkeypatch):
             "new",
             "my-api",
             "--framework",
-            "fastapi-hello-world",
+            "fastapi",
+            "--template",
+            "hello-world",
             "--no-git",
             "--no-install",
             "--yes",
@@ -37,7 +39,30 @@ def test_new_non_interactive_happy_path(tmp_path: Path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert (tmp_path / "my-api" / "pyproject.toml").is_file()
     assert (tmp_path / "my-api" / "src" / "my_api" / "main.py").is_file()
+    assert not (tmp_path / "my-api" / "Dockerfile").exists()
     assert "Success!" in result.stdout
+
+
+def test_new_with_docker_flag(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "hello-world",
+            "--docker",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert (tmp_path / "my-api" / "Dockerfile").is_file()
+    assert (tmp_path / "my-api" / ".dockerignore").is_file()
 
 
 def test_bare_invocation_defaults_to_new(tmp_path: Path, monkeypatch):
@@ -54,6 +79,7 @@ def test_bare_invocation_defaults_to_new(tmp_path: Path, monkeypatch):
     result = runner.invoke(app, [])
     assert result.exit_code == 0, result.stdout
     assert (tmp_path / "my-app" / "pyproject.toml").is_file()
+    assert not (tmp_path / "my-app" / "Dockerfile").exists()  # docker defaults off
     assert calls == ["git", "install"]
 
 
@@ -62,9 +88,7 @@ def test_new_existing_nonempty_directory_errors(tmp_path: Path, monkeypatch):
     (tmp_path / "my-api").mkdir()
     (tmp_path / "my-api" / "existing.txt").write_text("hi")
 
-    result = runner.invoke(
-        app, ["new", "my-api", "--framework", "fastapi-hello-world", "--yes"]
-    )
+    result = runner.invoke(app, ["new", "my-api", "--framework", "fastapi", "--yes"])
     assert result.exit_code == 1
     assert "already exists" in result.stdout
 
@@ -84,6 +108,41 @@ def test_new_unknown_framework_errors(tmp_path: Path, monkeypatch):
     assert "Unknown --framework" in result.stdout
 
 
+def test_new_disabled_framework_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["new", "my-api", "--framework", "flask", "--yes"])
+    assert result.exit_code == 1
+    assert "isn't available yet" in result.stdout
+
+
+def test_new_unknown_template_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "does-not-exist",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Unknown --template" in result.stdout
+
+
+def test_new_disabled_template_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        ["new", "my-api", "--framework", "fastapi", "--template", "restapi", "--yes"],
+    )
+    assert result.exit_code == 1
+    assert "isn't available yet" in result.stdout
+
+
 def test_new_force_overwrites(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "my-api").mkdir()
@@ -95,7 +154,9 @@ def test_new_force_overwrites(tmp_path: Path, monkeypatch):
             "new",
             "my-api",
             "--framework",
-            "fastapi-hello-world",
+            "fastapi",
+            "--template",
+            "hello-world",
             "--no-git",
             "--no-install",
             "--yes",

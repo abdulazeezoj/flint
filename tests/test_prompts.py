@@ -10,17 +10,26 @@ import pytest
 
 from flint import prompts
 from flint.errors import FlintUserError
-from flint.generator import TemplateMeta
+from flint.generator import FrameworkMeta, TemplateMeta
 
-FASTAPI = TemplateMeta(
-    id="fastapi-hello-world",
-    label="FastAPI — Hello World",
+FASTAPI = FrameworkMeta(id="fastapi", label="FastAPI", description="", enabled=True, path=None)
+FLASK_SOON = FrameworkMeta(id="flask", label="Flask", description="", enabled=False, path=None)
+
+HELLO_WORLD = TemplateMeta(
+    id="hello-world",
+    label="Hello World",
     description="",
     enabled=True,
     path=None,
+    framework_id="fastapi",
 )
-FLASK_SOON = TemplateMeta(
-    id="flask-hello-world", label="Flask", description="", enabled=False, path=None
+RESTAPI_SOON = TemplateMeta(
+    id="restapi",
+    label="REST API",
+    description="",
+    enabled=False,
+    path=None,
+    framework_id="fastapi",
 )
 
 
@@ -57,15 +66,15 @@ def test_prompt_project_name_non_interactive_uses_default():
 
 def test_prompt_framework_interactive_select(monkeypatch):
     monkeypatch.setattr(
-        questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: "fastapi-hello-world"})()
+        questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: "fastapi"})()
     )
     result = prompts.prompt_framework(None, [FASTAPI, FLASK_SOON], interactive=True)
-    assert result == "fastapi-hello-world"
+    assert result == "fastapi"
 
 
-def test_prompt_framework_flag_disabled_template_rejected():
+def test_prompt_framework_flag_disabled_rejected():
     with pytest.raises(FlintUserError):
-        prompts.prompt_framework("flask-hello-world", [FASTAPI, FLASK_SOON], interactive=True)
+        prompts.prompt_framework("flask", [FASTAPI, FLASK_SOON], interactive=True)
 
 
 def test_prompt_framework_flag_unknown_rejected():
@@ -75,7 +84,46 @@ def test_prompt_framework_flag_unknown_rejected():
 
 def test_prompt_framework_non_interactive_picks_first_enabled():
     result = prompts.prompt_framework(None, [FASTAPI, FLASK_SOON], interactive=False)
-    assert result == "fastapi-hello-world"
+    assert result == "fastapi"
+
+
+def test_prompt_template_interactive_select(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: "hello-world"})()
+    )
+    result = prompts.prompt_template(None, [HELLO_WORLD, RESTAPI_SOON], interactive=True)
+    assert result == "hello-world"
+
+
+def test_prompt_template_flag_disabled_rejected():
+    with pytest.raises(FlintUserError):
+        prompts.prompt_template("restapi", [HELLO_WORLD, RESTAPI_SOON], interactive=True)
+
+
+def test_prompt_template_non_interactive_picks_first_enabled():
+    result = prompts.prompt_template(None, [HELLO_WORLD, RESTAPI_SOON], interactive=False)
+    assert result == "hello-world"
+
+
+def test_prompt_docker_interactive_default_false(monkeypatch):
+    seen = {}
+
+    def fake_confirm(question, default):
+        seen["default"] = default
+        return type("Q", (), {"ask": lambda self: default})()
+
+    monkeypatch.setattr(questionary, "confirm", fake_confirm)
+    assert prompts.prompt_docker(None, interactive=True) is False
+    assert seen["default"] is False
+
+
+def test_prompt_docker_flag_skips_prompt(monkeypatch):
+    monkeypatch.setattr(questionary, "confirm", lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not prompt")))
+    assert prompts.prompt_docker(True, interactive=True) is True
+
+
+def test_prompt_docker_non_interactive_defaults_false():
+    assert prompts.prompt_docker(None, interactive=False) is False
 
 
 def test_prompt_git_init_interactive(monkeypatch):

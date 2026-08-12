@@ -12,7 +12,7 @@ import questionary
 from rich.console import Console
 
 from flint.errors import FlintUserError
-from flint.generator import TemplateMeta
+from flint.generator import FrameworkMeta, TemplateMeta
 from flint.naming import validate_project_name
 
 console = Console()
@@ -43,34 +43,65 @@ def prompt_project_name(name: str | None, interactive: bool) -> tuple[str, str, 
             console.print(f"[red]✖[/red] {exc}")
 
 
-def prompt_framework(
-    framework: str | None, templates: list[TemplateMeta], interactive: bool
+def _select_enabled(
+    question: str,
+    value: str | None,
+    entries: list[FrameworkMeta] | list[TemplateMeta],
+    interactive: bool,
+    not_found_label: str,
 ) -> str:
-    by_id = {t.id: t for t in templates}
+    by_id = {e.id: e for e in entries}
 
-    if framework is not None:
-        if framework not in by_id:
+    if value is not None:
+        if value not in by_id:
             raise FlintUserError(
-                f"Unknown --framework '{framework}'. "
-                f"Available: {', '.join(t.id for t in templates)}."
+                f"Unknown {not_found_label} '{value}'. "
+                f"Available: {', '.join(e.id for e in entries)}."
             )
-        if not by_id[framework].enabled:
-            raise FlintUserError(f"'{framework}' isn't available yet.")
-        return framework
+        if not by_id[value].enabled:
+            raise FlintUserError(f"'{value}' isn't available yet.")
+        return value
 
-    enabled = [t for t in templates if t.enabled]
+    enabled = [e for e in entries if e.enabled]
     if not interactive:
         return enabled[0].id
 
     choices = [
         questionary.Choice(
-            title=t.label if t.enabled else f"{t.label} (coming soon)",
-            value=t.id,
-            disabled="coming soon" if not t.enabled else None,
+            title=e.label if e.enabled else f"{e.label} (coming soon)",
+            value=e.id,
+            disabled="coming soon" if not e.enabled else None,
         )
-        for t in templates
+        for e in entries
     ]
-    answer = questionary.select("Which framework?", choices=choices).ask()
+    answer = questionary.select(question, choices=choices).ask()
+    if answer is None:
+        raise FlintUserError("Cancelled.")
+    return answer
+
+
+def prompt_framework(
+    framework: str | None, frameworks: list[FrameworkMeta], interactive: bool
+) -> str:
+    return _select_enabled(
+        "Which framework?", framework, frameworks, interactive, "--framework"
+    )
+
+
+def prompt_template(
+    template: str | None, templates: list[TemplateMeta], interactive: bool
+) -> str:
+    return _select_enabled(
+        "Which template?", template, templates, interactive, "--template"
+    )
+
+
+def prompt_docker(docker: bool | None, interactive: bool) -> bool:
+    if docker is not None:
+        return docker
+    if not interactive:
+        return False
+    answer = questionary.confirm("Add a Dockerfile?", default=False).ask()
     if answer is None:
         raise FlintUserError("Cancelled.")
     return answer

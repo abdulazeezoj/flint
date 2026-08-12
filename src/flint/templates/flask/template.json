@@ -1,0 +1,6 @@
+{
+  "id": "flask",
+  "label": "Flask",
+  "description": "Flask — a lightweight WSGI web framework. Coming soon.",
+  "enabled": false
+}

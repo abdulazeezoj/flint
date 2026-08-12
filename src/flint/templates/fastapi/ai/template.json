@@ -1,0 +1,6 @@
+{
+  "id": "ai",
+  "label": "AI App",
+  "description": "A FastAPI app pre-wired for an LLM-backed endpoint. Coming soon.",
+  "enabled": false
+}

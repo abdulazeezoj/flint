@@ -3,9 +3,35 @@
 All notable changes to Flint are documented here.
 
 Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
-§10): `release` is the major epoch (starting at `0`), `feature` bumps for
+§11): `release` is the major epoch (starting at `0`), `feature` bumps for
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
+
+## v0.2.0 — 2026-08-12
+
+### Added
+
+- `--docker/--no-docker` flag (and matching wizard prompt, default off):
+  adds a `Dockerfile` and `.dockerignore` to the generated project. The
+  `fastapi/hello-world` template's generated README gains a Docker
+  section when used; the CLI summary prints `docker build`/`docker run`
+  next steps.
+- Every generated project now includes `AGENTS.md` — run/test commands,
+  layout, and conventions for AI coding agents working in the repo.
+  Always on, no flag.
+- `templates/fastapi/hello-world/README.md` — maintainer docs for the
+  template itself (not shipped to generated projects).
+
+### Changed
+
+- **Breaking (pre-1.0):** templates are now addressed as
+  `--framework <id> --template <id>` (e.g. `--framework fastapi
+  --template hello-world`) instead of a single combined
+  `--framework fastapi-hello-world`. The wizard now asks framework and
+  template as two separate steps. `restapi` and `ai` are listed as
+  disabled ("coming soon") templates under `fastapi`; `flask` and
+  `django` are listed as disabled frameworks — signaling the template
+  roadmap the same way disabled frameworks already did.
 
 ## v0.1.0 — 2026-08-12
 

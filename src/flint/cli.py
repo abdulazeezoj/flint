@@ -35,7 +35,16 @@ def root(
         console.print(f"flint {__version__}")
         raise typer.Exit()
     if ctx.invoked_subcommand is None:
-        _run_new(name=None, framework=None, git=None, install=None, yes=False, force=False)
+        _run_new(
+            name=None,
+            framework=None,
+            template=None,
+            docker=None,
+            git=None,
+            install=None,
+            yes=False,
+            force=False,
+        )
 
 
 @app.command()
@@ -44,8 +53,15 @@ def new(
         Optional[str], typer.Argument(help="Project name, e.g. 'my-api'.")
     ] = None,
     framework: Annotated[
+        Optional[str], typer.Option(help="Framework to use, e.g. 'fastapi'.")
+    ] = None,
+    template: Annotated[
         Optional[str],
-        typer.Option(help="Template to use, e.g. 'fastapi-hello-world'."),
+        typer.Option(help="Template variant within the framework, e.g. 'hello-world'."),
+    ] = None,
+    docker: Annotated[
+        Optional[bool],
+        typer.Option("--docker/--no-docker", help="Add a Dockerfile."),
     ] = None,
     git: Annotated[
         Optional[bool],
@@ -69,13 +85,24 @@ def new(
     ] = False,
 ) -> None:
     """Generate a new project."""
-    _run_new(name=name, framework=framework, git=git, install=install, yes=yes, force=force)
+    _run_new(
+        name=name,
+        framework=framework,
+        template=template,
+        docker=docker,
+        git=git,
+        install=install,
+        yes=yes,
+        force=force,
+    )
 
 
 def _run_new(
     *,
     name: Optional[str],
     framework: Optional[str],
+    template: Optional[str],
+    docker: Optional[bool],
     git: Optional[bool],
     install: Optional[bool],
     yes: bool,
@@ -93,8 +120,20 @@ def _run_new(
                 "Use --force to generate into it anyway."
             )
 
-        templates = generator.list_templates()
-        template_id = prompts.prompt_framework(framework, templates, interactive)
+        frameworks = generator.list_frameworks()
+        framework_id = prompts.prompt_framework(framework, frameworks, interactive)
+
+        templates = generator.list_templates(framework_id)
+        template_id = prompts.prompt_template(template, templates, interactive)
+
+        chosen_template = generator.get_template(framework_id, template_id)
+        docker_requested = prompts.prompt_docker(docker, interactive)
+        if docker_requested and not chosen_template.supports_docker:
+            console.print(
+                f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
+                "--docker yet — skipping the Dockerfile."
+            )
+            docker_requested = False
 
         if interactive:
             console.print("Using uv to manage dependencies.")
@@ -106,11 +145,13 @@ def _run_new(
             project_name=project_name,
             slug=slug,
             package_name=package_name,
-            framework=template_id,
+            framework=framework_id,
+            template=template_id,
             git_init=git_init,
             install=install_now,
+            docker=docker_requested,
         )
-        created = generator.render(template_id, target_dir, answers, force=force)
+        created = generator.render(framework_id, template_id, target_dir, answers, force=force)
 
         git_ok = postgen.git_init(target_dir) if git_init else False
         installed_ok = postgen.install_dependencies(target_dir) if install_now else False
@@ -119,7 +160,7 @@ def _run_new(
             project_name=project_name,
             slug=slug,
             package_name=package_name,
-            template_id=template_id,
+            template_full_id=chosen_template.full_id,
             target_dir=target_dir,
             created=created,
             git_ok=git_ok,

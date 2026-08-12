@@ -15,10 +15,21 @@ Then open <http://127.0.0.1:8000> — you should see `{"message": "Hello, World!
 ```
 uv run pytest
 ```
+{% if docker %}
+## Docker
 
+```
+docker build -t {{ slug }} .
+docker run -p 8000:8000 {{ slug }}
+```
+{% endif %}
 ## Layout
 
 ```
 src/{{ package_name }}/   application package
 tests/                    tests
+AGENTS.md                 project context for AI coding agents
+{%- if docker %}
+Dockerfile                container build
+{%- endif %}
 ```

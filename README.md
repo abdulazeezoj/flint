@@ -9,12 +9,15 @@ uvx flint
 
 ```
 ? What is your project named? my-api
-? Which framework? FastAPI — Hello World
+? Which framework? FastAPI
+? Which template? Hello World
 Using uv to manage dependencies.
+? Add a Dockerfile? No
 ? Initialize a git repository? Yes
 ? Install dependencies with uv now? Yes
 
-Creating my-api/ from fastapi-hello-world...
+Creating my-api/ from fastapi/hello-world...
+  ✔ AGENTS.md
   ✔ pyproject.toml
   ✔ README.md
   ✔ .gitignore
@@ -44,23 +47,33 @@ uvx flint
 ## Usage
 
 ```
-flint                          # interactive wizard
-flint new my-api                # interactive, name pre-filled
+flint                            # interactive wizard
+flint new my-api                  # interactive, name pre-filled
 flint new my-api \
-  --framework fastapi-hello-world \
-  --git --install --yes         # fully non-interactive, for scripts/CI
+  --framework fastapi --template hello-world \
+  --docker --git --install --yes  # fully non-interactive, for scripts/CI
 flint --version
 flint --help
 ```
 
+Every prompt has a matching flag: `--framework`, `--template`,
+`--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`,
+`--yes` (accept all defaults), `--force` (generate into a non-empty dir).
+
 ## What v0 ships
 
-- **`fastapi-hello-world`** — a `uv`-managed, `src/`-layout FastAPI app
-  with a passing test, ready to run with no edits.
+A project is always generated from a `<framework>/<template>` pair — the
+**framework** is the underlying library (FastAPI, Flask, ...), the
+**template** is a specific project shape built on it (Hello World, REST
+API, ...). Today:
 
-More frameworks are on the roadmap; the wizard already lists them as
-"coming soon" where relevant. See `docs/PRODUCT_SPEC.md` for full v0
-scope and non-goals.
+- **`fastapi/hello-world`** — a `uv`-managed, `src/`-layout FastAPI app
+  with a passing test and an `AGENTS.md`, ready to run with no edits.
+  Pass `--docker` for a `Dockerfile` + `.dockerignore` too.
+
+More frameworks (Flask, Django) and templates (REST API, AI App) are on
+the roadmap; the wizard already lists them as "coming soon". See
+`docs/PRODUCT_SPEC.md` for full v0 scope and non-goals.
 
 ## Docs
 
@@ -76,3 +89,7 @@ uv sync
 uv run pytest
 uv run flint --help
 ```
+
+Adding a framework or template is a content-only change — no code edits
+needed. See `src/flint/templates/fastapi/hello-world/README.md` for the
+layout a new template directory needs.
