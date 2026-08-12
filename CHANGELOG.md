@@ -7,6 +7,25 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.2.1 — 2026-08-12
+
+### Fixed
+
+- `generator.render` now rolls back a partially-written target directory
+  when a `FlintError` (not just any other exception) is raised mid-render
+  — previously that branch re-raised without cleaning up, breaking the
+  documented all-or-nothing generation guarantee. Currently unreachable
+  via any real input, but would have mattered the moment a future layer
+  hook raised one.
+
+### Changed
+
+- Test suite now enforces 100% statement + branch coverage
+  (`--cov-fail-under=100` in `pyproject.toml`, branch coverage on) —
+  every module in `src/flint/` is fully covered, including the
+  `python -m flint` entry points, `git`/`uv` subprocess failure paths,
+  and every prompt cancellation branch.
+
 ## v0.2.0 — 2026-08-12
 
 ### Added

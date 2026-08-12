@@ -1,6 +1,6 @@
 [project]
 name = "flint-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "Interactive project scaffolding for Python frameworks — create-next-app, for FastAPI, Flask, and friends."
 readme = "README.md"
 license = "MIT"
@@ -38,4 +38,12 @@ module-name = "flint"
 [dependency-groups]
 dev = [
     "pytest>=8.3.4",
+    "pytest-cov>=7.1.0",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=flint --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+source = ["flint"]

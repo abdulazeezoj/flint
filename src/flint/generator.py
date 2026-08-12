@@ -179,11 +179,11 @@ def render(
         target_dir.mkdir(parents=True, exist_ok=True)
         for layer in layers:
             created.extend(_render_layer(template.path / layer, target_dir, context))
-    except FlintError:
-        raise
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
             shutil.rmtree(target_dir, ignore_errors=True)
+        if isinstance(exc, FlintError):
+            raise
         raise FlintError(f"Failed to generate project: {exc}") from exc
 
     return sorted(created)

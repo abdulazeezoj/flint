@@ -1,7 +1,9 @@
+import json
 from pathlib import Path
 
 import pytest
 
+import flint.generator as generator_module
 from flint.errors import FlintError, FlintUserError
 from flint.generator import (
     Answers,
@@ -151,8 +153,6 @@ def test_render_disabled_framework_raises(tmp_path: Path):
 def test_render_rolls_back_on_failure(tmp_path: Path, monkeypatch):
     target = tmp_path / "my-api"
 
-    import flint.generator as generator_module
-
     original_render_content = generator_module._render_content
     calls = {"count": 0}
 
@@ -173,3 +173,79 @@ def test_render_rolls_back_on_failure(tmp_path: Path, monkeypatch):
 def test_render_unknown_template_raises(tmp_path: Path):
     with pytest.raises(FlintUserError):
         render("fastapi", "does-not-exist", tmp_path / "x", make_answers())
+
+
+def test_render_propagates_flint_error_without_wrapping_but_still_rolls_back(
+    tmp_path: Path, monkeypatch
+):
+    # A FlintError raised mid-render (e.g. surfaced from a future layer
+    # hook) should pass through unchanged rather than being wrapped in
+    # the generic "Failed to generate project" message — but generation
+    # is still all-or-nothing, so the partial directory must be rolled
+    # back just like for any other exception.
+    target = tmp_path / "my-api"
+
+    def raise_user_error(layer_root, target_dir, context):
+        raise FlintUserError("deliberate")
+
+    monkeypatch.setattr(generator_module, "_render_layer", raise_user_error)
+
+    with pytest.raises(FlintUserError, match="deliberate"):
+        render("fastapi", "hello-world", target, make_answers())
+
+    assert not target.exists()
+
+
+def test_render_content_copies_non_jinja_files_verbatim(tmp_path: Path):
+    source = tmp_path / "static.txt"
+    source.write_text("{{ not_rendered }}", encoding="utf-8")
+
+    result = generator_module._render_content(source, {"not_rendered": "should not appear"})
+
+    assert result == "{{ not_rendered }}"
+
+
+def _write_meta(directory: Path, id_: str) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "template.json").write_text(
+        json.dumps({"id": id_, "label": id_.title(), "description": "d", "enabled": True})
+    )
+
+
+def test_list_frameworks_skips_entries_without_template_json(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+    _write_meta(tmp_path / "widget", "widget")
+    (tmp_path / "stray.txt").write_text("not a framework")
+
+    frameworks = generator_module.list_frameworks()
+    assert [f.id for f in frameworks] == ["widget"]
+
+
+def test_list_templates_skips_subdirs_without_template_json(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+    _write_meta(tmp_path / "widget", "widget")
+    _write_meta(tmp_path / "widget" / "basic", "basic")
+    (tmp_path / "widget" / "docs").mkdir()  # a dir with no template.json
+
+    templates = generator_module.list_templates("widget")
+    assert [t.id for t in templates] == ["basic"]
+
+
+def test_render_does_not_delete_preexisting_directory_on_failure(tmp_path: Path, monkeypatch):
+    # created_before=True (the target dir existed before this render call,
+    # e.g. a --force run) must never be cleaned up on failure — only
+    # directories flint itself created get rolled back.
+    target = tmp_path / "my-api"
+    target.mkdir()
+    (target / "keepme.txt").write_text("do not delete")
+
+    def raise_error(layer_root, target_dir, context):
+        raise FlintUserError("deliberate")
+
+    monkeypatch.setattr(generator_module, "_render_layer", raise_error)
+
+    with pytest.raises(FlintUserError):
+        render("fastapi", "hello-world", target, make_answers(), force=True)
+
+    assert target.exists()
+    assert (target / "keepme.txt").read_text() == "do not delete"

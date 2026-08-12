@@ -86,7 +86,7 @@ the roadmap; the wizard already lists them as "coming soon". See
 
 ```
 uv sync
-uv run pytest
+uv run pytest       # also runs coverage — the suite fails under 100%
 uv run flint --help
 ```
 

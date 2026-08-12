@@ -186,32 +186,66 @@ generated (a template's own `files/README.md.jinja` can safely branch on
 
 ## 6. Testing strategy
 
+`pytest` runs with `--cov=flint --cov-report=term-missing
+--cov-fail-under=100` by default (`[tool.pytest.ini_options]` in
+`pyproject.toml`), with branch coverage on
+(`[tool.coverage.run] branch = true`) — the suite fails the moment any
+line *or* branch in `src/flint/` goes uncovered, not just when a whole
+function is untested. `uv run pytest` is enough to check both tests and
+coverage locally.
+
 - `test_naming.py` — table-driven tests of the slugify/package-name
-  rules (keywords, leading digits, unicode, empty string, etc.).
+  rules (keywords, leading digits, unicode, empty string, etc.), plus one
+  test that forces the defensive non-identifier guard in
+  `validate_project_name` (unreachable via real input — `slugify`/
+  `package_name_from_slug` only ever produce valid identifiers — so it's
+  exercised by monkeypatching `package_name_from_slug` directly).
 - `test_generator.py` — renders `fastapi/hello-world` into a `tmp_path`
   (with and without `docker=True`), asserts exact expected file set and
   spot-checks rendered content (e.g. `package_name` substitution landed
   correctly, the README's Docker section only appears when requested);
   asserts the non-empty-directory guard, disabled-framework/-template
-  rejection, and the rollback-on-failure behavior.
+  rejection, the rollback-on-failure behavior (including that a
+  `FlintError` raised mid-render still rolls back, and that a
+  pre-existing `--force` target directory is *never* deleted), the
+  verbatim-copy path for non-`.jinja` files, and that `list_frameworks`/
+  `list_templates` skip directory entries with no `template.json`.
 - `test_prompts.py` — monkeypatches `questionary`'s `.ask()` calls (it
   drives a real TTY via `prompt_toolkit`, which can't be exercised
   through Typer's `CliRunner`) to cover the interactive branches:
   select/confirm happy paths, re-prompt on invalid input, flag
-  short-circuiting, cancellation.
+  short-circuiting, cancellation (every prompt function, not just
+  project name).
 - `test_cli.py` — Typer's `CliRunner`, covering: full non-interactive
   happy path (with and without `--docker`), `--version`, `--help`,
   existing-directory error, invalid name, unknown/disabled
-  framework/template. The one test that exercises wizard *defaults*
-  (bare `flint` invocation) monkeypatches `postgen.git_init` /
-  `install_dependencies` so the test suite makes no real subprocess or
+  framework/template, `--docker` requested against a template that
+  doesn't support it, a `typer.Exit` raised mid-flow passing through
+  unchanged, and an unexpected exception mapping to exit code 2. The
+  fully-interactive path (including the "Using uv..." message) is
+  exercised by calling `cli._run_new` directly with `sys.stdin` patched
+  and `questionary` stubbed, rather than through `CliRunner` — Click's
+  `CliRunner.invoke()` swaps `sys.stdin` out for its own stream for the
+  duration of the call, which would clobber an `isatty()` patch made
+  beforehand. Tests that don't need the real subprocesses (bare
+  invocation, the interactive path) monkeypatch `postgen.git_init` /
+  `install_dependencies` so the suite makes no real subprocess or
   network calls.
+- `test_postgen.py` — `git_init`/`install_dependencies` directly, with
+  `subprocess.run` monkeypatched: binary-not-found, success, and
+  `CalledProcessError` for each.
+- `test_main.py` — covers the `python -m flint` / `python -m flint.cli`
+  entry-point guards via `runpy.run_module(..., run_name="__main__")`
+  (executes in-process, unlike `subprocess`, so `coverage.py` sees it),
+  plus a plain `import flint.__main__` to cover the guard's
+  not-taken branch.
 - End-to-end smoke test (manual for v0, candidate for CI later): actually
   run generated output through `uv sync && uv run pytest`, and — with
   `--docker` — `docker build`/`docker run` + a live request, to confirm
   the *template* itself is a valid, passing, deployable project. This is
-  a property of the template content, not of Flint's own code, but it's
-  the ultimate acceptance check for the spec's "zero manual edits" goal.
+  a property of the template content, not of Flint's own code, and
+  isn't part of the 100% coverage gate, but it's the ultimate acceptance
+  check for the spec's "zero manual edits" goal.
 
 ## 7. Versioning & release mechanics
 

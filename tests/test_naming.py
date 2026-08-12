@@ -1,5 +1,6 @@
 import pytest
 
+import flint.naming as naming_module
 from flint.errors import FlintUserError
 from flint.naming import validate_project_name
 
@@ -37,3 +38,14 @@ def test_validate_project_name_ok(raw, expected_slug, expected_package):
 def test_validate_project_name_rejects(raw):
     with pytest.raises(FlintUserError):
         validate_project_name(raw)
+
+
+def test_validate_project_name_rejects_non_identifier_defensively(monkeypatch):
+    # slugify()/package_name_from_slug() only ever produce [a-z0-9_] text
+    # that's already a valid identifier, so this branch is a defensive
+    # backstop rather than something reachable via real input — exercise
+    # it directly by forcing package_name_from_slug to misbehave.
+    monkeypatch.setattr(naming_module, "package_name_from_slug", lambda slug: "1-not-ok")
+
+    with pytest.raises(FlintUserError, match="cannot be turned into a valid Python package name"):
+        validate_project_name("whatever")

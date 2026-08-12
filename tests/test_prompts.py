@@ -144,3 +144,35 @@ def test_prompt_cancelled_raises(monkeypatch):
     monkeypatch.setattr(questionary, "text", lambda *a, **k: type("Q", (), {"ask": lambda self: None})())
     with pytest.raises(FlintUserError):
         prompts.prompt_project_name(None, interactive=True)
+
+
+def test_prompt_framework_select_cancelled_raises(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
+    )
+    with pytest.raises(FlintUserError):
+        prompts.prompt_framework(None, [FASTAPI, FLASK_SOON], interactive=True)
+
+
+def test_prompt_docker_cancelled_raises(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
+    )
+    with pytest.raises(FlintUserError):
+        prompts.prompt_docker(None, interactive=True)
+
+
+def test_prompt_git_init_cancelled_raises(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
+    )
+    with pytest.raises(FlintUserError):
+        prompts.prompt_git_init(None, interactive=True)
+
+
+def test_prompt_install_cancelled_raises(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
+    )
+    with pytest.raises(FlintUserError):
+        prompts.prompt_install(None, interactive=True)
