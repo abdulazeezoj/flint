@@ -141,6 +141,7 @@ def test_run_new_interactive_full_flow(tmp_path: Path, monkeypatch, capsys):
         name=None,
         framework=None,
         template=None,
+        option=[],
         docker=None,
         git=None,
         install=None,
@@ -232,14 +233,6 @@ def test_new_unknown_template_errors(tmp_path: Path, monkeypatch):
     assert "Unknown --template" in result.stdout
 
 
-def test_new_disabled_template_errors(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(
-        app,
-        ["new", "my-api", "--framework", "fastapi", "--template", "restapi", "--yes"],
-    )
-    assert result.exit_code == 1
-    assert "isn't available yet" in result.stdout
 
 
 def test_new_force_overwrites(tmp_path: Path, monkeypatch):
@@ -264,3 +257,101 @@ def test_new_force_overwrites(tmp_path: Path, monkeypatch):
     )
     assert result.exit_code == 0, result.stdout
     assert (tmp_path / "my-api" / "pyproject.toml").is_file()
+
+
+def test_new_restapi_with_options(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "--option",
+            "database=none",
+            "-o",
+            "worker=none",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Options: database=none, orm=none, migrations=False, worker=none, redis=False" in (
+        result.stdout
+    )
+    assert (tmp_path / "my-api" / "src" / "my_api" / "routes" / "items.py").is_file()
+    assert not (tmp_path / "my-api" / "src" / "my_api" / "db").exists()
+
+
+def test_new_option_unknown_key_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "--option",
+            "bogus=x",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Unknown option" in result.stdout
+
+
+def test_new_option_invalid_value_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "restapi",
+            "--option",
+            "database=mysql",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "not a valid value" in result.stdout
+
+
+def test_new_option_malformed_flag_errors(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        ["new", "my-api", "--framework", "fastapi", "--template", "hello-world", "-o", "config"],
+    )
+    assert result.exit_code == 1
+    assert "key=value" in result.stdout
+
+
+def test_new_prints_options_summary_line(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "fastapi",
+            "--template",
+            "hello-world",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Options: config=False" in result.stdout

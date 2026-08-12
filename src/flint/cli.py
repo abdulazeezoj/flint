@@ -39,6 +39,7 @@ def root(
             name=None,
             framework=None,
             template=None,
+            option=[],
             docker=None,
             git=None,
             install=None,
@@ -59,6 +60,18 @@ def new(
         Optional[str],
         typer.Option(help="Template variant within the framework, e.g. 'hello-world'."),
     ] = None,
+    option: Annotated[
+        list[str],
+        typer.Option(
+            "--option",
+            "-o",
+            help=(
+                "Set a template-specific option as key=value (repeatable), "
+                "e.g. -o database=postgres -o orm=sqlmodel. See the wizard "
+                "or the template's README for available keys."
+            ),
+        ),
+    ] = [],  # noqa: B006 - Typer's documented pattern for repeatable options
     docker: Annotated[
         Optional[bool],
         typer.Option("--docker/--no-docker", help="Add a Dockerfile."),
@@ -89,6 +102,7 @@ def new(
         name=name,
         framework=framework,
         template=template,
+        option=option,
         docker=docker,
         git=git,
         install=install,
@@ -102,6 +116,7 @@ def _run_new(
     name: Optional[str],
     framework: Optional[str],
     template: Optional[str],
+    option: list[str],
     docker: Optional[bool],
     git: Optional[bool],
     install: Optional[bool],
@@ -127,6 +142,12 @@ def _run_new(
         template_id = prompts.prompt_template(template, templates, interactive)
 
         chosen_template = generator.get_template(framework_id, template_id)
+
+        provided_options = prompts.parse_option_flags(option)
+        resolved_options = prompts.prompt_template_options(
+            chosen_template, provided_options, interactive
+        )
+
         docker_requested = prompts.prompt_docker(docker, interactive)
         if docker_requested and not chosen_template.supports_docker:
             console.print(
@@ -150,6 +171,7 @@ def _run_new(
             git_init=git_init,
             install=install_now,
             docker=docker_requested,
+            options=resolved_options,
         )
         created = generator.render(framework_id, template_id, target_dir, answers, force=force)
 
@@ -166,6 +188,7 @@ def _run_new(
             git_ok=git_ok,
             installed_ok=installed_ok,
             installed_requested=install_now,
+            options=resolved_options,
         )
     except FlintUserError as exc:
         console.print(f"[red]Error:[/red] {exc}")

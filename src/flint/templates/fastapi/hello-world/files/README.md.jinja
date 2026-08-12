@@ -15,6 +15,13 @@ Then open <http://127.0.0.1:8000> — you should see `{"message": "Hello, World!
 ```
 uv run pytest
 ```
+{% if config %}
+## Configuration
+
+Settings are loaded from `.env` via `pydantic-settings` (see
+`src/{{ package_name }}/config.py`). Copy `.env` and adjust values as
+needed — it's already git-ignored.
+{% endif %}
 {% if docker %}
 ## Docker
 
@@ -29,7 +36,10 @@ docker run -p 8000:8000 {{ slug }}
 src/{{ package_name }}/   application package
 tests/                    tests
 AGENTS.md                 project context for AI coding agents
-{%- if docker %}
+{% if config %}
+.env                      local configuration (git-ignored)
+{% endif %}
+{% if docker %}
 Dockerfile                container build
-{%- endif %}
+{% endif %}
 ```

@@ -1,4 +1,6 @@
+import ast
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ from flint.generator import (
     list_frameworks,
     list_templates,
     render,
+    when_matches,
 )
 
 
@@ -30,6 +33,34 @@ def make_answers(**overrides) -> Answers:
     return Answers(**defaults)
 
 
+def _assert_all_python_files_parse(target: Path) -> None:
+    for path in target.rglob("*.py"):
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+def _assert_valid_toml(path: Path) -> dict:
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+class TestWhenMatches:
+    def test_empty_when_always_matches(self):
+        assert when_matches({}, {}) is True
+        assert when_matches({}, {"anything": "x"}) is True
+
+    def test_single_key_match(self):
+        assert when_matches({"worker": ["none"]}, {"worker": "none"}) is True
+        assert when_matches({"worker": ["none"]}, {"worker": "celery"}) is False
+
+    def test_multiple_keys_require_all(self):
+        when = {"orm": ["sqlmodel"], "migrations": [True]}
+        assert when_matches(when, {"orm": "sqlmodel", "migrations": True}) is True
+        assert when_matches(when, {"orm": "sqlmodel", "migrations": False}) is False
+        assert when_matches(when, {"orm": "sqlalchemy", "migrations": True}) is False
+
+    def test_missing_key_does_not_match(self):
+        assert when_matches({"worker": ["none"]}, {}) is False
+
+
 def test_list_frameworks_includes_fastapi():
     frameworks = list_frameworks()
     ids = {f.id for f in frameworks}
@@ -41,10 +72,10 @@ def test_get_framework_unknown_raises():
         get_framework("does-not-exist")
 
 
-def test_list_templates_includes_hello_world():
+def test_list_templates_includes_hello_world_and_restapi():
     templates = list_templates("fastapi")
     ids = {t.id for t in templates}
-    assert "hello-world" in ids
+    assert {"hello-world", "restapi"} <= ids
 
 
 def test_get_template_unknown_raises():
@@ -56,6 +87,31 @@ def test_get_template_full_id_and_docker_support():
     template = get_template("fastapi", "hello-world")
     assert template.full_id == "fastapi/hello-world"
     assert template.supports_docker is True
+
+
+def test_hello_world_declares_config_option():
+    template = get_template("fastapi", "hello-world")
+    assert [o.key for o in template.options] == ["config"]
+    assert template.options[0].type == "confirm"
+    assert template.options[0].default is False
+
+
+def test_restapi_declares_expected_options_and_layers():
+    template = get_template("fastapi", "restapi")
+    option_keys = [o.key for o in template.options]
+    assert option_keys == ["database", "orm", "migrations", "worker", "redis"]
+
+    layer_dirs = {layer.dir for layer in template.layers}
+    assert layer_dirs == {
+        "docker",
+        "db-sqlmodel",
+        "db-sqlalchemy",
+        "migrations-sqlmodel",
+        "migrations-sqlalchemy",
+        "worker-taskiq",
+        "worker-celery",
+        "redis",
+    }
 
 
 def test_render_creates_expected_files(tmp_path: Path):
@@ -116,6 +172,29 @@ def test_render_substitutes_package_name(tmp_path: Path):
     assert "my_api" in agents_md
 
 
+def test_render_hello_world_with_config_option(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render(
+        "fastapi", "hello-world", target, make_answers(options={"config": True})
+    )
+
+    assert Path("src/my_api/config.py") in created
+    assert Path(".env") in created
+    main_py = (target / "src/my_api/main.py").read_text()
+    assert "from my_api.config import settings" in main_py
+    _assert_all_python_files_parse(target)
+
+
+def test_render_hello_world_without_config_option_omits_config_files(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render(
+        "fastapi", "hello-world", target, make_answers(options={"config": False})
+    )
+
+    assert Path("src/my_api/config.py") not in created
+    assert Path(".env") not in created
+
+
 def test_render_refuses_nonempty_directory_without_force(tmp_path: Path):
     target = tmp_path / "my-api"
     target.mkdir()
@@ -135,9 +214,18 @@ def test_render_force_overwrites_nonempty_directory(tmp_path: Path):
     assert len(created) == 7
 
 
-def test_render_disabled_template_raises(tmp_path: Path):
+def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+    _write_meta(tmp_path / "widget", "widget")
+    _write_meta(tmp_path / "widget" / "basic", "basic", enabled=False)
+
     with pytest.raises(FlintUserError):
-        render("fastapi", "restapi", tmp_path / "x", make_answers(template="restapi"))
+        render(
+            "widget",
+            "basic",
+            tmp_path / "out",
+            make_answers(framework="widget", template="basic"),
+        )
 
 
 def test_render_disabled_framework_raises(tmp_path: Path):
@@ -205,10 +293,10 @@ def test_render_content_copies_non_jinja_files_verbatim(tmp_path: Path):
     assert result == "{{ not_rendered }}"
 
 
-def _write_meta(directory: Path, id_: str) -> None:
+def _write_meta(directory: Path, id_: str, enabled: bool = True) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "template.json").write_text(
-        json.dumps({"id": id_, "label": id_.title(), "description": "d", "enabled": True})
+        json.dumps({"id": id_, "label": id_.title(), "description": "d", "enabled": enabled})
     )
 
 
@@ -249,3 +337,168 @@ def test_render_does_not_delete_preexisting_directory_on_failure(tmp_path: Path,
 
     assert target.exists()
     assert (target / "keepme.txt").read_text() == "do not delete"
+
+
+# --- restapi: the options/layers engine exercised through a real template ---
+
+
+def make_restapi_answers(**option_overrides) -> Answers:
+    options = dict(
+        database="sqlite", orm="sqlmodel", migrations=True, worker="none", redis=False
+    )
+    options.update(option_overrides)
+    return make_answers(template="restapi", options=options)
+
+
+def test_restapi_in_memory_default(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers(database="none", orm="none", migrations=False)
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/routes/items.py") in created
+    assert Path("src/my_api/db/session.py") not in created
+    assert Path("alembic.ini") not in created
+    routes = (target / "src/my_api/routes/items.py").read_text()
+    assert "_items" in routes  # the in-memory store
+    _assert_all_python_files_parse(target)
+    _assert_valid_toml(target / "pyproject.toml")
+
+
+def test_restapi_sqlite_sqlmodel_with_migrations(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers()  # sqlite + sqlmodel + migrations=True
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/db/session.py") in created
+    assert Path("src/my_api/db/models.py") in created
+    assert Path("alembic.ini") in created
+    assert Path("alembic/env.py") in created
+    assert Path("alembic/script.py.mako") in created
+    assert Path("alembic/versions/.gitkeep") in created
+
+    routes = (target / "src/my_api/routes/items.py").read_text()
+    assert "get_session" in routes
+    assert "sqlmodel" in (target / "src/my_api/db/session.py").read_text()
+
+    env_py = (target / "alembic/env.py").read_text()
+    assert "SQLModel.metadata" in env_py
+
+    _assert_all_python_files_parse(target)
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert "sqlmodel>=0.0.22" in config["project"]["dependencies"]
+    assert "alembic>=1.14.0" in config["project"]["dependencies"]
+
+
+def test_restapi_postgres_sqlalchemy_no_migrations(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers(database="postgres", orm="sqlalchemy", migrations=False)
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/db/session.py") in created
+    assert Path("alembic.ini") not in created
+
+    session_py = (target / "src/my_api/db/session.py").read_text()
+    assert "sqlalchemy" in session_py.lower()
+    env_file = (target / ".env").read_text()
+    assert "postgresql+asyncpg://" in env_file
+
+    _assert_all_python_files_parse(target)
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert "asyncpg>=0.30.0" in config["project"]["dependencies"]
+    assert "sqlalchemy>=2.0.36" in config["project"]["dependencies"]
+    assert not any("alembic" in dep for dep in config["project"]["dependencies"])
+
+
+def test_restapi_worker_taskiq_implies_redis(tmp_path: Path):
+    # Whether a worker choice *implies* redis (skip_value resolution) is a
+    # prompts.py concern (see test_prompts.py) — render() just applies
+    # whatever options dict it's given, which here already has redis=True
+    # to simulate what prompts.prompt_template_options would have resolved.
+    target = tmp_path / "api"
+    answers = make_restapi_answers(
+        database="none", orm="none", migrations=False, worker="taskiq", redis=True
+    )
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/worker.py") in created
+    assert Path("src/my_api/tasks.py") in created
+    assert Path("src/my_api/core/redis.py") in created
+
+    main_py = (target / "src/my_api/main.py").read_text()
+    assert "lifespan" in main_py
+    assert "/tasks/add" in main_py
+    _assert_all_python_files_parse(target)
+
+
+def test_restapi_worker_celery(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers(database="none", orm="none", migrations=False, worker="celery")
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/worker.py") in created
+    worker_py = (target / "src/my_api/worker.py").read_text()
+    assert "Celery(" in worker_py
+    main_py = (target / "src/my_api/main.py").read_text()
+    assert "add.delay" in main_py
+    _assert_all_python_files_parse(target)
+
+
+def test_restapi_redis_standalone_toggle(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers(
+        database="none", orm="none", migrations=False, worker="none", redis=True
+    )
+    created = render("fastapi", "restapi", target, answers)
+
+    assert Path("src/my_api/core/redis.py") in created
+    assert Path("src/my_api/worker.py") not in created
+
+
+def test_restapi_all_features_combined(tmp_path: Path):
+    target = tmp_path / "api"
+    answers = make_restapi_answers(
+        database="postgres", orm="sqlalchemy", migrations=True, worker="celery", redis=True
+    )
+    created = render("fastapi", "restapi", target, answers, force=True)
+
+    for expected in [
+        "src/my_api/db/session.py",
+        "alembic.ini",
+        "src/my_api/worker.py",
+        "src/my_api/core/redis.py",
+    ]:
+        assert Path(expected) in created, expected
+
+    _assert_all_python_files_parse(target)
+    _assert_valid_toml(target / "pyproject.toml")
+
+
+def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monkeypatch):
+    # A layer can be declared in template.json with a `when` that matches
+    # but have no directory on disk (e.g. a template-authoring slip) —
+    # render() skips it rather than failing generation over an unshipped
+    # extra.
+    monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+    framework_dir = tmp_path / "widget"
+    _write_meta(framework_dir, "widget")
+    template_dir = framework_dir / "basic"
+    (template_dir / "files").mkdir(parents=True)
+    (template_dir / "files" / "README.md").write_text("hello")
+    (template_dir / "template.json").write_text(
+        json.dumps(
+            {
+                "id": "basic",
+                "label": "Basic",
+                "description": "d",
+                "enabled": True,
+                "layers": [{"dir": "docker", "when": {"docker": [True]}}],
+            }
+        )
+    )
+
+    target = tmp_path / "out"
+    created = render(
+        "widget", "basic", target, make_answers(framework="widget", template="basic", docker=True)
+    )
+
+    assert created == [Path("README.md")]

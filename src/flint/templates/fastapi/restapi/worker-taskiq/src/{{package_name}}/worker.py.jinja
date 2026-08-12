@@ -1,0 +1,11 @@
+from taskiq_redis import ListQueueBroker
+
+from {{ package_name }}.core.config import settings
+
+broker = ListQueueBroker(url=settings.redis_url)
+
+# Imported last, after `broker` exists: `tasks.py` needs `broker` to
+# register `@broker.task`-decorated functions, and the worker process
+# only discovers those tasks by importing this module — so every new
+# task module goes on a line here too.
+from {{ package_name }} import tasks  # noqa: E402,F401

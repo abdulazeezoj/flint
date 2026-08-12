@@ -1,0 +1,44 @@
+from collections.abc import AsyncGenerator
+
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+
+from {{ package_name }}.db.models import Base
+from {{ package_name }}.db.session import get_session
+from {{ package_name }}.main import app
+
+# Tests always run against an isolated in-memory SQLite database,
+# regardless of the database configured in .env — no external database
+# needed to run the suite (see README.md's "Test" section).
+test_engine = create_async_engine(
+    "sqlite+aiosqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+test_session_maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def _override_get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with test_session_maker() as session:
+        yield session
+
+
+app.dependency_overrides[get_session] = _override_get_session
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _prepare_database() -> AsyncGenerator[None, None]:
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac

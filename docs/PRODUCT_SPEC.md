@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.2: framework/template split, `--docker`, AGENTS.md)
+**Last updated:** 2026-08-12 (v0.3: template options — restapi's database/ORM/migrations/worker/redis, hello-world's config; `ai` template removed)
 
 ## 1. Vision
 
@@ -17,52 +17,79 @@ uvx flint
 ```
 
 ...and 60 seconds later you're looking at `Hello, World!` from a real,
-runnable FastAPI app.
+runnable FastAPI app. Pick a richer template and the same wizard also
+gets you a real database, migrations, and a background worker wired up —
+whatever a project actually needs to stop being a toy on day one.
 
 ## 2. Problem
 
 Every new FastAPI/Flask/etc. project starts with the same repetitive setup:
 `pyproject.toml`, virtual env, src layout, a first endpoint, a test, a
-`.gitignore`, a README nobody writes. Developers either copy an old project
-(and drag its cruft along) or start from a blank folder every time.
+`.gitignore`, a README nobody writes — and, past the toy stage, the same
+recurring decisions: which database, which ORM, whether to bother with
+migrations yet, whether background work needs a queue. Developers either
+copy an old project (and drag its cruft along) or start from a blank
+folder every time, re-deciding and re-wiring the same things.
 
-The JS ecosystem solved this years ago (`create-react-app`,
+The JS ecosystem solved the first part years ago (`create-react-app`,
 `create-next-app`, `create-vite`) with a single interactive command that
 gets you to running code immediately. Python has no equivalent with that
-UX. The nearest tools (`cookiecutter`, `copier`) require finding and
-trusting a third-party template repo, are template-authoring frameworks
-rather than finished products, and have no polished interactive prompt
-flow out of the box.
+UX. The nearest tools (`cookiecutter`, `copier`, and a handful of
+FastAPI-specific scaffolders) require finding and trusting a third-party
+template repo, are template-authoring frameworks rather than finished
+products, and either stay minimal (bare boilerplate) or go maximal (one
+big configurable mega-template with a wall of flags) rather than letting
+a project grow into what it needs. Flint's answer is a small set of
+distinct, opinionated templates, each of which can offer its own
+follow-up choices — not one template trying to be everything.
 
-## 3. Terminology: framework vs. template
+## 3. Terminology: framework, template, option
 
-Two distinct, nested choices in the wizard — don't conflate them:
+Three distinct concepts in the wizard — don't conflate them:
 
 - **Framework** — the underlying library, e.g. `fastapi`, `flask`,
   `django`. Selected first.
 - **Template** — a specific project shape built on that framework, e.g.
-  `hello-world`, `restapi`, `ai`. Selected second, scoped to the chosen
+  `hello-world`, `restapi`. Selected second, scoped to the chosen
   framework.
+- **Option** — a further, template-specific choice, declared by the
+  template itself (not hardcoded in Flint). E.g. `restapi` asks for a
+  database, ORM, whether to add migrations, a background worker, and
+  Redis; `hello-world` asks only whether to add `pydantic-settings`
+  config. Different templates can declare entirely different options —
+  Flint's CLI/wizard code has no built-in knowledge of "database" or
+  "worker," it just renders whatever a template's `template.json`
+  declares (see `PRODUCT_ARCH.md` §4).
 
 A generated project always comes from exactly one `<framework>/<template>`
-pair (e.g. `fastapi/hello-world`). This is what lets the roadmap grow in
-two independent directions — more frameworks, and more templates per
-framework — without either axis blocking the other.
+pair (e.g. `fastapi/restapi`) plus whatever options that template offers.
+This is what lets the roadmap grow in three independent directions — more
+frameworks, more templates per framework, and richer options per
+template — without any axis blocking the others.
 
 ## 4. Goals — v0
 
 1. Zero-arg interactive wizard: `flint` (or `uvx flint`) prompts for the
-   handful of decisions that matter and generates a project.
+   handful of decisions that matter — including a template's own options
+   — and generates a project.
 2. The wizard produces a runnable "Hello World" FastAPI app in under 60
    seconds (excluding dependency download time), managed by `uv`.
-3. A fully non-interactive mode via flags, for scripting and CI.
-4. The generated project includes: `src/` layout package, `uv`-managed
+3. A richer `restapi` template offers real head-start choices — database
+   (none/SQLite/PostgreSQL), ORM (SQLModel/SQLAlchemy), Alembic
+   migrations, a background worker (Taskiq/Celery), and Redis — instead
+   of forcing a from-scratch wiring job the moment a project needs more
+   than a single endpoint.
+4. A fully non-interactive mode via flags, including a generic
+   `--option key=value` for template-specific choices, for scripting and
+   CI.
+5. The generated project includes: `src/` layout package, `uv`-managed
    `pyproject.toml`, a README with run instructions, `AGENTS.md` (context
    for AI coding agents), `.gitignore`, and a passing `pytest` test — with
-   no manual edits required to run it.
-5. Optionally, a generated `Dockerfile`/`.dockerignore` via `--docker`.
-6. Flint ships as an installable, `pipx`/`uv tool`-friendly CLI.
-7. Semantic-ish versioning scheme `v{release}.{feature}.{fixes}`, starting
+   no manual edits required to run it, regardless of which options were
+   chosen.
+6. Optionally, a generated `Dockerfile`/`.dockerignore` via `--docker`.
+7. Flint ships as an installable, `pipx`/`uv tool`-friendly CLI.
+8. Semantic-ish versioning scheme `v{release}.{feature}.{fixes}`, starting
    at `v0.1.0`, with `CHANGELOG.md` updated on every user-facing change.
 
 ## 5. Non-Goals — v0
@@ -73,49 +100,61 @@ already stubbed as disabled/"coming soon" entries so the roadmap is
 visible in the wizard):
 
 - Frameworks other than FastAPI (Flask, Django are stubbed disabled)
-- Templates other than `hello-world` (`restapi`, `ai` are stubbed
-  disabled under `fastapi`)
+- Templates other than `hello-world` and `restapi`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
-- Database/ORM selection, auth scaffolding, Docker Compose, CI workflow
-  templates
+- Auth scaffolding, Docker Compose, CI workflow templates
+- Message brokers other than Redis (RabbitMQ, etc.) for the worker option
 - `.agents/skills/<framework>` — see §12 Open Questions
 - A GUI or web-based wizard
+
+Database/ORM/migrations/worker selection — a v0.1/v0.2 non-goal — is now
+in scope as of v0.3, scoped specifically to the `restapi` template.
 
 ## 6. Personas
 
 - **Solo/side-project developer** — wants to skip boilerplate and get to
-  writing actual endpoints.
+  writing actual endpoints, with a real database wired up from the start
+  if the project needs one.
 - **Team lead standardizing scaffolding** — wants every new internal
-  service to start from the same shape, scriptable in automation.
+  service to start from the same shape, scriptable in automation,
+  including the team's preferred DB/ORM/worker stack.
 
 ## 7. User Stories
 
 - As a developer, I run one command, answer a few short prompts, and get a
   working FastAPI app I can `uv run` immediately — no follow-up edits.
+- As a developer starting a "real" service, I pick the `restapi`
+  template, choose PostgreSQL + SQLModel + migrations + a Celery worker,
+  and get a project with all of that already wired and passing tests —
+  not a blank slate I have to wire myself.
 - As a developer working in CI/scripts, I run
-  `flint new my-api --framework fastapi --template hello-world --no-git --no-install --yes`
+  `flint new my-api --framework fastapi --template restapi -o database=postgres -o orm=sqlmodel --no-git --no-install --yes`
   and get the identical result with no prompts.
 - As a developer deploying to a container, I pass `--docker` and get a
   working `Dockerfile` alongside the app, no Docker knowledge required.
 - As a developer, after generation I see a clear "next steps" block (cd,
-  run, open browser) so I never have to guess the run command.
-- As a developer, if I mistype something or the target directory already
-  has files in it, Flint tells me clearly instead of silently
-  overwriting or half-generating a project.
+  run, open browser, plus migration/worker commands if relevant) so I
+  never have to guess the run command.
+- As a developer, if I mistype something — a bad project name, an
+  unknown `--option` key, an invalid option value, a non-empty target
+  directory — Flint tells me clearly instead of silently doing the wrong
+  thing or half-generating a project.
 
 ## 8. Functional Requirements
 
 | ID | Requirement |
 |----|-------------|
-| FR1 | Interactive wizard order: project name → target directory check → framework (v0: FastAPI enabled, others listed disabled) → template within that framework (v0: Hello World enabled, others listed disabled) → add a Dockerfile? (default no) → initialize git repo? (default yes) → install dependencies now? (default yes) |
+| FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → initialize git repo? (default yes) → install dependencies now? (default yes) |
 | FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force` |
-| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
-| FR4 | After generation: print a summary of what was created and the exact next-step commands to run the app (and, if `--docker` was used, the `docker build`/`docker run` commands) |
+| FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
+| FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run` — whichever apply) |
 | FR5 | `flint --version` prints the current version |
-| FR6 | Exit codes: `0` success, `1` user/input error (e.g. bad name, existing dir, disabled framework/template), `2` unexpected/internal error |
+| FR6 | Exit codes: `0` success, `1` user/input error (e.g. bad name, existing dir, disabled framework/template, unknown/invalid `--option`), `2` unexpected/internal error |
 | FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; if the chosen template doesn't support it yet, warn and continue rather than failing the whole generation |
 | FR8 | Every generated project includes an `AGENTS.md` with run/test commands, layout, and conventions — no flag, always on |
+| FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
+| FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
 
 ## 9. Non-Functional Requirements
 
@@ -150,6 +189,10 @@ visible in the wizard):
 - `v0.2.0` — framework/template split (`--framework`/`--template`
   replace the single `fastapi-hello-world` id), `--docker`, `AGENTS.md`
   in generated projects.
+- `v0.3.0` — per-template options (`--option key=value`); `restapi`
+  template with database/ORM/migrations/worker/Redis choices;
+  `hello-world` gains an optional `pydantic-settings` config; `ai`
+  template removed (was a disabled stub, never shipped real content).
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -163,12 +206,23 @@ visible in the wizard):
   `PRODUCT_ARCH.md` for how the template system is kept decoupled to
   allow this later.
 - **`AGENTS.md` vs. `.agents/skills/<framework>`**: `AGENTS.md` ships now
-  (v0.2) — it's a single Jinja file, same mechanism as the README, and
-  gives any AI coding agent working in the generated project immediate
-  context (run/test commands, layout, conventions). `.agents/skills/<framework>`
-  — a directory of framework-specific, agent-consumable skills — is a
-  larger bet: it needs real per-framework content (not just metadata),
-  a decision on which skill format/consumers to target, and is more
-  provable once there's more than one framework/template to
-  differentiate against. Tracked as a roadmap item, not committed to a
-  release yet.
+  (since v0.2) — it's a single Jinja file, same mechanism as the README,
+  and gives any AI coding agent working in the generated project
+  immediate context (run/test commands, layout, conventions).
+  `.agents/skills/<framework>` — a directory of framework-specific,
+  agent-consumable skills — is a larger bet: it needs real per-framework
+  content (not just metadata), a decision on which skill format/consumers
+  to target, and is more provable now that `restapi` gives more surface
+  to differentiate against. Tracked as a roadmap item, not committed to
+  a release yet.
+- **Message broker choice for the worker option**: v0.3 hardcodes Redis
+  as the broker for both Taskiq and Celery. RabbitMQ (a common Celery
+  broker) is a plausible follow-up if requested, but doubles the
+  worker×broker combinations to support and verify — deferred until
+  there's real demand.
+- **`ai` template**: removed in v0.3 (was a disabled stub with no
+  content). Revisit once there's a clear, minimal shape for it —
+  research (see PM/engineering discussion prior to v0.3) pointed at "one
+  streaming completion endpoint + `pydantic-settings` for the
+  key/model," deliberately smaller than the RAG/agent-framework
+  templates common in the wild.

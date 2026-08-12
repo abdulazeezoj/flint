@@ -8,16 +8,21 @@ interactive mode does the function actually ask.
 
 from __future__ import annotations
 
+from typing import Any
+
 import questionary
 from rich.console import Console
 
 from flint.errors import FlintUserError
-from flint.generator import FrameworkMeta, TemplateMeta
+from flint.generator import FrameworkMeta, TemplateMeta, when_matches
 from flint.naming import validate_project_name
 
 console = Console()
 
 DEFAULT_PROJECT_NAME = "my-app"
+
+_TRUTHY = {"true", "1", "yes", "y"}
+_FALSY = {"false", "0", "no", "n"}
 
 
 def prompt_project_name(name: str | None, interactive: bool) -> tuple[str, str, str]:
@@ -129,3 +134,79 @@ def prompt_install(install: bool | None, interactive: bool) -> bool:
     if answer is None:
         raise FlintUserError("Cancelled.")
     return answer
+
+
+def parse_option_flags(raw_options: list[str]) -> dict[str, str]:
+    """Parse repeatable ``--option key=value`` flags into a dict."""
+    parsed: dict[str, str] = {}
+    for item in raw_options:
+        if "=" not in item:
+            raise FlintUserError(f"--option '{item}' must be in key=value form.")
+        key, _, value = item.partition("=")
+        parsed[key] = value
+    return parsed
+
+
+def _parse_bool_flag(key: str, raw: str) -> bool:
+    normalized = raw.strip().lower()
+    if normalized in _TRUTHY:
+        return True
+    if normalized in _FALSY:
+        return False
+    raise FlintUserError(f"'{raw}' is not a valid boolean for --option {key} (use true/false).")
+
+
+def prompt_template_options(
+    template: TemplateMeta, provided: dict[str, str], interactive: bool
+) -> dict[str, Any]:
+    """Resolve every option a template declares, in declared order.
+
+    Declared order matters: a later option's ``when`` can only see
+    already-resolved earlier options (PRODUCT_ARCH.md documents this as a
+    template-authoring requirement).
+    """
+    unknown = set(provided) - {option.key for option in template.options}
+    if unknown:
+        raise FlintUserError(
+            f"Unknown option(s) for {template.full_id}: {', '.join(sorted(unknown))}."
+        )
+
+    resolved: dict[str, Any] = {}
+    for option in template.options:
+        if option.key in provided:
+            raw = provided[option.key]
+            if option.type == "confirm":
+                resolved[option.key] = _parse_bool_flag(option.key, raw)
+            else:
+                valid_values = {choice["value"] for choice in option.choices}
+                if raw not in valid_values:
+                    raise FlintUserError(
+                        f"'{raw}' is not a valid value for --option {option.key}. "
+                        f"Available: {', '.join(sorted(valid_values))}."
+                    )
+                resolved[option.key] = raw
+            continue
+
+        if not when_matches(option.when, resolved):
+            resolved[option.key] = option.resolved_skip_value
+            continue
+
+        if not interactive:
+            resolved[option.key] = option.default
+            continue
+
+        if option.type == "confirm":
+            answer = questionary.confirm(option.label, default=bool(option.default)).ask()
+        else:
+            choices = [
+                questionary.Choice(title=choice["label"], value=choice["value"])
+                for choice in option.choices
+            ]
+            answer = questionary.select(
+                option.label, choices=choices, default=option.default
+            ).ask()
+        if answer is None:
+            raise FlintUserError("Cancelled.")
+        resolved[option.key] = answer
+
+    return resolved

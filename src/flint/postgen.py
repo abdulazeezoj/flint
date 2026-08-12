@@ -79,8 +79,12 @@ def print_summary(
     git_ok: bool,
     installed_ok: bool,
     installed_requested: bool,
+    options: dict[str, object] | None = None,
 ) -> None:
     console.print()
+    if options:
+        rendered = ", ".join(f"{key}={value}" for key, value in options.items())
+        console.print(f"Options: {rendered}")
     console.print(f"Creating [bold]{slug}/[/bold] from {template_full_id}...")
     for path in created:
         console.print(f"  [green]✔[/green] {path.as_posix()}")

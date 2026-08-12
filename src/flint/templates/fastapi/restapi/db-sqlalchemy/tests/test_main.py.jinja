@@ -1,0 +1,29 @@
+from httpx import AsyncClient
+
+
+async def test_read_root(client: AsyncClient) -> None:
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello, World!"}
+
+
+async def test_item_crud(client: AsyncClient) -> None:
+    create_response = await client.post(
+        "/items/", json={"name": "Widget", "description": "A thing"}
+    )
+    assert create_response.status_code == 201
+    item = create_response.json()
+    assert item["name"] == "Widget"
+
+    list_response = await client.get("/items/")
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+    get_response = await client.get(f"/items/{item['id']}")
+    assert get_response.status_code == 200
+
+    delete_response = await client.delete(f"/items/{item['id']}")
+    assert delete_response.status_code == 204
+
+    missing_response = await client.get(f"/items/{item['id']}")
+    assert missing_response.status_code == 404

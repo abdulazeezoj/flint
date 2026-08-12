@@ -12,6 +12,22 @@ from pathlib import Path
 from flint import postgen
 
 
+def _summary_kwargs(**overrides):
+    kwargs = dict(
+        project_name="My Api",
+        slug="my-api",
+        package_name="my_api",
+        template_full_id="fastapi/hello-world",
+        target_dir=Path("my-api"),
+        created=[Path("pyproject.toml")],
+        git_ok=False,
+        installed_ok=False,
+        installed_requested=False,
+    )
+    kwargs.update(overrides)
+    return kwargs
+
+
 class _FakeCompletedProcess:
     def __init__(self, args):
         self.args = args
@@ -72,3 +88,18 @@ def test_install_dependencies_failure(tmp_path: Path, monkeypatch, capsys):
 
     assert postgen.install_dependencies(tmp_path) is False
     assert "uv sync failed" in capsys.readouterr().out
+
+
+def test_print_summary_omits_options_line_when_none(capsys):
+    postgen.print_summary(**_summary_kwargs(options=None))
+    assert "Options:" not in capsys.readouterr().out
+
+
+def test_print_summary_omits_options_line_when_empty_dict(capsys):
+    postgen.print_summary(**_summary_kwargs(options={}))
+    assert "Options:" not in capsys.readouterr().out
+
+
+def test_print_summary_shows_options_line_when_present(capsys):
+    postgen.print_summary(**_summary_kwargs(options={"config": True}))
+    assert "Options: config=True" in capsys.readouterr().out

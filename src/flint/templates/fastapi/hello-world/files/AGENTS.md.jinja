@@ -29,6 +29,11 @@ uv run pytest
 - `src/{{ package_name }}/main.py` — the FastAPI app (`app`) and its routes.
 - `tests/` — pytest tests; use `fastapi.testclient.TestClient` against
   `{{ package_name }}.main.app`.
+{% if config %}
+- `src/{{ package_name }}/config.py` — `Settings` (`pydantic-settings`),
+  loaded from `.env`. Add new config fields there, not as scattered
+  `os.environ` reads.
+{% endif %}
 
 ## Conventions
 

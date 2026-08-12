@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+.git
+.pytest_cache
+.env
+Dockerfile
+.dockerignore
+{% if database == "sqlite" %}
+*.db
+{% endif %}

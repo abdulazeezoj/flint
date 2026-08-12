@@ -1,7 +1,9 @@
 # flint
 
 `create-next-app`, for Python. One command, a short interactive wizard,
-and you have a running project — no hand-written boilerplate.
+and you have a running project — no hand-written boilerplate. Pick a
+richer template and the same wizard wires up a real database,
+migrations, and a background worker too.
 
 ```
 uvx flint
@@ -10,20 +12,19 @@ uvx flint
 ```
 ? What is your project named? my-api
 ? Which framework? FastAPI
-? Which template? Hello World
+? Which template? REST API
+? Database? PostgreSQL
+? ORM? SQLModel
+? Add Alembic migrations? Yes
+? Background worker? Taskiq
 Using uv to manage dependencies.
 ? Add a Dockerfile? No
 ? Initialize a git repository? Yes
 ? Install dependencies with uv now? Yes
 
-Creating my-api/ from fastapi/hello-world...
-  ✔ AGENTS.md
-  ✔ pyproject.toml
-  ✔ README.md
-  ✔ .gitignore
-  ✔ src/my_api/__init__.py
-  ✔ src/my_api/main.py
-  ✔ tests/test_main.py
+Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, redis=True
+Creating my-api/ from fastapi/restapi...
+  ✔ ...
 ✔ Initialized git repository
 ✔ Installed dependencies (uv sync)
 
@@ -31,9 +32,9 @@ Success! Created my-api at ./my-api
 
 Next steps:
   cd my-api
+  uv run alembic upgrade head
   uv run fastapi dev src/my_api/main.py
-
-Then open http://127.0.0.1:8000
+  uv run taskiq worker my_api.worker:broker --app-dir src   # separate process
 ```
 
 ## Install
@@ -47,33 +48,48 @@ uvx flint
 ## Usage
 
 ```
-flint                            # interactive wizard
-flint new my-api                  # interactive, name pre-filled
+flint                                     # interactive wizard
+flint new my-api                           # interactive, name pre-filled
 flint new my-api \
-  --framework fastapi --template hello-world \
-  --docker --git --install --yes  # fully non-interactive, for scripts/CI
+  --framework fastapi --template restapi \
+  -o database=sqlite -o orm=sqlmodel \
+  --docker --git --install --yes            # fully non-interactive, for scripts/CI
 flint --version
 flint --help
 ```
 
 Every prompt has a matching flag: `--framework`, `--template`,
-`--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`,
-`--yes` (accept all defaults), `--force` (generate into a non-empty dir).
+`--option`/`-o key=value` (repeatable — one per template-specific
+choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
+--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
+(accept all defaults), `--force` (generate into a non-empty dir).
 
 ## What v0 ships
 
 A project is always generated from a `<framework>/<template>` pair — the
 **framework** is the underlying library (FastAPI, Flask, ...), the
 **template** is a specific project shape built on it (Hello World, REST
-API, ...). Today:
+API, ...). A template can declare its own follow-up **options** — Flint
+itself has no built-in notion of "database" or "worker," it just renders
+whatever the chosen template's `template.json` declares. Today:
 
 - **`fastapi/hello-world`** — a `uv`-managed, `src/`-layout FastAPI app
   with a passing test and an `AGENTS.md`, ready to run with no edits.
-  Pass `--docker` for a `Dockerfile` + `.dockerignore` too.
+  `-o config=true` adds `pydantic-settings`-based configuration.
+  `--docker` adds a `Dockerfile` + `.dockerignore`.
+- **`fastapi/restapi`** — the same, plus real head-start choices:
+  - `-o database=none|sqlite|postgres` (default: `sqlite`)
+  - `-o orm=sqlmodel|sqlalchemy` (only asked with a database; default: `sqlmodel`)
+  - `-o migrations=true|false` — async Alembic, autogenerate-ready (default: `true` with a database)
+  - `-o worker=none|taskiq|celery`, with a demo `/tasks/add` endpoint
+  - `-o redis=true|false` — implied automatically the moment a worker is chosen
+  - Tests always run against an isolated SQLite database, whatever
+    production database was configured — `uv run pytest` never needs a
+    real Postgres.
 
-More frameworks (Flask, Django) and templates (REST API, AI App) are on
-the roadmap; the wizard already lists them as "coming soon". See
-`docs/PRODUCT_SPEC.md` for full v0 scope and non-goals.
+More frameworks (Flask, Django) are on the roadmap; the wizard already
+lists them as "coming soon". See `docs/PRODUCT_SPEC.md` for full v0
+scope and non-goals.
 
 ## Docs
 
@@ -92,4 +108,5 @@ uv run flint --help
 
 Adding a framework or template is a content-only change — no code edits
 needed. See `src/flint/templates/fastapi/hello-world/README.md` for the
-layout a new template directory needs.
+minimal layout a new template needs, or `src/flint/templates/fastapi/
+restapi/template.json` for an example with options and gated layers.

@@ -1,0 +1,11 @@
+from celery import Celery
+
+from {{ package_name }}.core.config import settings
+
+celery_app = Celery("{{ package_name }}", broker=settings.redis_url, backend=settings.redis_url)
+
+# Imported last, after `celery_app` exists: `tasks.py` needs `celery_app`
+# to register `@celery_app.task`-decorated functions, and the worker
+# process only discovers those tasks by importing this module — so every
+# new task module goes on a line here too.
+from {{ package_name }} import tasks  # noqa: E402,F401
