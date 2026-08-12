@@ -72,13 +72,13 @@ def print_summary(
     *,
     project_name: str,
     slug: str,
-    package_name: str,
     template_full_id: str,
     target_dir: Path,
     created: list[Path],
     git_ok: bool,
     installed_ok: bool,
     installed_requested: bool,
+    run_command: str,
     options: dict[str, object] | None = None,
 ) -> None:
     console.print()
@@ -101,7 +101,7 @@ def print_summary(
     console.print(f"  cd {slug}")
     if not installed_ok:
         console.print("  uv sync")
-    console.print(f"  uv run fastapi dev src/{package_name}/main.py")
+    console.print(f"  {run_command}")
     console.print()
     console.print("Then open [link]http://127.0.0.1:8000[/link]")
 

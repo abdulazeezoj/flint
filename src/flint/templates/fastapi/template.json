@@ -2,5 +2,6 @@
   "id": "fastapi",
   "label": "FastAPI",
   "description": "FastAPI — a modern, fast Python web framework.",
-  "enabled": true
+  "enabled": true,
+  "run_command": "uv run fastapi dev src/{package_name}/main.py"
 }

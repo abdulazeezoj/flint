@@ -44,6 +44,29 @@ def test_new_non_interactive_happy_path(tmp_path: Path, monkeypatch):
     assert (tmp_path / "my-api" / "src" / "my_api" / "main.py").is_file()
     assert not (tmp_path / "my-api" / "Dockerfile").exists()
     assert "Success!" in result.stdout
+    assert "uv run fastapi dev src/my_api/main.py" in result.stdout
+
+
+def test_new_flask_uses_flask_run_command(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "new",
+            "my-api",
+            "--framework",
+            "flask",
+            "--template",
+            "hello-world",
+            "--no-git",
+            "--no-install",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert (tmp_path / "my-api" / "src" / "my_api" / "main.py").is_file()
+    assert "uv run flask --app src/my_api/main.py run" in result.stdout
+    assert "fastapi dev" not in result.stdout
 
 
 def test_new_with_docker_flag(tmp_path: Path, monkeypatch):
@@ -210,8 +233,21 @@ def test_new_unknown_framework_errors(tmp_path: Path, monkeypatch):
 
 
 def test_new_disabled_framework_errors(tmp_path: Path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, ["new", "my-api", "--framework", "flask", "--yes"])
+    templates_dir = tmp_path / "templates"
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    (templates_dir / "widget").mkdir(parents=True)
+    (templates_dir / "widget" / "template.json").write_text(
+        '{"id": "widget", "label": "Widget", "description": "d", "enabled": false}'
+    )
+    (templates_dir / "widget" / "basic").mkdir()
+    (templates_dir / "widget" / "basic" / "template.json").write_text(
+        '{"id": "basic", "label": "Basic", "description": "d", "enabled": true}'
+    )
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", templates_dir)
+    monkeypatch.chdir(work_dir)
+
+    result = runner.invoke(app, ["new", "my-api", "--framework", "widget", "--yes"])
     assert result.exit_code == 1
     assert "isn't available yet" in result.stdout
 

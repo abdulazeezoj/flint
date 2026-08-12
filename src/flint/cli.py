@@ -159,6 +159,8 @@ def _run_new(
             default_id=prefs.get_last_framework(stored_prefs),
         )
 
+        chosen_framework = generator.get_framework(framework_id)
+
         templates = generator.list_templates(framework_id)
         template_id = prompts.prompt_template(
             template,
@@ -224,13 +226,13 @@ def _run_new(
         postgen.print_summary(
             project_name=project_name,
             slug=slug,
-            package_name=package_name,
             template_full_id=chosen_template.full_id,
             target_dir=target_dir,
             created=created,
             git_ok=git_ok,
             installed_ok=installed_ok,
             installed_requested=install_now,
+            run_command=chosen_framework.run_command.format(package_name=package_name),
             options=resolved_options,
         )
     except FlintUserError as exc:

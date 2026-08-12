@@ -231,13 +231,17 @@ def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
         )
 
 
-def test_render_disabled_framework_raises(tmp_path: Path):
+def test_render_disabled_framework_raises(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+    _write_meta(tmp_path / "widget", "widget", enabled=False)
+    _write_meta(tmp_path / "widget" / "basic", "basic")
+
     with pytest.raises(FlintUserError):
         render(
-            "flask",
-            "hello-world",
+            "widget",
+            "basic",
             tmp_path / "x",
-            make_answers(framework="flask", template="hello-world"),
+            make_answers(framework="widget", template="basic"),
         )
 
 

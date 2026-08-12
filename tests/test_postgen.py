@@ -16,13 +16,13 @@ def _summary_kwargs(**overrides):
     kwargs = dict(
         project_name="My Api",
         slug="my-api",
-        package_name="my_api",
         template_full_id="fastapi/hello-world",
         target_dir=Path("my-api"),
         created=[Path("pyproject.toml")],
         git_ok=False,
         installed_ok=False,
         installed_requested=False,
+        run_command="uv run fastapi dev src/my_api/main.py",
     )
     kwargs.update(overrides)
     return kwargs

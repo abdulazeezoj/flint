@@ -123,6 +123,7 @@ class FrameworkMeta:
     description: str
     enabled: bool
     path: Path
+    run_command: str = ""
 
 
 @dataclass(frozen=True)
@@ -187,6 +188,7 @@ def list_frameworks() -> list[FrameworkMeta]:
                     description=data["description"],
                     enabled=data.get("enabled", True),
                     path=framework_dir,
+                    run_command=data.get("run_command", ""),
                 )
             )
     return frameworks
@@ -204,6 +206,7 @@ def get_framework(framework_id: str) -> FrameworkMeta:
         description=data["description"],
         enabled=data.get("enabled", True),
         path=framework_dir,
+        run_command=data.get("run_command", ""),
     )
 
 
