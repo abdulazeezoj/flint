@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from {{ package_name }}.db.models import Item
-from {{ package_name }}.db.session import get_session
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Item
 from {{ package_name }}.schemas import ItemCreate, ItemRead
 
 router = APIRouter(prefix="/items", tags=["items"])

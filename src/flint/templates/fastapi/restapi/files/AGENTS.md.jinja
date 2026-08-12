@@ -34,28 +34,40 @@ uv run pytest
 
 ## Layout
 
-- `src/{{ package_name }}/main.py` — the FastAPI app (`app`) and its routes.
-- `src/{{ package_name }}/core/config.py` — `Settings` (`pydantic-settings`),
-  loaded from `.env`. Add new config fields there, not scattered
-  `os.environ` reads.
-- `src/{{ package_name }}/schemas.py` — Pydantic request/response models.
-- `src/{{ package_name }}/routes/items.py` — the example `items` resource.
+Two fixed entrypoints, two "add a resource here" folders, one folder for
+shared infrastructure — the rest is unopinionated (borrowed from how
+Next.js only enforces structure for routing, nothing else):
+
+- `src/{{ package_name }}/main.py` — **the** FastAPI entrypoint: `app`,
+  lifespan, mounted routers. Don't rename or move it.
+- `src/{{ package_name }}/routes/` — **one module per HTTP resource.**
+  `items.py` is the example; a new resource is a new file here plus one
+  `app.include_router(...)` line in `main.py`.
+{% if worker != "none" %}
+- `src/{{ package_name }}/worker.py` — **the** {{ worker }} entrypoint:
+  broker/app setup, importing every `tasks/` module so the worker
+  process can discover them. Don't rename or move it.
+- `src/{{ package_name }}/tasks/` — **one module per background job.**
+  `example.py` is the demo; a new task is a new file here plus one
+  import line in `worker.py` (see the comment there for why).
+{% endif %}
+- `src/{{ package_name }}/core/` — shared infrastructure every
+  route/task might depend on: `config.py` (`Settings`, always), {% if database != "none" %}`db.py`
+  (async engine/session), {% endif %}{% if redis %}`redis.py` (the `redis_client`), {% endif %}and
+  the natural home for anything similar later (e.g. a scheduler). Add
+  new config fields to `Settings`, not scattered `os.environ` reads.
+- `src/{{ package_name }}/schemas.py` — Pydantic request/response
+  models.{% if database != "none" %} Not enforced the way `routes/`/`tasks/`/`core/` are — a `schemas/`
+  folder is a reasonable next step once there's more than one resource.{% endif %}
 {% if database != "none" %}
-- `src/{{ package_name }}/db/` — {{ orm }} models (`models.py`) and the
-  async session/engine (`session.py`).
+- `src/{{ package_name }}/models.py` — {{ orm }} models. Same story as
+  `schemas.py`: fine as one file for one resource, free to become
+  `models/` later.
 {% endif %}
 {% if migrations %}
 - `alembic/` — migrations. New model → `uv run alembic revision
   --autogenerate -m "..."`, review the generated file, then `uv run
   alembic upgrade head`.
-{% endif %}
-{% if worker != "none" %}
-- `src/{{ package_name }}/worker.py` — the {{ worker }} app/broker.
-- `src/{{ package_name }}/tasks.py` — background tasks; add new ones here.
-{% endif %}
-{% if redis %}
-- `src/{{ package_name }}/core/redis.py` — the Redis client
-  (`redis_client`), ready for caching.
 {% endif %}
 - `tests/` — pytest tests{% if database != "none" %} against an
   isolated in-memory SQLite database via a `get_session` override in
@@ -68,6 +80,9 @@ uv run pytest
   `uv.lock`; run `uv add <package>` / `uv remove <package>` instead.
 - Keep route handlers typed; return plain dicts or Pydantic models, not
   raw strings.
+- New HTTP endpoints go in `routes/`, new background jobs go in
+  `tasks/`, new shared infrastructure goes in `core/` — don't put any of
+  these in `main.py`/`worker.py` themselves, which stay thin entrypoints.
 {% if database != "none" %}
 - New endpoints that touch the database take `session` via
   `Depends(get_session)` — don't create engines/sessions ad hoc.

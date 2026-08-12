@@ -6,11 +6,11 @@ from fastapi import FastAPI
 
 from {{ package_name }}.core.config import settings
 {% if database != "none" %}
-from {{ package_name }}.db.session import init_db
+from {{ package_name }}.core.db import init_db
 {% endif %}
 from {{ package_name }}.routes.items import router as items_router
 {% if worker != "none" %}
-from {{ package_name }}.tasks import add
+from {{ package_name }}.tasks.example import add
 {% endif %}
 {% if worker == "taskiq" %}
 from {{ package_name }}.worker import broker

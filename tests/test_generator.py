@@ -178,10 +178,10 @@ def test_render_hello_world_with_config_option(tmp_path: Path):
         "fastapi", "hello-world", target, make_answers(options={"config": True})
     )
 
-    assert Path("src/my_api/config.py") in created
+    assert Path("src/my_api/core/config.py") in created
     assert Path(".env") in created
     main_py = (target / "src/my_api/main.py").read_text()
-    assert "from my_api.config import settings" in main_py
+    assert "from my_api.core.config import settings" in main_py
     _assert_all_python_files_parse(target)
 
 
@@ -191,7 +191,7 @@ def test_render_hello_world_without_config_option_omits_config_files(tmp_path: P
         "fastapi", "hello-world", target, make_answers(options={"config": False})
     )
 
-    assert Path("src/my_api/config.py") not in created
+    assert Path("src/my_api/core/config.py") not in created
     assert Path(".env") not in created
 
 
@@ -356,7 +356,7 @@ def test_restapi_in_memory_default(tmp_path: Path):
     created = render("fastapi", "restapi", target, answers)
 
     assert Path("src/my_api/routes/items.py") in created
-    assert Path("src/my_api/db/session.py") not in created
+    assert Path("src/my_api/core/db.py") not in created
     assert Path("alembic.ini") not in created
     routes = (target / "src/my_api/routes/items.py").read_text()
     assert "_items" in routes  # the in-memory store
@@ -369,8 +369,8 @@ def test_restapi_sqlite_sqlmodel_with_migrations(tmp_path: Path):
     answers = make_restapi_answers()  # sqlite + sqlmodel + migrations=True
     created = render("fastapi", "restapi", target, answers)
 
-    assert Path("src/my_api/db/session.py") in created
-    assert Path("src/my_api/db/models.py") in created
+    assert Path("src/my_api/core/db.py") in created
+    assert Path("src/my_api/models.py") in created
     assert Path("alembic.ini") in created
     assert Path("alembic/env.py") in created
     assert Path("alembic/script.py.mako") in created
@@ -378,7 +378,7 @@ def test_restapi_sqlite_sqlmodel_with_migrations(tmp_path: Path):
 
     routes = (target / "src/my_api/routes/items.py").read_text()
     assert "get_session" in routes
-    assert "sqlmodel" in (target / "src/my_api/db/session.py").read_text()
+    assert "sqlmodel" in (target / "src/my_api/core/db.py").read_text()
 
     env_py = (target / "alembic/env.py").read_text()
     assert "SQLModel.metadata" in env_py
@@ -394,10 +394,10 @@ def test_restapi_postgres_sqlalchemy_no_migrations(tmp_path: Path):
     answers = make_restapi_answers(database="postgres", orm="sqlalchemy", migrations=False)
     created = render("fastapi", "restapi", target, answers)
 
-    assert Path("src/my_api/db/session.py") in created
+    assert Path("src/my_api/core/db.py") in created
     assert Path("alembic.ini") not in created
 
-    session_py = (target / "src/my_api/db/session.py").read_text()
+    session_py = (target / "src/my_api/core/db.py").read_text()
     assert "sqlalchemy" in session_py.lower()
     env_file = (target / ".env").read_text()
     assert "postgresql+asyncpg://" in env_file
@@ -421,7 +421,7 @@ def test_restapi_worker_taskiq_implies_redis(tmp_path: Path):
     created = render("fastapi", "restapi", target, answers)
 
     assert Path("src/my_api/worker.py") in created
-    assert Path("src/my_api/tasks.py") in created
+    assert Path("src/my_api/tasks/example.py") in created
     assert Path("src/my_api/core/redis.py") in created
 
     main_py = (target / "src/my_api/main.py").read_text()
@@ -462,9 +462,11 @@ def test_restapi_all_features_combined(tmp_path: Path):
     created = render("fastapi", "restapi", target, answers, force=True)
 
     for expected in [
-        "src/my_api/db/session.py",
+        "src/my_api/core/db.py",
+        "src/my_api/models.py",
         "alembic.ini",
         "src/my_api/worker.py",
+        "src/my_api/tasks/example.py",
         "src/my_api/core/redis.py",
     ]:
         assert Path(expected) in created, expected

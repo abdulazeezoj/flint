@@ -30,9 +30,10 @@ uv run pytest
 - `tests/` — pytest tests; use `fastapi.testclient.TestClient` against
   `{{ package_name }}.main.app`.
 {% if config %}
-- `src/{{ package_name }}/config.py` — `Settings` (`pydantic-settings`),
+- `src/{{ package_name }}/core/config.py` — `Settings` (`pydantic-settings`),
   loaded from `.env`. Add new config fields there, not as scattered
-  `os.environ` reads.
+  `os.environ` reads. `core/` is where shared infrastructure lives —
+  config now, and anything else every route might depend on later.
 {% endif %}
 
 ## Conventions

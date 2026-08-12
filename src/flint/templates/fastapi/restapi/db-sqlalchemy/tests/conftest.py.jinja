@@ -5,9 +5,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from {{ package_name }}.db.models import Base
-from {{ package_name }}.db.session import get_session
+from {{ package_name }}.core.db import get_session
 from {{ package_name }}.main import app
+from {{ package_name }}.models import Base
 
 # Tests always run against an isolated in-memory SQLite database,
 # regardless of the database configured in .env — no external database

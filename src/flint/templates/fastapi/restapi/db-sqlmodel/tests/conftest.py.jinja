@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from {{ package_name }}.db.session import get_session
+from {{ package_name }}.core.db import get_session
 from {{ package_name }}.main import app
 
 # Tests always run against an isolated in-memory SQLite database,

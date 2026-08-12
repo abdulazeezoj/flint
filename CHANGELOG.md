@@ -7,6 +7,43 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.4.0 — 2026-08-12
+
+### Changed
+
+**Breaking (pre-1.0):** the `restapi` template's generated project
+layout is now opinionated, borrowed from how Next.js only enforces
+structure for routing and leaves everything else as convention:
+
+- `main.py` / `worker.py` — fixed-name entrypoints (unchanged in
+  spirit, now documented as load-bearing rather than incidental).
+- `routes/` / `tasks/` — "one module per resource/job" folders. Worker
+  tasks moved from a single `tasks.py` to a `tasks/` package
+  (`tasks/example.py` for the demo task) so a project can grow the same
+  way `routes/` already does.
+- `core/` — shared infrastructure, now including the database
+  session/engine: `core/db.py` (was `db/session.py`). `core/config.py`
+  and `core/redis.py` already lived here and are unchanged.
+- `models.py` — ORM models moved to a top-level file (was
+  `db/models.py`); deliberately **not** under `core/`, since domain
+  models aren't cross-cutting infrastructure the way config/db-session/
+  redis-client are — see `docs/PRODUCT_ARCH.md` §4.4 for the full
+  reasoning. `schemas.py` (already top-level) is unaffected.
+- `hello-world`'s optional `config` option follows suit:
+  `core/config.py` instead of a top-level `config.py`, for consistency
+  across templates.
+
+No CLI-facing behavior changed — same flags, same `--option` keys, same
+prompts. Only the shape of what gets generated.
+
+### Fixed
+
+- Re-verified live end-to-end after the restructure (real Alembic
+  migrations against SQLite and PostgreSQL, real Taskiq and Celery
+  workers against real Redis) and caught a template gap along the way:
+  the Celery worker layer was missing its actual task file
+  (`tasks/example.py`) — present for Taskiq, not for Celery. Fixed.
+
 ## v0.3.0 — 2026-08-12
 
 ### Added

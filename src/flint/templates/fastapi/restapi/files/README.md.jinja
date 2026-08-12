@@ -13,7 +13,7 @@ uv run fastapi dev src/{{ package_name }}/main.py
 
 The database ({{ "SQLite" if database == "sqlite" else "PostgreSQL" }}) and
 its tables are created automatically on startup — see
-`src/{{ package_name }}/db/session.py`.
+`src/{{ package_name }}/core/db.py`.
 {% if database == "postgres" %}
 For PostgreSQL, either run one locally or adjust `DATABASE_URL` in `.env`
 to point at yours before starting the app.
@@ -95,28 +95,40 @@ Settings are loaded from `.env` via `pydantic-settings` (see
 
 ## Layout
 
+Borrowed from Next.js: routes and worker tasks have one obvious,
+consistent home each; shared infrastructure lives in `core/`; the rest
+is up to you.
+
 ```
 src/{{ package_name }}/
-  main.py            FastAPI app + routes
-  core/config.py     settings (pydantic-settings)
-  schemas.py         Pydantic request/response models
-  routes/items.py    example resource
-{% if database != "none" %}
-  db/                {{ orm }} models + async session
-{% endif %}
+  main.py                 FastAPI entrypoint — app, lifespan, mounted routers
 {% if worker != "none" %}
-  worker.py          {{ worker }} app/broker
-  tasks.py           background tasks
+  worker.py               {{ worker }} entrypoint — broker/app setup
+{% endif %}
+  routes/                  one module per resource
+    items.py                example resource
+  core/                     shared infrastructure
+    config.py                settings (pydantic-settings)
+{% if database != "none" %}
+    db.py                     async engine/session
 {% endif %}
 {% if redis %}
-  core/redis.py       Redis client
+    redis.py                  Redis client
 {% endif %}
-tests/               tests
+{% if worker != "none" %}
+  tasks/                    one module per background job
+    example.py                the /tasks/add demo task
+{% endif %}
+  schemas.py               Pydantic request/response models
+{% if database != "none" %}
+  models.py                 {{ orm }} models
+{% endif %}
+tests/                     tests
 {% if migrations %}
-alembic/             migrations
+alembic/                    migrations
 {% endif %}
-AGENTS.md            project context for AI coding agents
+AGENTS.md                  project context for AI coding agents
 {% if docker %}
-Dockerfile           container build
+Dockerfile                  container build
 {% endif %}
 ```

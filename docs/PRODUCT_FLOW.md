@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.3: per-template options, `--option`, restapi)
+**Last updated:** 2026-08-12 (v0.4: opinionated generated-project layout)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -212,15 +212,15 @@ Creating my-api/ from fastapi/restapi...
   ✔ src/my_api/__init__.py
   ✔ src/my_api/core/__init__.py
   ✔ src/my_api/core/config.py
+  ✔ src/my_api/core/db.py
   ✔ src/my_api/core/redis.py
-  ✔ src/my_api/db/__init__.py
-  ✔ src/my_api/db/models.py
-  ✔ src/my_api/db/session.py
   ✔ src/my_api/main.py
+  ✔ src/my_api/models.py
   ✔ src/my_api/routes/__init__.py
   ✔ src/my_api/routes/items.py
   ✔ src/my_api/schemas.py
-  ✔ src/my_api/tasks.py
+  ✔ src/my_api/tasks/__init__.py
+  ✔ src/my_api/tasks/example.py
   ✔ src/my_api/worker.py
   ✔ tests/conftest.py
   ✔ tests/test_main.py

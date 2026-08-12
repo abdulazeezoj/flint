@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.3: per-template options, generalized layer gating, restapi)
+**Last updated:** 2026-08-12 (v0.4: opinionated, Next.js-inspired generated-project layout)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -63,15 +63,15 @@ flint/
 │           │   │   └── config/                     # rendered iff config option is true
 │           │   └── restapi/
 │           │       ├── template.json               # options: [database, orm, migrations, worker, redis]
-│           │       ├── files/                       # always rendered — in-memory CRUD, config, schemas
+│           │       ├── files/                       # always rendered — main.py, core/config.py, schemas.py, routes/items.py (in-memory)
 │           │       ├── docker/                       # rendered iff --docker
-│           │       ├── db-sqlmodel/                   # rendered iff orm == sqlmodel; overrides routes/items.py
-│           │       ├── db-sqlalchemy/                 # rendered iff orm == sqlalchemy; overrides routes/items.py
+│           │       ├── db-sqlmodel/                   # rendered iff orm == sqlmodel; overrides routes/items.py, adds core/db.py + models.py
+│           │       ├── db-sqlalchemy/                 # rendered iff orm == sqlalchemy; same shape, SQLAlchemy Core/ORM
 │           │       ├── migrations-sqlmodel/            # rendered iff migrations && orm == sqlmodel
 │           │       ├── migrations-sqlalchemy/          # rendered iff migrations && orm == sqlalchemy
-│           │       ├── worker-taskiq/                   # rendered iff worker == taskiq
-│           │       ├── worker-celery/                   # rendered iff worker == celery
-│           │       └── redis/                            # rendered iff redis is true (requested or implied)
+│           │       ├── worker-taskiq/                   # rendered iff worker == taskiq; worker.py + tasks/example.py
+│           │       ├── worker-celery/                   # rendered iff worker == celery; same shape, Celery
+│           │       └── redis/                            # rendered iff redis is true (requested or implied); core/redis.py
 │           ├── flask/template.json                  # disabled stub — roadmap
 │           └── django/template.json                 # disabled stub — roadmap
 ├── tests/
@@ -256,9 +256,9 @@ a given file makes templates harder to maintain:
 - **Layers** (preferred for code): a whole file either exists for a
   given combination of choices or it doesn't. `db-sqlmodel/` and
   `db-sqlalchemy/` each ship their own complete `routes/items.py` and
-  `db/session.py` — no shared file has ORM-specific branches in it.
-  Keeps generated *code* readable (a developer opens `routes/items.py`
-  and sees one clean implementation, not four nested `{% if %}` blocks).
+  `core/db.py` — no shared file has ORM-specific branches in it. Keeps
+  generated *code* readable (a developer opens `routes/items.py` and
+  sees one clean implementation, not four nested `{% if %}` blocks).
 - **Inline `{% if %}`** (acceptable for "gathering" files): some files
   inherently need to mention *multiple* orthogonal choices in one place
   — `pyproject.toml` (the dependency list touches orm/database/
@@ -287,6 +287,60 @@ output once per new conditional file (`ast.parse()` for `.py`, `tomllib.
 loads()` for `.toml` — see `test_generator.py`'s `_assert_all_python_
 files_parse`/`_assert_valid_toml` helpers) rather than trusting it by
 eye.
+
+### 4.4 The generated *project's* layout is opinionated too — Next.js-style
+
+Everything above is about how flint's *own* code decides what to
+render. This section is about the shape of what gets rendered — the
+layout a developer (or a coding agent extending the scaffold) actually
+sees inside `restapi`'s `src/{{package_name}}/`.
+
+The model is Next.js's own rule, taken literally rather than loosely:
+**only routing is magic and strictly located; everything else is
+convention, not enforcement.** Next doesn't mandate `lib/`/`components/`
+— people converge on those because *routing* has one unambiguous home
+(`app/`/`pages/`) and nothing else competes for that kind of certainty.
+Applied here:
+
+- **Strictly opinionated** (flint always uses this exact name/location,
+  and every generated project agrees):
+  - `main.py` — the FastAPI entrypoint. Never renamed, never moved.
+  - `worker.py` — the worker entrypoint (present only when a worker is
+    chosen). Same rule.
+  - `routes/` — one module per HTTP resource. This is the "app/" of
+    this layout: the one place with real, load-bearing significance
+    (routers get individually imported and mounted in `main.py`).
+  - `tasks/` — one module per background job, mirroring `routes/`.
+  - `core/` — shared infrastructure every route/task might reasonably
+    depend on: `config.py` (always), `db.py` (async engine/session, iff
+    a database is chosen), `redis.py` (iff redis resolves true). A
+    hypothetical future `schedules.py` (periodic job registration) would
+    live here too — the folder's job is "cross-cutting plumbing," not
+    "everything that isn't a route."
+- **A default, not a rule** — flint picks *something* reasonable so the
+  project isn't missing a home for these, but doesn't treat it as fixed
+  the way the above is: `schemas.py` (Pydantic contracts) and
+  `models.py` (ORM models, iff a database is chosen) stay single
+  top-level files for now, because restapi only ships one resource.
+  Both are natural candidates to become `schemas/`/`models/` folders —
+  mirroring `routes/`/`tasks/` — the moment a generated project grows a
+  second resource, but flint doesn't make that call for the user.
+
+Why `models.py` (and `db.py`'s session/engine setup) is **not** under
+`core/`, despite both starting life under `db/` before this design: the
+prior FastAPI-scaffolding research (`PRODUCT_ARCH.md`'s v0.2 research
+pass, and independently `zhanymkanov/fastapi-best-practices`) draws the
+same line — `core/` is config + cross-cutting infrastructure,
+`models/`/`schemas/` are domain content that scale with resource count.
+Putting `Item` inside `core/` would mean every future resource's model
+also lands in the one folder meant to stay small and stable — exactly
+the ambiguity this layout exists to avoid.
+
+`hello-world`'s optional `config` option follows the same convention for
+consistency (`core/config.py`, not top-level `config.py`) even though a
+one-endpoint template doesn't need the rest of the `core/`/`routes/`/
+`tasks/` structure — a developer who's used one flint template shouldn't
+have to relearn where config lives in another.
 
 ## 5. CLI flow → code mapping
 
@@ -405,13 +459,17 @@ surfaced by actually running the generated tooling:
   actually running `alembic revision`.
 - **Taskiq/Celery task discovery**: pointing either worker CLI at
   `worker.py` (which defines the broker/app) doesn't automatically
-  import `tasks.py` (which registers the actual tasks) — the worker
-  starts cleanly and reports zero known tasks. Fixed by importing
-  `tasks` at the *bottom* of `worker.py` (after the broker/app object
-  exists, to sidestep the circular import — `tasks.py` needs to import
-  `broker`/`celery_app` from `worker.py`). Only a real worker process
-  boot ("`[tasks]` empty" / "task not found") surfaces this — the code
-  imports and type-checks fine either way.
+  import the task modules under `tasks/` (which register the actual
+  tasks) — the worker starts cleanly and reports zero known tasks.
+  Fixed by importing each `tasks/*.py` module at the *bottom* of
+  `worker.py` (after the broker/app object exists, to sidestep the
+  circular import — a task module needs to import `broker`/`celery_app`
+  from `worker.py`). A bare `from ... import tasks` (the package) isn't
+  enough either — importing a package doesn't auto-import its
+  submodules, so each new file under `tasks/` needs its own explicit
+  import line. Only a real worker process boot ("`[tasks]` empty" /
+  "task not found") surfaces this — the code imports and type-checks
+  fine either way.
 - **`aiosqlite` only in prod deps for `database == "sqlite"`**: but
   restapi's tests *always* use an isolated SQLite database for
   isolation (FR10), regardless of which database was configured for

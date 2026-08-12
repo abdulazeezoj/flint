@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.3: template options — restapi's database/ORM/migrations/worker/redis, hello-world's config; `ai` template removed)
+**Last updated:** 2026-08-12 (v0.4: opinionated, Next.js-inspired generated-project layout)
 
 ## 1. Vision
 
@@ -193,6 +193,11 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
   template with database/ORM/migrations/worker/Redis choices;
   `hello-world` gains an optional `pydantic-settings` config; `ai`
   template removed (was a disabled stub, never shipped real content).
+- `v0.4.0` — the generated project layout itself becomes opinionated,
+  Next.js-style: `main.py`/`worker.py` as fixed entrypoints, `routes/`/
+  `tasks/` as "one file per resource/job" folders, `core/` for shared
+  infrastructure (config, db session, redis client) — applied
+  consistently to both `restapi` and `hello-world`'s optional config.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
