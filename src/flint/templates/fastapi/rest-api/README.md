@@ -1,4 +1,4 @@
-# Template: fastapi / restapi
+# Template: fastapi / rest-api
 
 Maintainer documentation for this template — not part of the generated
 project (that's `files/README.md.jinja`).
@@ -92,7 +92,7 @@ version, since it's easy to "fix" these back in accidentally:
 
 ## Testing this template
 
-`tests/test_generator.py` has a dedicated block of `restapi`-specific
+`tests/test_generator.py` has a dedicated block of `rest-api`-specific
 tests: in-memory, SQLite+SQLModel+migrations, Postgres+SQLAlchemy,
 Taskiq, Celery, Redis-standalone, and "all features combined." Each
 asserts the right files exist/don't (including the specific paths from

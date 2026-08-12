@@ -260,7 +260,7 @@ def test_new_force_overwrites(tmp_path: Path, monkeypatch):
     assert (tmp_path / "my-api" / "pyproject.toml").is_file()
 
 
-def test_new_restapi_with_options(tmp_path: Path, monkeypatch):
+def test_new_rest_api_with_options(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(
         app,
@@ -270,7 +270,7 @@ def test_new_restapi_with_options(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "--option",
             "database=none",
             "-o",
@@ -298,7 +298,7 @@ def test_new_option_unknown_key_errors(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "--option",
             "bogus=x",
             "--yes",
@@ -318,7 +318,7 @@ def test_new_option_invalid_value_errors(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "--option",
             "database=mysql",
             "--yes",
@@ -348,7 +348,7 @@ def test_new_remembers_choices_across_runs(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "-o",
             "database=postgres",
             "-o",
@@ -383,7 +383,7 @@ def test_new_no_remember_does_not_persist_or_read(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "-o",
             "database=postgres",
             "--no-git",
@@ -403,7 +403,7 @@ def test_new_no_remember_does_not_persist_or_read(tmp_path: Path, monkeypatch):
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "--no-git",
             "--no-install",
             "--yes",
@@ -422,7 +422,7 @@ def test_new_remembered_defaults_never_override_explicit_flags(tmp_path: Path, m
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "-o",
             "database=postgres",
             "--no-git",
@@ -438,7 +438,7 @@ def test_new_remembered_defaults_never_override_explicit_flags(tmp_path: Path, m
             "--framework",
             "fastapi",
             "--template",
-            "restapi",
+            "rest-api",
             "-o",
             "database=sqlite",
             "--no-git",
@@ -458,9 +458,9 @@ def test_new_stale_remembered_option_falls_back_to_template_default(tmp_path: Pa
     prefs.save_prefs(
         {
             "last_framework": "fastapi",
-            "last_templates": {"fastapi": "restapi"},
+            "last_templates": {"fastapi": "rest-api"},
             "templates": {
-                "fastapi/restapi": {
+                "fastapi/rest-api": {
                     "options": {"database": "mysql"},
                     "docker": False,
                     "git_init": False,

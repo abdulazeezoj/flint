@@ -72,10 +72,10 @@ def test_get_framework_unknown_raises():
         get_framework("does-not-exist")
 
 
-def test_list_templates_includes_hello_world_and_restapi():
+def test_list_templates_includes_hello_world_and_rest_api():
     templates = list_templates("fastapi")
     ids = {t.id for t in templates}
-    assert {"hello-world", "restapi"} <= ids
+    assert {"hello-world", "rest-api"} <= ids
 
 
 def test_get_template_unknown_raises():
@@ -96,8 +96,8 @@ def test_hello_world_declares_config_option():
     assert template.options[0].default is False
 
 
-def test_restapi_declares_expected_options_and_layers():
-    template = get_template("fastapi", "restapi")
+def test_rest_api_declares_expected_options_and_layers():
+    template = get_template("fastapi", "rest-api")
     option_keys = [o.key for o in template.options]
     assert option_keys == ["database", "orm", "migrations", "worker", "redis"]
 
@@ -339,21 +339,21 @@ def test_render_does_not_delete_preexisting_directory_on_failure(tmp_path: Path,
     assert (target / "keepme.txt").read_text() == "do not delete"
 
 
-# --- restapi: the options/layers engine exercised through a real template ---
+# --- rest-api: the options/layers engine exercised through a real template ---
 
 
-def make_restapi_answers(**option_overrides) -> Answers:
+def make_rest_api_answers(**option_overrides) -> Answers:
     options = dict(
         database="sqlite", orm="sqlmodel", migrations=True, worker="none", redis=False
     )
     options.update(option_overrides)
-    return make_answers(template="restapi", options=options)
+    return make_answers(template="rest-api", options=options)
 
 
-def test_restapi_in_memory_default(tmp_path: Path):
+def test_rest_api_in_memory_default(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers(database="none", orm="none", migrations=False)
-    created = render("fastapi", "restapi", target, answers)
+    answers = make_rest_api_answers(database="none", orm="none", migrations=False)
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/routes/items.py") in created
     assert Path("src/my_api/core/db.py") not in created
@@ -364,10 +364,10 @@ def test_restapi_in_memory_default(tmp_path: Path):
     _assert_valid_toml(target / "pyproject.toml")
 
 
-def test_restapi_sqlite_sqlmodel_with_migrations(tmp_path: Path):
+def test_rest_api_sqlite_sqlmodel_with_migrations(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers()  # sqlite + sqlmodel + migrations=True
-    created = render("fastapi", "restapi", target, answers)
+    answers = make_rest_api_answers()  # sqlite + sqlmodel + migrations=True
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/core/db.py") in created
     assert Path("src/my_api/models.py") in created
@@ -389,10 +389,10 @@ def test_restapi_sqlite_sqlmodel_with_migrations(tmp_path: Path):
     assert "alembic>=1.14.0" in config["project"]["dependencies"]
 
 
-def test_restapi_postgres_sqlalchemy_no_migrations(tmp_path: Path):
+def test_rest_api_postgres_sqlalchemy_no_migrations(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers(database="postgres", orm="sqlalchemy", migrations=False)
-    created = render("fastapi", "restapi", target, answers)
+    answers = make_rest_api_answers(database="postgres", orm="sqlalchemy", migrations=False)
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/core/db.py") in created
     assert Path("alembic.ini") not in created
@@ -409,16 +409,16 @@ def test_restapi_postgres_sqlalchemy_no_migrations(tmp_path: Path):
     assert not any("alembic" in dep for dep in config["project"]["dependencies"])
 
 
-def test_restapi_worker_taskiq_implies_redis(tmp_path: Path):
+def test_rest_api_worker_taskiq_implies_redis(tmp_path: Path):
     # Whether a worker choice *implies* redis (skip_value resolution) is a
     # prompts.py concern (see test_prompts.py) — render() just applies
     # whatever options dict it's given, which here already has redis=True
     # to simulate what prompts.prompt_template_options would have resolved.
     target = tmp_path / "api"
-    answers = make_restapi_answers(
+    answers = make_rest_api_answers(
         database="none", orm="none", migrations=False, worker="taskiq", redis=True
     )
-    created = render("fastapi", "restapi", target, answers)
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/worker.py") in created
     assert Path("src/my_api/tasks/example.py") in created
@@ -430,10 +430,10 @@ def test_restapi_worker_taskiq_implies_redis(tmp_path: Path):
     _assert_all_python_files_parse(target)
 
 
-def test_restapi_worker_celery(tmp_path: Path):
+def test_rest_api_worker_celery(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers(database="none", orm="none", migrations=False, worker="celery")
-    created = render("fastapi", "restapi", target, answers)
+    answers = make_rest_api_answers(database="none", orm="none", migrations=False, worker="celery")
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/worker.py") in created
     worker_py = (target / "src/my_api/worker.py").read_text()
@@ -443,23 +443,23 @@ def test_restapi_worker_celery(tmp_path: Path):
     _assert_all_python_files_parse(target)
 
 
-def test_restapi_redis_standalone_toggle(tmp_path: Path):
+def test_rest_api_redis_standalone_toggle(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers(
+    answers = make_rest_api_answers(
         database="none", orm="none", migrations=False, worker="none", redis=True
     )
-    created = render("fastapi", "restapi", target, answers)
+    created = render("fastapi", "rest-api", target, answers)
 
     assert Path("src/my_api/core/redis.py") in created
     assert Path("src/my_api/worker.py") not in created
 
 
-def test_restapi_all_features_combined(tmp_path: Path):
+def test_rest_api_all_features_combined(tmp_path: Path):
     target = tmp_path / "api"
-    answers = make_restapi_answers(
+    answers = make_rest_api_answers(
         database="postgres", orm="sqlalchemy", migrations=True, worker="celery", redis=True
     )
-    created = render("fastapi", "restapi", target, answers, force=True)
+    created = render("fastapi", "rest-api", target, answers, force=True)
 
     for expected in [
         "src/my_api/core/db.py",

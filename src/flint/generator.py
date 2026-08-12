@@ -3,20 +3,20 @@
 Templates are organized two levels deep (PRODUCT_ARCH.md §4):
 ``templates/<framework>/<template>/``, e.g. ``templates/fastapi/hello-world/``.
 A framework (``fastapi``) groups one or more templates/variants
-(``hello-world``, ``restapi``, ...); each variant is a complete,
+(``hello-world``, ``rest-api``, ...); each variant is a complete,
 independently renderable project.
 
 Beyond the base file set, a template can declare:
 
 - **options** — extra interactive prompts scoped to that template (e.g.
-  restapi's database/ORM/migrations/worker/redis choices, hello-world's
+  rest-api's database/ORM/migrations/worker/redis choices, hello-world's
   optional pydantic-settings config). Each is `select` or `confirm`,
   can depend on an earlier option via `when`, and resolves to
   `skip_value` when its `when` isn't satisfied.
 - **layers** — extra directories rendered *in addition to* the base
   `files/` layer, each gated by a `when` predicate evaluated against the
   fully resolved answers (fixed fields + options). This is how
-  `--docker` adds a Dockerfile, and how e.g. restapi's `worker-taskiq`
+  `--docker` adds a Dockerfile, and how e.g. rest-api's `worker-taskiq`
   layer adds worker code only when that worker was chosen. A later
   layer's file silently overwrites an earlier one at the same relative
   path — that's how e.g. a database layer swaps in a DB-backed

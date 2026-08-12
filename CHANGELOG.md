@@ -7,6 +7,19 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.6.0 — 2026-08-12
+
+### Changed
+
+- **Breaking (pre-1.0):** the `restapi` template is renamed to
+  `rest-api`, to match the hyphenated id style used elsewhere (e.g.
+  `hello-world`) instead of being the odd one out. `--template restapi`
+  is no longer recognized — use `--template rest-api`. Anything already
+  remembered in `~/.flint/last.json` under the old `fastapi/restapi` key
+  (§ v0.5.0) is simply never looked up again under the new id and falls
+  back to the template's own defaults, same as any other stale entry —
+  no manual migration needed.
+
 ## v0.5.0 — 2026-08-12
 
 ### Added

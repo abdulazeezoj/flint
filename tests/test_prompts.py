@@ -24,7 +24,7 @@ HELLO_WORLD = TemplateMeta(
     framework_id="fastapi",
 )
 SOON_TEMPLATE = TemplateMeta(
-    id="restapi",
+    id="rest-api",
     label="REST API",
     description="",
     enabled=False,
@@ -97,7 +97,7 @@ def test_prompt_template_interactive_select(monkeypatch):
 
 def test_prompt_template_flag_disabled_rejected():
     with pytest.raises(FlintUserError):
-        prompts.prompt_template("restapi", [HELLO_WORLD, SOON_TEMPLATE], interactive=True)
+        prompts.prompt_template("rest-api", [HELLO_WORLD, SOON_TEMPLATE], interactive=True)
 
 
 def test_prompt_template_non_interactive_picks_first_enabled():
@@ -455,11 +455,11 @@ def test_prompt_template_options_explicit_flag_wins_over_remembered():
     assert resolved["database"] == "sqlite"
 
 
-def test_prompt_template_options_real_restapi_template_default_flow():
+def test_prompt_template_options_real_rest_api_template_default_flow():
     from flint.generator import get_template
 
-    restapi = get_template("fastapi", "restapi")
-    resolved = prompts.prompt_template_options(restapi, {}, interactive=False)
+    rest_api = get_template("fastapi", "rest-api")
+    resolved = prompts.prompt_template_options(rest_api, {}, interactive=False)
     assert resolved == {
         "database": "sqlite",
         "orm": "sqlmodel",
@@ -469,11 +469,11 @@ def test_prompt_template_options_real_restapi_template_default_flow():
     }
 
 
-def test_prompt_template_options_real_restapi_worker_implies_redis():
+def test_prompt_template_options_real_rest_api_worker_implies_redis():
     from flint.generator import get_template
 
-    restapi = get_template("fastapi", "restapi")
+    rest_api = get_template("fastapi", "rest-api")
     resolved = prompts.prompt_template_options(
-        restapi, {"worker": "taskiq"}, interactive=False
+        rest_api, {"worker": "taskiq"}, interactive=False
     )
     assert resolved["redis"] is True

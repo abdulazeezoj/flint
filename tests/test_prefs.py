@@ -67,17 +67,17 @@ def test_get_last_template_wrong_value_type_ignored():
 
 
 def test_get_last_template_present():
-    prefs_data = {"last_templates": {"fastapi": "restapi"}}
-    assert prefs.get_last_template(prefs_data, "fastapi") == "restapi"
+    prefs_data = {"last_templates": {"fastapi": "rest-api"}}
+    assert prefs.get_last_template(prefs_data, "fastapi") == "rest-api"
 
 
 def test_get_last_template_different_framework_not_found():
-    prefs_data = {"last_templates": {"fastapi": "restapi"}}
+    prefs_data = {"last_templates": {"fastapi": "rest-api"}}
     assert prefs.get_last_template(prefs_data, "flask") is None
 
 
 def test_get_template_prefs_absent_returns_defaults():
-    assert prefs.get_template_prefs({}, "fastapi/restapi") == {
+    assert prefs.get_template_prefs({}, "fastapi/rest-api") == {
         "options": {},
         "docker": None,
         "git_init": None,
@@ -86,13 +86,13 @@ def test_get_template_prefs_absent_returns_defaults():
 
 
 def test_get_template_prefs_wrong_container_type_ignored():
-    result = prefs.get_template_prefs({"templates": "oops"}, "fastapi/restapi")
+    result = prefs.get_template_prefs({"templates": "oops"}, "fastapi/rest-api")
     assert result == {"options": {}, "docker": None, "git_init": None, "install": None}
 
 
 def test_get_template_prefs_wrong_entry_type_ignored():
     result = prefs.get_template_prefs(
-        {"templates": {"fastapi/restapi": "oops"}}, "fastapi/restapi"
+        {"templates": {"fastapi/rest-api": "oops"}}, "fastapi/rest-api"
     )
     assert result == {"options": {}, "docker": None, "git_init": None, "install": None}
 
@@ -100,7 +100,7 @@ def test_get_template_prefs_wrong_entry_type_ignored():
 def test_get_template_prefs_present():
     prefs_data = {
         "templates": {
-            "fastapi/restapi": {
+            "fastapi/rest-api": {
                 "options": {"database": "postgres"},
                 "docker": True,
                 "git_init": False,
@@ -108,7 +108,7 @@ def test_get_template_prefs_present():
             }
         }
     }
-    assert prefs.get_template_prefs(prefs_data, "fastapi/restapi") == {
+    assert prefs.get_template_prefs(prefs_data, "fastapi/rest-api") == {
         "options": {"database": "postgres"},
         "docker": True,
         "git_init": False,
@@ -119,7 +119,7 @@ def test_get_template_prefs_present():
 def test_get_template_prefs_non_bool_flags_ignored():
     prefs_data = {
         "templates": {
-            "fastapi/restapi": {
+            "fastapi/rest-api": {
                 "options": {},
                 "docker": "yes",
                 "git_init": 1,
@@ -127,7 +127,7 @@ def test_get_template_prefs_non_bool_flags_ignored():
             }
         }
     }
-    assert prefs.get_template_prefs(prefs_data, "fastapi/restapi") == {
+    assert prefs.get_template_prefs(prefs_data, "fastapi/rest-api") == {
         "options": {},
         "docker": None,
         "git_init": None,
@@ -136,8 +136,8 @@ def test_get_template_prefs_non_bool_flags_ignored():
 
 
 def test_get_template_prefs_non_dict_options_ignored():
-    prefs_data = {"templates": {"fastapi/restapi": {"options": "oops"}}}
-    result = prefs.get_template_prefs(prefs_data, "fastapi/restapi")
+    prefs_data = {"templates": {"fastapi/rest-api": {"options": "oops"}}}
+    result = prefs.get_template_prefs(prefs_data, "fastapi/rest-api")
     assert result["options"] == {}
 
 
@@ -145,8 +145,8 @@ def test_record_run_from_empty():
     updated = prefs.record_run(
         {},
         framework_id="fastapi",
-        template_id="restapi",
-        full_id="fastapi/restapi",
+        template_id="rest-api",
+        full_id="fastapi/rest-api",
         options={"database": "postgres"},
         docker=True,
         git_init=False,
@@ -154,9 +154,9 @@ def test_record_run_from_empty():
     )
     assert updated == {
         "last_framework": "fastapi",
-        "last_templates": {"fastapi": "restapi"},
+        "last_templates": {"fastapi": "rest-api"},
         "templates": {
-            "fastapi/restapi": {
+            "fastapi/rest-api": {
                 "options": {"database": "postgres"},
                 "docker": True,
                 "git_init": False,
@@ -182,18 +182,18 @@ def test_record_run_preserves_other_frameworks_and_templates():
     updated = prefs.record_run(
         existing,
         framework_id="fastapi",
-        template_id="restapi",
-        full_id="fastapi/restapi",
+        template_id="rest-api",
+        full_id="fastapi/rest-api",
         options={"database": "sqlite"},
         docker=False,
         git_init=True,
         install=True,
     )
-    assert updated["last_templates"] == {"fastapi": "restapi"}
+    assert updated["last_templates"] == {"fastapi": "rest-api"}
     assert updated["templates"]["fastapi/hello-world"] == existing["templates"][
         "fastapi/hello-world"
     ]
-    assert updated["templates"]["fastapi/restapi"]["options"] == {"database": "sqlite"}
+    assert updated["templates"]["fastapi/rest-api"]["options"] == {"database": "sqlite"}
 
 
 def test_record_run_does_not_mutate_input():
@@ -201,8 +201,8 @@ def test_record_run_does_not_mutate_input():
     prefs.record_run(
         existing,
         framework_id="fastapi",
-        template_id="restapi",
-        full_id="fastapi/restapi",
+        template_id="rest-api",
+        full_id="fastapi/rest-api",
         options={},
         docker=False,
         git_init=True,

@@ -1,5 +1,5 @@
 {
-  "id": "restapi",
+  "id": "rest-api",
   "label": "REST API",
   "description": "A layered FastAPI REST API with pydantic-settings, and your choice of database/ORM, migrations, background worker, and Redis.",
   "enabled": true,

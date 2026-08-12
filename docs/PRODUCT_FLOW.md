@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
+**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -14,7 +14,7 @@ flow depends on.
 |---|---|
 | `uvx flint` / `flint` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
 | `flint new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
-| `flint new NAME --framework fastapi --template restapi -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
+| `flint new NAME --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
 | `flint new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.flint/last.json` for this run (§6). |
 | `flint --version` | Prints version, exits. |
 | `flint --help` / `flint new --help` | Prints usage, exits. |
@@ -77,14 +77,14 @@ falls back to.
    code has no built-in knowledge of these — see PRODUCT_ARCH.md §4).
    Some options depend on an earlier one and are silently skipped
    (resolved to a documented value) rather than asked when their
-   dependency isn't satisfied — e.g. restapi's ORM prompt never appears
+   dependency isn't satisfied — e.g. rest-api's ORM prompt never appears
    if "no database" was chosen. Each option's default below is the
    template's own declared default; a remembered value for this
    `<framework>/<template>` (§6) is preselected instead when one exists
    and is still valid for that option (e.g. still among a select's
    choices).
 
-   For restapi:
+   For rest-api:
    ? Database? › None / SQLite / PostgreSQL           (default: SQLite)
    ? ORM? › SQLModel / SQLAlchemy                       (skipped if no DB; default: SQLModel)
    ? Add Alembic migrations? (Y/n)                      (skipped if no DB; default: yes)
@@ -127,7 +127,7 @@ falls back to.
 
 11. Summary / next steps
    Options: database=sqlite, orm=sqlmodel, migrations=True, worker=none, redis=False
-   Creating my-api/ from fastapi/restapi...
+   Creating my-api/ from fastapi/rest-api...
      ✔ ...
    ✔ Initialized git repository
    ✔ Installed dependencies (uv sync)
@@ -195,7 +195,7 @@ still fail independently without affecting this), Flint records:
 
 - The chosen framework, as the new "last framework."
 - The chosen template, as the new "last template" *for that framework*
-  specifically (picking `fastapi` again later remembers `restapi`
+  specifically (picking `fastapi` again later remembers `rest-api`
   independently of whatever's remembered for a future `flask`).
 - For that exact `<framework>/<template>`: every resolved template
   option, plus whether `--docker`/`--git`/`--install` were used.
@@ -243,7 +243,7 @@ regardless of which options were chosen. This is the same information
 printed in the CLI summary, so the user never has to re-discover it
 later.
 
-## 8. Example transcript (interactive, restapi with a real stack)
+## 8. Example transcript (interactive, rest-api with a real stack)
 
 ```
 $ uvx flint
@@ -260,7 +260,7 @@ Using uv to manage dependencies.
 ? Install dependencies with uv now? Yes
 
 Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, redis=True
-Creating my-api/ from fastapi/restapi...
+Creating my-api/ from fastapi/rest-api...
   ✔ .env
   ✔ .gitignore
   ✔ AGENTS.md

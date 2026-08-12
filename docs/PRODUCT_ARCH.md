@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
+**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -62,7 +62,7 @@ flint/
 │           │   │   ├── files/                      # always rendered
 │           │   │   ├── docker/                     # rendered iff --docker
 │           │   │   └── config/                     # rendered iff config option is true
-│           │   └── restapi/
+│           │   └── rest-api/
 │           │       ├── template.json               # options: [database, orm, migrations, worker, redis]
 │           │       ├── files/                       # always rendered — main.py, core/config.py, schemas.py, routes/items.py (in-memory)
 │           │       ├── docker/                       # rendered iff --docker
@@ -96,7 +96,7 @@ Templates are organized two levels deep: `templates/<framework>/<template>/`
 (PRODUCT_SPEC §3 defines the framework/template/option distinction). A
 **framework** directory (`templates/fastapi/`) has its own
 `template.json` and one subdirectory per **template** variant
-(`hello-world/`, `restapi/`), each with its own `template.json`. Disabled
+(`hello-world/`, `rest-api/`), each with its own `template.json`. Disabled
 frameworks (`flask`, `django`) are stubs — just a `template.json` with
 `"enabled": false`, no `files/` — that exist purely so the wizard/CLI can
 list them as "coming soon" (PRODUCT_FLOW §2 step 3) without any code
@@ -106,7 +106,7 @@ changes.
 
 ```json
 {
-  "id": "restapi",
+  "id": "rest-api",
   "label": "REST API",
   "description": "...",
   "enabled": true,
@@ -147,7 +147,7 @@ changes.
   order matters, since a `when` can only see already-resolved keys.
   When `when` is present and doesn't match, the option is never asked
   (interactive or not) and instead resolves to `skip_value` (falling
-  back to `default` if `skip_value` is omitted). This is how restapi's
+  back to `default` if `skip_value` is omitted). This is how rest-api's
   `orm`/`migrations` collapse to `"none"`/`false` when no database was
   chosen, and how `redis` resolves to `true` — implied, not asked — the
   moment a worker is chosen (its `when` is `{"worker": ["none"]}`; picking
@@ -161,10 +161,10 @@ changes.
   `docker`/`git_init` merged with the template's own resolved options —
   see `Answers.context()`). This is how `--docker` adds a Dockerfile
   (`{"dir": "docker", "when": {"docker": [true]}}` — no code path is
-  hardcoded to "docker" anymore, it's just data) and how e.g. restapi's
+  hardcoded to "docker" anymore, it's just data) and how e.g. rest-api's
   `worker-taskiq` layer adds worker code only when that worker was
   chosen. **A later layer's file silently overwrites an earlier one at
-  the same relative path** — that's the mechanism restapi uses to swap
+  the same relative path** — that's the mechanism rest-api uses to swap
   in a DB-backed `routes/items.py`/`main.py` over the base in-memory
   ones, rather than sprinkling `{% if %}` through shared code files (see
   §4.2). `TemplateMeta.supports_docker` is derived, not stored — `any(
@@ -201,7 +201,7 @@ class Answers(BaseModel):
     slug: str               # "my-api" — directory / distribution name
     package_name: str       # "my_api" — importable package name
     framework: str          # "fastapi"
-    template: str            # "restapi"
+    template: str            # "rest-api"
     git_init: bool
     install: bool
     docker: bool
@@ -233,7 +233,7 @@ new *framework* is the same, one level up. Adding Flask/Django for real
 is purely a content change (swap `enabled: false` → `true` and fill in
 `files/`), not an architecture change.
 
-### 4.1 A worked example: restapi's `redis` option
+### 4.1 A worked example: rest-api's `redis` option
 
 Three moving pieces, all data-driven:
 
@@ -296,7 +296,7 @@ eye.
 Everything above is about how flint's *own* code decides what to
 render. This section is about the shape of what gets rendered — the
 layout a developer (or a coding agent extending the scaffold) actually
-sees inside `restapi`'s `src/{{package_name}}/`.
+sees inside `rest-api`'s `src/{{package_name}}/`.
 
 The model is Next.js's own rule, taken literally rather than loosely:
 **only routing is magic and strictly located; everything else is
@@ -324,7 +324,7 @@ Applied here:
   project isn't missing a home for these, but doesn't treat it as fixed
   the way the above is: `schemas.py` (Pydantic contracts) and
   `models.py` (ORM models, iff a database is chosen) stay single
-  top-level files for now, because restapi only ships one resource.
+  top-level files for now, because rest-api only ships one resource.
   Both are natural candidates to become `schemas/`/`models/` folders —
   mirroring `routes/`/`tasks/` — the moment a generated project grows a
   second resource, but flint doesn't make that call for the user.
@@ -361,9 +361,9 @@ Shape:
 ```json
 {
   "last_framework": "fastapi",
-  "last_templates": { "fastapi": "restapi" },
+  "last_templates": { "fastapi": "rest-api" },
   "templates": {
-    "fastapi/restapi": {
+    "fastapi/rest-api": {
       "options": { "database": "postgres", "orm": "sqlmodel", "...": "..." },
       "docker": true,
       "git_init": false,
@@ -379,7 +379,7 @@ Shape:
 - `templates` — keyed by `full_id` (`<framework>/<template>`, matching
   `TemplateMeta.full_id`), holding everything specific to that exact
   template: its resolved options plus `docker`/`git_init`/`install`.
-  Two different templates never share a bucket, so restapi's remembered
+  Two different templates never share a bucket, so rest-api's remembered
   `database` choice can't leak into hello-world's option set (which
   doesn't even have a `database` key).
 
@@ -494,7 +494,7 @@ the gate temporarily.
   deleted); the verbatim-copy path for non-`.jinja` files;
   `list_frameworks`/`list_templates` skipping entries without
   `template.json`; a declared layer with a missing directory being
-  skipped rather than failing. A dedicated block of `restapi`-specific
+  skipped rather than failing. A dedicated block of `rest-api`-specific
   tests renders real combinations (in-memory, SQLite+SQLModel+migrations,
   Postgres+SQLAlchemy, Taskiq, Celery, Redis, "all features combined")
   and asserts the right files exist/don't, then runs every `.py` file
@@ -507,13 +507,13 @@ the gate temporarily.
   through Typer's `CliRunner`) to cover the interactive branches for
   every prompt function, plus `parse_option_flags` and
   `prompt_template_options` against both a synthetic template (a
-  `database`/`orm`/`migrations` option chain mirroring restapi's shape,
-  for isolated `when`/`skip_value` testing) and the real `restapi`
+  `database`/`orm`/`migrations` option chain mirroring rest-api's shape,
+  for isolated `when`/`skip_value` testing) and the real `rest-api`
   template (confirming its actual declared defaults and that `worker`
   really does imply `redis`).
 - `test_cli.py` — Typer's `CliRunner`, covering: full non-interactive
   happy path (with and without `--docker`), `--option` end-to-end for
-  restapi (and its "Options: ..." summary line), unknown/invalid
+  rest-api (and its "Options: ..." summary line), unknown/invalid
   `--option` values, a malformed `--option` (no `=`), `--version`,
   `--help`, existing-directory error, invalid name, unknown/disabled
   framework/template, `--docker` requested against a template that
@@ -562,7 +562,7 @@ the gate temporarily.
 Worth recording — each was invisible to `uv sync && pytest`, only
 surfaced by actually running the generated tooling:
 
-- **Missing top-level `__init__.py`** in restapi's `files/` layer (only
+- **Missing top-level `__init__.py`** in rest-api's `files/` layer (only
   `core/__init__.py` and `routes/__init__.py` existed). Plain Python
   imports still worked via PEP 420 namespace packages, and so did
   pytest (its own `pythonpath` config), which is exactly why `uv sync &&
@@ -589,7 +589,7 @@ surfaced by actually running the generated tooling:
   "task not found") surfaces this — the code imports and type-checks
   fine either way.
 - **`aiosqlite` only in prod deps for `database == "sqlite"`**: but
-  restapi's tests *always* use an isolated SQLite database for
+  rest-api's tests *always* use an isolated SQLite database for
   isolation (FR10), regardless of which database was configured for
   production — so `database == "postgres"` generated a project whose
   own test suite couldn't run (`ModuleNotFoundError: aiosqlite`) unless
@@ -620,7 +620,7 @@ surfaced by actually running the generated tooling:
 - Package-manager choice (pip/poetry) — `postgen.py`'s install step is
   already isolated behind one function, swappable per an `Answers.pm`
   field if that's ever added.
-- Message brokers other than Redis for restapi's `worker` option (e.g.
+- Message brokers other than Redis for rest-api's `worker` option (e.g.
   RabbitMQ for Celery) — would multiply the worker×broker combinations
   to support and verify; deferred until there's real demand.
 - `.agents/skills/<framework>` — a directory of framework-specific,

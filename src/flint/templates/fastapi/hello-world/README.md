@@ -59,5 +59,5 @@ Copy this directory, change `template.json`'s `id`/`label`/`description`,
 set `enabled: false` until it's ready, and adjust `files/` (and any
 option-gated layers). No code changes are needed elsewhere — the CLI and
 generator discover variants, options, and layers by reading each
-`template.json`. See `../restapi/template.json` for an example with
+`template.json`. See `../rest-api/template.json` for an example with
 multiple dependent options and several gated layers.

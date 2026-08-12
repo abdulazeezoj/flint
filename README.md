@@ -23,7 +23,7 @@ Using uv to manage dependencies.
 ? Install dependencies with uv now? Yes
 
 Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, redis=True
-Creating my-api/ from fastapi/restapi...
+Creating my-api/ from fastapi/rest-api...
   ✔ ...
 ✔ Initialized git repository
 ✔ Installed dependencies (uv sync)
@@ -51,7 +51,7 @@ uvx flint
 flint                                     # interactive wizard
 flint new my-api                           # interactive, name pre-filled
 flint new my-api \
-  --framework fastapi --template restapi \
+  --framework fastapi --template rest-api \
   -o database=sqlite -o orm=sqlmodel \
   --docker --git --install --yes            # fully non-interactive, for scripts/CI
 flint --version
@@ -84,7 +84,7 @@ whatever the chosen template's `template.json` declares. Today:
   with a passing test and an `AGENTS.md`, ready to run with no edits.
   `-o config=true` adds `pydantic-settings`-based configuration.
   `--docker` adds a `Dockerfile` + `.dockerignore`.
-- **`fastapi/restapi`** — the same, plus real head-start choices:
+- **`fastapi/rest-api`** — the same, plus real head-start choices:
   - `-o database=none|sqlite|postgres` (default: `sqlite`)
   - `-o orm=sqlmodel|sqlalchemy` (only asked with a database; default: `sqlmodel`)
   - `-o migrations=true|false` — async Alembic, autogenerate-ready (default: `true` with a database)
@@ -116,4 +116,4 @@ uv run flint --help
 Adding a framework or template is a content-only change — no code edits
 needed. See `src/flint/templates/fastapi/hello-world/README.md` for the
 minimal layout a new template needs, or `src/flint/templates/fastapi/
-restapi/template.json` for an example with options and gated layers.
+rest-api/template.json` for an example with options and gated layers.

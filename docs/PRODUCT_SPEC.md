@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.5: remembered preferences via `~/.flint/last.json`)
+**Last updated:** 2026-08-12 (v0.6: `restapi` template renamed to `rest-api`)
 
 ## 1. Vision
 
@@ -50,10 +50,10 @@ Three distinct concepts in the wizard — don't conflate them:
 - **Framework** — the underlying library, e.g. `fastapi`, `flask`,
   `django`. Selected first.
 - **Template** — a specific project shape built on that framework, e.g.
-  `hello-world`, `restapi`. Selected second, scoped to the chosen
+  `hello-world`, `rest-api`. Selected second, scoped to the chosen
   framework.
 - **Option** — a further, template-specific choice, declared by the
-  template itself (not hardcoded in Flint). E.g. `restapi` asks for a
+  template itself (not hardcoded in Flint). E.g. `rest-api` asks for a
   database, ORM, whether to add migrations, a background worker, and
   Redis; `hello-world` asks only whether to add `pydantic-settings`
   config. Different templates can declare entirely different options —
@@ -62,7 +62,7 @@ Three distinct concepts in the wizard — don't conflate them:
   declares (see `PRODUCT_ARCH.md` §4).
 
 A generated project always comes from exactly one `<framework>/<template>`
-pair (e.g. `fastapi/restapi`) plus whatever options that template offers.
+pair (e.g. `fastapi/rest-api`) plus whatever options that template offers.
 This is what lets the roadmap grow in three independent directions — more
 frameworks, more templates per framework, and richer options per
 template — without any axis blocking the others.
@@ -74,7 +74,7 @@ template — without any axis blocking the others.
    — and generates a project.
 2. The wizard produces a runnable "Hello World" FastAPI app in under 60
    seconds (excluding dependency download time), managed by `uv`.
-3. A richer `restapi` template offers real head-start choices — database
+3. A richer `rest-api` template offers real head-start choices — database
    (none/SQLite/PostgreSQL), ORM (SQLModel/SQLAlchemy), Alembic
    migrations, a background worker (Taskiq/Celery), and Redis — instead
    of forcing a from-scratch wiring job the moment a project needs more
@@ -100,7 +100,7 @@ already stubbed as disabled/"coming soon" entries so the roadmap is
 visible in the wizard):
 
 - Frameworks other than FastAPI (Flask, Django are stubbed disabled)
-- Templates other than `hello-world` and `restapi`
+- Templates other than `hello-world` and `rest-api`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
 - Auth scaffolding, Docker Compose, CI workflow templates
@@ -109,7 +109,7 @@ visible in the wizard):
 - A GUI or web-based wizard
 
 Database/ORM/migrations/worker selection — a v0.1/v0.2 non-goal — is now
-in scope as of v0.3, scoped specifically to the `restapi` template.
+in scope as of v0.3, scoped specifically to the `rest-api` template.
 
 ## 6. Personas
 
@@ -124,12 +124,12 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
 
 - As a developer, I run one command, answer a few short prompts, and get a
   working FastAPI app I can `uv run` immediately — no follow-up edits.
-- As a developer starting a "real" service, I pick the `restapi`
+- As a developer starting a "real" service, I pick the `rest-api`
   template, choose PostgreSQL + SQLModel + migrations + a Celery worker,
   and get a project with all of that already wired and passing tests —
   not a blank slate I have to wire myself.
 - As a developer working in CI/scripts, I run
-  `flint new my-api --framework fastapi --template restapi -o database=postgres -o orm=sqlmodel --no-git --no-install --yes`
+  `flint new my-api --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --no-git --no-install --yes`
   and get the identical result with no prompts.
 - As a developer deploying to a container, I pass `--docker` and get a
   working `Dockerfile` alongside the app, no Docker knowledge required.
@@ -190,7 +190,7 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
 - `v0.2.0` — framework/template split (`--framework`/`--template`
   replace the single `fastapi-hello-world` id), `--docker`, `AGENTS.md`
   in generated projects.
-- `v0.3.0` — per-template options (`--option key=value`); `restapi`
+- `v0.3.0` — per-template options (`--option key=value`); `rest-api`
   template with database/ORM/migrations/worker/Redis choices;
   `hello-world` gains an optional `pydantic-settings` config; `ai`
   template removed (was a disabled stub, never shipped real content).
@@ -198,11 +198,13 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
   Next.js-style: `main.py`/`worker.py` as fixed entrypoints, `routes/`/
   `tasks/` as "one file per resource/job" folders, `core/` for shared
   infrastructure (config, db session, redis client) — applied
-  consistently to both `restapi` and `hello-world`'s optional config.
+  consistently to both `rest-api` and `hello-world`'s optional config.
 - `v0.5.0` — remembered preferences: `~/.flint/last.json` persists the
   last framework/template and per-template resolved options/docker/git/
   install, used as the new default for both the wizard and non-interactive
   runs; `--remember/--no-remember` opts out.
+- `v0.6.0` — the `restapi` template is renamed to `rest-api`, matching
+  the hyphenated id style `hello-world` already used.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -222,7 +224,7 @@ in scope as of v0.3, scoped specifically to the `restapi` template.
   `.agents/skills/<framework>` — a directory of framework-specific,
   agent-consumable skills — is a larger bet: it needs real per-framework
   content (not just metadata), a decision on which skill format/consumers
-  to target, and is more provable now that `restapi` gives more surface
+  to target, and is more provable now that `rest-api` gives more surface
   to differentiate against. Tracked as a roadmap item, not committed to
   a release yet.
 - **Message broker choice for the worker option**: v0.3 hardcodes Redis
