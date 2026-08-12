@@ -1,0 +1,18 @@
+{
+  "id": "hello-world",
+  "label": "Hello World",
+  "description": "A minimal Flask app with a single Hello World endpoint, managed with uv.",
+  "enabled": true,
+  "options": [
+    {
+      "key": "config",
+      "label": "Add configuration (pydantic-settings)?",
+      "type": "confirm",
+      "default": false
+    }
+  ],
+  "layers": [
+    { "dir": "docker", "when": { "docker": [true] } },
+    { "dir": "config", "when": { "config": [true] } }
+  ]
+}
