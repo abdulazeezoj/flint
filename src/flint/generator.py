@@ -21,11 +21,20 @@ Beyond the base file set, a template can declare:
   layer's file silently overwrites an earlier one at the same relative
   path — that's how e.g. a database layer swaps in a DB-backed
   `routes/items.py` over the base in-memory one.
+- **skills** — references (by `id`, each with its own `when`) into a
+  *shared* catalog at `src/flint/skills/<id>/`, decoupled from any one
+  framework/template so e.g. the `pytest` or `redis` skill isn't
+  duplicated across fastapi and flask. Every matched skill is rendered
+  into `.agents/skills/<id>/` in the generated project — deeper,
+  library-specific reference material (`SKILL.md`, `references/`,
+  `guides/`) for exactly the stack that was chosen, alongside a
+  generated `.agents/skills/README.md` index. See §"skills" catalog
+  below and PRODUCT_ARCH.md §4.4.
 
 Both file/directory *names* and file *contents* are rendered through
 Jinja2, generation is all-or-nothing (rolled back on any failure), and
-adding a new framework, template, option, or layer is purely a matter of
-editing `template.json` and adding files — no changes here.
+adding a new framework, template, option, layer, or skill is purely a
+matter of editing `template.json`/adding files — no changes here.
 """
 
 from __future__ import annotations
@@ -42,6 +51,13 @@ from pydantic import BaseModel
 from flint.errors import FlintError, FlintUserError
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# A shared catalog of "agent skills" — deeper, library-specific reference
+# material (SKILL.md + references/ + guides/) that templates opt into by
+# id, same `when`-gating as layers. Lives outside templates/ because a
+# skill (e.g. "pytest", "redis") is typically useful to more than one
+# framework/template and shouldn't be duplicated per template.
+SKILLS_DIR = Path(__file__).parent / "skills"
 
 # Files whose on-disk *source* name can't carry their real target name
 # (e.g. a literal leading dot doesn't round-trip cleanly through every
@@ -117,6 +133,28 @@ class TemplateLayer:
 
 
 @dataclass(frozen=True)
+class SkillRef:
+    """A template's reference to a shared skill (`SKILLS_DIR / id`),
+    included in the generated project's `.agents/skills/` when `when`
+    matches — same predicate mechanism as `TemplateLayer`."""
+
+    id: str
+    when: dict[str, list[Any]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SkillMeta:
+    """Metadata for one entry in the shared skills catalog, read from
+    `SKILLS_DIR / id / skill.json` (mirrors `FrameworkMeta`/`TemplateMeta`
+    — a maintainer-facing manifest, not itself rendered into a project)."""
+
+    id: str
+    label: str
+    description: str
+    path: Path
+
+
+@dataclass(frozen=True)
 class FrameworkMeta:
     id: str
     label: str
@@ -136,6 +174,7 @@ class TemplateMeta:
     framework_id: str
     options: list[TemplateOption] = field(default_factory=list)
     layers: list[TemplateLayer] = field(default_factory=list)
+    skills: list[SkillRef] = field(default_factory=list)
 
     @property
     def full_id(self) -> str:
@@ -172,6 +211,31 @@ def _parse_option(data: dict) -> TemplateOption:
 
 def _parse_layer(data: dict) -> TemplateLayer:
     return TemplateLayer(dir=data["dir"], when=data.get("when", {}))
+
+
+def _parse_skill_ref(data: dict) -> SkillRef:
+    return SkillRef(id=data["id"], when=data.get("when", {}))
+
+
+def get_skill(skill_id: str) -> SkillMeta:
+    """Look up one entry in the shared skills catalog (`SKILLS_DIR`).
+
+    Raises `FlintError` (not `FlintUserError`) if `skill_id` has no
+    matching directory — an unknown skill id is a bundled-content bug
+    (a template referencing a skill that doesn't exist), never something
+    the CLI user typed.
+    """
+    skill_dir = SKILLS_DIR / skill_id
+    meta_path = skill_dir / "skill.json"
+    if not meta_path.is_file():
+        raise FlintError(f"Unknown skill '{skill_id}' referenced by a template.")
+    data = _read_json(meta_path)
+    return SkillMeta(
+        id=data["id"],
+        label=data["label"],
+        description=data["description"],
+        path=skill_dir,
+    )
 
 
 def list_frameworks() -> list[FrameworkMeta]:
@@ -230,6 +294,7 @@ def list_templates(framework_id: str) -> list[TemplateMeta]:
                     framework_id=framework_id,
                     options=[_parse_option(o) for o in data.get("options", [])],
                     layers=[_parse_layer(l) for l in data.get("layers", [])],
+                    skills=[_parse_skill_ref(s) for s in data.get("skills", [])],
                 )
             )
     return templates
@@ -275,6 +340,9 @@ def render(
     layer_dirs = [_BASE_LAYER] + [
         layer.dir for layer in template.layers if when_matches(layer.when, context)
     ]
+    matched_skills = [
+        get_skill(ref.id) for ref in template.skills if when_matches(ref.when, context)
+    ]
 
     created_before = target_dir.exists()
     created: list[Path] = []
@@ -285,6 +353,10 @@ def render(
             if not layer_path.is_dir():
                 continue
             created.extend(_render_layer(layer_path, target_dir, context))
+        for skill in matched_skills:
+            created.extend(_render_skill(skill, target_dir, context))
+        if matched_skills:
+            created.append(_write_skills_index(target_dir, matched_skills))
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
             shutil.rmtree(target_dir, ignore_errors=True)
@@ -313,6 +385,50 @@ def _render_layer(layer_root: Path, target_dir: Path, context: dict) -> list[Pat
             (target_dir / example_target).write_text(rendered, encoding="utf-8")
             created.append(example_target)
     return created
+
+
+_SKILL_CONTENT_DIR = "content"
+_SKILLS_INDEX_PATH = Path(".agents", "skills", "README.md")
+
+
+def _render_skill(skill: SkillMeta, target_dir: Path, context: dict) -> list[Path]:
+    """Render one matched skill's `content/` into `.agents/skills/<id>/`.
+
+    `skill.path` is the skill's catalog root (sibling to `skill.json`,
+    the maintainer-facing manifest `get_skill` already read) — content
+    lives one level down in `content/` precisely so `skill.json` itself
+    never gets swept up by `_render_layer`'s `rglob`, the same way a
+    template's own `template.json` is never rendered because it sits
+    beside `files/`, not inside it.
+    """
+    content_root = skill.path / _SKILL_CONTENT_DIR
+    skill_target = Path(".agents", "skills", skill.id)
+    rendered = _render_layer(content_root, target_dir / skill_target, context)
+    return [skill_target / rel for rel in rendered]
+
+
+def _write_skills_index(target_dir: Path, skills: list[SkillMeta]) -> Path:
+    """Write `.agents/skills/README.md`, a generated table of contents
+    over exactly the skills this project got — so an agent working in
+    the project can discover them without listing the directory."""
+    lines = [
+        "# Agent Skills",
+        "",
+        "Deeper, library-specific reference material for exactly the stack",
+        "this project uses — generated by flint to match the choices made",
+        "when it was scaffolded. Each skill's `SKILL.md` explains what it",
+        "covers and when to reach for it; `references/` and `guides/` go",
+        "deeper on specific APIs and tasks.",
+        "",
+        "| Skill | What it covers |",
+        "| --- | --- |",
+    ]
+    for skill in sorted(skills, key=lambda s: s.id):
+        lines.append(f"| [{skill.label}](./{skill.id}/SKILL.md) | {skill.description} |")
+    dest = target_dir / _SKILLS_INDEX_PATH
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return _SKILLS_INDEX_PATH
 
 
 def _render_relative_path(rel_source: Path, context: dict) -> Path:

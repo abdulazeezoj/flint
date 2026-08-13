@@ -1,0 +1,85 @@
+# Routing & dependencies
+
+## Router structure
+
+Every resource gets its own file under `src/{{ package_name }}/routes/`,
+exporting a single `router = APIRouter(prefix="/items", tags=["items"])`
+(swap `items` for the resource name). `main.py` registers it once:
+
+```python
+from {{ package_name }}.routes.items import router as items_router
+app.include_router(items_router)
+```
+
+Route handlers are plain functions decorated with `@router.get(...)`,
+`@router.post(...)`, etc. — `HTTPException` for error responses,
+`response_model=` to declare the shape of a successful response
+(FastAPI uses it to filter/validate the return value *and* to generate
+the OpenAPI schema — always set it for anything that isn't `204`).
+
+## Sync vs. async handlers
+
+Both are valid — FastAPI runs a `def` handler in a thread pool and an
+`async def` handler on the event loop directly. The rule in this
+project: **a handler is `async def` the moment it awaits anything**
+(a database call, an HTTP client, `asyncio.sleep`, ...). A handler with
+no I/O (the in-memory `hello-world` routes, before a database is
+chosen) stays a plain `def` — making it `async def` for no reason adds
+nothing and is easy to get wrong later by awaiting inside a sync
+context by mistake.
+
+## Dependency injection with `Depends()`
+
+The database session is the canonical example in this project —
+`core/db.py` defines `get_session()`, a generator/async-generator
+dependency:
+
+```python
+# core/db.py
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+# routes/items.py
+@router.get("/", response_model=list[ItemRead])
+async def list_items(session: AsyncSession = Depends(get_session)) -> list[Item]:
+    result = await session.exec(select(Item))
+    return list(result.all())
+```
+
+`Depends(get_session)` is re-evaluated per request — each request gets
+its own session, opened and closed around exactly that request's work,
+never shared across requests or held longer than needed. Follow this
+same shape for any other per-request resource (a request-scoped cache
+client, a per-request auth context): a generator dependency that
+`yield`s the resource and does cleanup after.
+
+For anything that should be computed *once* (settings, a Redis
+connection pool), don't use `Depends()` at all — see
+`core/config.py`'s module-level `settings = Settings()` and (if Redis
+was chosen) `core/redis.py`'s module-level client. `Depends()` is for
+per-request values, not app-lifetime singletons.
+
+## Request/response models
+
+`schemas.py` holds the Pydantic models that cross the HTTP boundary —
+`ItemCreate` (what a client sends) and `ItemRead` (what the API
+returns) are deliberately separate types even though they overlap,
+because the fields a client is allowed to set and the fields a
+response exposes usually diverge in a real project (an `id`, a
+`created_at`, a computed field) — starting with two types instead of
+one avoids a bigger refactor later. If a database was chosen, the ORM
+model (`models.py`) is a third, distinct type — route handlers convert
+between them (`Item(**item.model_dump())`, `response_model=ItemRead`
+against the ORM instance), never expose the ORM model directly as a
+response type.
+
+## Error handling
+
+Raise `HTTPException(status_code=..., detail=...)` from inside a
+handler — FastAPI turns it into the right JSON error response
+automatically. Don't catch it further up; let it propagate. For a
+class of error that recurs across many handlers, a custom exception +
+an `@app.exception_handler(...)` on `app` in `main.py` is the pattern
+to reach for instead of repeating the same `try`/`except` in every
+route.

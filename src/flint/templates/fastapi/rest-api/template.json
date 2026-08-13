@@ -76,5 +76,8 @@
     { "dir": "worker-taskiq", "when": { "worker": ["taskiq"] } },
     { "dir": "worker-celery", "when": { "worker": ["celery"] } },
     { "dir": "redis", "when": { "redis": [true] } }
+  ],
+  "skills": [
+    { "id": "fastapi" }
   ]
 }

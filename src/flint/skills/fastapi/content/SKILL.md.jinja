@@ -1,0 +1,54 @@
+---
+name: fastapi
+description: Routing, dependency injection, request/response models, lifespan, and testing conventions for this project's FastAPI app. Use when adding or changing an endpoint, wiring a new dependency, or touching startup/shutdown behavior.
+---
+
+# FastAPI
+
+This project's web layer is FastAPI. This skill covers how *this
+project* uses it — not the whole library surface — so you can add
+code that matches the existing conventions instead of introducing a
+second style.
+
+## When to reach for this
+
+- Adding, changing, or removing an HTTP endpoint.
+- Adding a new dependency (`Depends(...)`) — e.g. a new shared resource
+  like a session, a cache client, or an auth check.
+- Touching `src/{{ package_name }}/main.py` — app construction, startup/
+  shutdown behavior, router registration.
+- Debugging a validation error, a 422 response, or an async/sync
+  mismatch in a route handler.
+
+## Quick reference
+
+- **App entrypoint**: `src/{{ package_name }}/main.py`. The `FastAPI(...)`
+  instance is built once, at module scope — importing this module is
+  always safe (no I/O happens on import).
+- **Routers**: one file per resource under `src/{{ package_name }}/routes/`,
+  each exporting an `APIRouter` named `router`, included in `main.py` via
+  `app.include_router(...)`. Don't add routes directly on `app` outside
+  `main.py`'s own `/` health-check route — every resource gets its own
+  router file, even a small one.
+- **Request/response models**: `src/{{ package_name }}/schemas.py` (or
+  the ORM models themselves, for the simplest cases) — never accept or
+  return a bare `dict` for a real resource; a Pydantic model is what
+  gives you validation and the OpenAPI schema for free.
+- **Run it**: `uv run fastapi dev src/{{ package_name }}/main.py` — the
+  `fastapi` CLI, not `uvicorn` directly. `fastapi dev` adds autoreload
+  and a friendlier startup banner; `fastapi run` is its production-mode
+  equivalent (see the Dockerfile if `--docker` was chosen).
+- **Interactive docs**: `/docs` (Swagger UI) and `/redoc`, generated
+  automatically from your routers' type hints — free, don't hand-write
+  API docs that would just drift from these.
+
+## Go deeper
+
+- `references/routing-and-dependencies.md` — router structure,
+  `Depends()` patterns, request/response models, error handling.
+- `references/gotchas.md` — real mistakes this project's own templates
+  hit while being built, and why the fix looks the way it does.
+- `guides/add-an-endpoint.md` — the concrete steps to add a new
+  resource end-to-end (router, schema, registration, test).
+- `guides/testing.md` — how this project's test suite talks to the app
+  without a running server.

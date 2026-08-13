@@ -1,0 +1,97 @@
+# Guide: add a new endpoint
+
+Walks through adding a `widgets` resource end-to-end, following the
+same shape as the existing `items` resource — copy that shape for any
+new resource rather than inventing a new one.
+
+## 1. Define the schemas
+
+In `src/{{ package_name }}/schemas.py`, add the request/response models:
+
+```python
+class WidgetCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class WidgetRead(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+{% if orm == "sqlmodel" %}
+    model_config = {"from_attributes": True}
+{% elif orm == "sqlalchemy" %}
+    model_config = {"from_attributes": True}
+{% endif %}
+```
+
+{% if database != "none" %}
+## 2. Define the model
+
+In `src/{{ package_name }}/models.py`, add the ORM model (mirror the
+existing `Item` model's shape — same `{{ orm }}` conventions, see the
+`{{ orm }}` skill for the model-definition patterns this project uses).
+
+## 3. Write the router
+{% else %}
+## 2. Write the router
+{% endif %}
+
+Create `src/{{ package_name }}/routes/widgets.py`:
+
+```python
+from fastapi import APIRouter, HTTPException
+{% if database != "none" %}
+from fastapi import Depends
+
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Widget
+{% endif %}
+from {{ package_name }}.schemas import WidgetCreate, WidgetRead
+
+router = APIRouter(prefix="/widgets", tags=["widgets"])
+
+
+@router.get("/", response_model=list[WidgetRead])
+{% if database != "none" %}
+async def list_widgets(session=Depends(get_session)) -> list[Widget]:
+    ...  # same query shape as routes/items.py's list_items
+{% else %}
+def list_widgets() -> list[WidgetRead]:
+    ...  # same in-memory-store shape as routes/items.py
+{% endif %}
+```
+
+Follow `routes/items.py` for the rest of the CRUD handlers (`POST`,
+`GET /{id}`, `DELETE /{id}`) — same status codes (`201` on create,
+`204` on delete, `404` via `HTTPException` when not found), same
+`response_model=` on every handler.
+
+{% if database != "none" %}
+## 4. Register the router
+{% else %}
+## 3. Register the router
+{% endif %}
+
+In `src/{{ package_name }}/main.py`:
+
+```python
+from {{ package_name }}.routes.widgets import router as widgets_router
+...
+app.include_router(widgets_router)
+```
+
+{% if database != "none" %}
+## 5. Test it
+
+Add `tests/test_widgets.py`, mirroring `tests/test_main.py`'s fixture
+usage (see `guides/testing.md`) — every new resource gets its own
+CRUD-cycle test (create, list, get, delete, and the 404 case), not just
+a smoke test of one happy path.
+{% else %}
+## 4. Test it
+
+Add `tests/test_widgets.py`, mirroring `tests/test_main.py` — every new
+resource gets its own CRUD-cycle test (create, list, get, delete, and
+the 404 case), not just a smoke test of one happy path.
+{% endif %}

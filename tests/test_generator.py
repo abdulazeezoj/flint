@@ -10,6 +10,7 @@ from flint.errors import FlintError, FlintUserError
 from flint.generator import (
     Answers,
     get_framework,
+    get_skill,
     get_template,
     list_frameworks,
     list_templates,
@@ -587,3 +588,236 @@ def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monk
     )
 
     assert created == [Path("README.md")]
+
+
+def _write_skill(skills_root: Path, skill_id: str, label: str = "Widget Skill") -> None:
+    skill_dir = skills_root / skill_id
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "skill.json").write_text(
+        json.dumps({"id": skill_id, "label": label, "description": f"About {skill_id}."})
+    )
+    content_dir = skill_dir / "content"
+    (content_dir / "references").mkdir(parents=True)
+    (content_dir / "guides").mkdir(parents=True)
+    (content_dir / "SKILL.md.jinja").write_text(
+        f"---\nname: {skill_id}\n---\n\n# {label}\n\nFor `{{{{ package_name }}}}`.\n"
+    )
+    (content_dir / "references" / "api.md.jinja").write_text("Reference for {{ package_name }}.")
+    (content_dir / "guides" / "howto.md.jinja").write_text("Guide for {{ package_name }}.")
+
+
+class TestSkillsMechanism:
+    def test_get_skill_returns_metadata(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", tmp_path)
+        _write_skill(tmp_path, "widget")
+
+        skill = get_skill("widget")
+
+        assert skill.id == "widget"
+        assert skill.label == "Widget Skill"
+        assert skill.description == "About widget."
+        assert skill.path == tmp_path / "widget"
+
+    def test_get_skill_unknown_raises_flint_error(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", tmp_path)
+
+        with pytest.raises(FlintError, match="Unknown skill 'ghost'"):
+            get_skill("ghost")
+
+    def test_template_json_skills_key_parses_into_skill_refs(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path)
+        framework_dir = tmp_path / "widget"
+        _write_meta(framework_dir, "widget")
+        template_dir = framework_dir / "basic"
+        (template_dir / "files").mkdir(parents=True)
+        (template_dir / "template.json").write_text(
+            json.dumps(
+                {
+                    "id": "basic",
+                    "label": "Basic",
+                    "description": "d",
+                    "enabled": True,
+                    "skills": [
+                        {"id": "widget"},
+                        {"id": "gizmo", "when": {"database": ["postgres"]}},
+                    ],
+                }
+            )
+        )
+
+        template = list_templates("widget")[0]
+
+        assert [s.id for s in template.skills] == ["widget", "gizmo"]
+        assert template.skills[1].when == {"database": ["postgres"]}
+
+    def test_render_writes_matched_skill_under_agents_skills(self, tmp_path: Path, monkeypatch):
+        skills_root = tmp_path / "skills"
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", skills_root)
+        _write_skill(skills_root, "widget", label="Widget Skill")
+
+        monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path / "templates")
+        framework_dir = tmp_path / "templates" / "acme"
+        _write_meta(framework_dir, "acme")
+        template_dir = framework_dir / "basic"
+        (template_dir / "files").mkdir(parents=True)
+        (template_dir / "files" / "README.md").write_text("hello")
+        (template_dir / "template.json").write_text(
+            json.dumps(
+                {
+                    "id": "basic",
+                    "label": "Basic",
+                    "description": "d",
+                    "enabled": True,
+                    "skills": [{"id": "widget"}],
+                }
+            )
+        )
+
+        target = tmp_path / "out"
+        created = render(
+            "acme", "basic", target, make_answers(framework="acme", template="basic")
+        )
+
+        skill_md = target / ".agents" / "skills" / "widget" / "SKILL.md"
+        assert skill_md.is_file()
+        assert "For `my_api`." in skill_md.read_text()
+        assert Path(".agents/skills/widget/SKILL.md") in created
+        assert Path(".agents/skills/widget/references/api.md") in created
+        assert Path(".agents/skills/widget/guides/howto.md") in created
+
+        # skill.json is maintainer metadata (mirrors template.json) — it
+        # must never be copied into the generated project.
+        assert not (target / ".agents" / "skills" / "widget" / "skill.json").exists()
+
+    def test_render_writes_generated_skills_index(self, tmp_path: Path, monkeypatch):
+        skills_root = tmp_path / "skills"
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", skills_root)
+        _write_skill(skills_root, "widget", label="Widget Skill")
+        _write_skill(skills_root, "gizmo", label="Gizmo Skill")
+
+        monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path / "templates")
+        framework_dir = tmp_path / "templates" / "acme"
+        _write_meta(framework_dir, "acme")
+        template_dir = framework_dir / "basic"
+        (template_dir / "files").mkdir(parents=True)
+        (template_dir / "template.json").write_text(
+            json.dumps(
+                {
+                    "id": "basic",
+                    "label": "Basic",
+                    "description": "d",
+                    "enabled": True,
+                    "skills": [{"id": "widget"}, {"id": "gizmo"}],
+                }
+            )
+        )
+
+        target = tmp_path / "out"
+        created = render(
+            "acme", "basic", target, make_answers(framework="acme", template="basic")
+        )
+
+        index_path = Path(".agents/skills/README.md")
+        assert index_path in created
+        index_text = (target / index_path).read_text()
+        assert "[Widget Skill](./widget/SKILL.md)" in index_text
+        assert "[Gizmo Skill](./gizmo/SKILL.md)" in index_text
+        assert "About widget." in index_text
+
+    def test_render_skips_skill_whose_when_does_not_match(self, tmp_path: Path, monkeypatch):
+        skills_root = tmp_path / "skills"
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", skills_root)
+        _write_skill(skills_root, "widget")
+
+        monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path / "templates")
+        framework_dir = tmp_path / "templates" / "acme"
+        _write_meta(framework_dir, "acme")
+        template_dir = framework_dir / "basic"
+        (template_dir / "files").mkdir(parents=True)
+        (template_dir / "template.json").write_text(
+            json.dumps(
+                {
+                    "id": "basic",
+                    "label": "Basic",
+                    "description": "d",
+                    "enabled": True,
+                    "skills": [{"id": "widget", "when": {"database": ["postgres"]}}],
+                }
+            )
+        )
+
+        target = tmp_path / "out"
+        created = render(
+            "acme",
+            "basic",
+            target,
+            make_answers(framework="acme", template="basic"),
+        )
+
+        assert not (target / ".agents").exists()
+        assert Path(".agents/skills/README.md") not in created
+
+    def test_render_raises_when_template_references_unknown_skill(
+        self, tmp_path: Path, monkeypatch
+    ):
+        monkeypatch.setattr(generator_module, "SKILLS_DIR", tmp_path / "skills")
+        (tmp_path / "skills").mkdir()
+
+        monkeypatch.setattr(generator_module, "TEMPLATES_DIR", tmp_path / "templates")
+        framework_dir = tmp_path / "templates" / "acme"
+        _write_meta(framework_dir, "acme")
+        template_dir = framework_dir / "basic"
+        (template_dir / "files").mkdir(parents=True)
+        (template_dir / "template.json").write_text(
+            json.dumps(
+                {
+                    "id": "basic",
+                    "label": "Basic",
+                    "description": "d",
+                    "enabled": True,
+                    "skills": [{"id": "ghost"}],
+                }
+            )
+        )
+
+        with pytest.raises(FlintError, match="Unknown skill 'ghost'"):
+            render(
+                "acme",
+                "basic",
+                tmp_path / "out",
+                make_answers(framework="acme", template="basic"),
+            )
+
+    def test_real_fastapi_skill_renders_without_leftover_jinja(self, tmp_path: Path):
+        # The hand-authored fastapi skill, rendered through the real
+        # fastapi/rest-api template — catches unbalanced `{% %}`/`{{ }}`
+        # in the shipped skill content the same way the template-content
+        # tests below catch it for template files.
+        target = tmp_path / "my-api"
+        created = render(
+            "fastapi",
+            "rest-api",
+            target,
+            make_answers(
+                framework="fastapi",
+                template="rest-api",
+                options={
+                    "database": "sqlite",
+                    "orm": "sqlmodel",
+                    "migrations": True,
+                    "worker": "none",
+                    "broker": "none",
+                    "redis": False,
+                },
+            ),
+        )
+
+        skill_paths = [p for p in created if p.parts[:2] == (".agents", "skills")]
+        assert Path(".agents/skills/fastapi/SKILL.md") in skill_paths
+        assert Path(".agents/skills/README.md") in skill_paths
+        for rel in skill_paths:
+            text = (target / rel).read_text()
+            assert "{%" not in text
+            assert "{{" not in text
+        skill_md_text = (target / ".agents/skills/fastapi/SKILL.md").read_text()
+        assert "my_api" in skill_md_text

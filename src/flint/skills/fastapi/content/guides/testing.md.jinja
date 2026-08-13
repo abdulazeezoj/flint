@@ -1,0 +1,49 @@
+# Guide: how this project's tests talk to the app
+
+```
+uv run pytest
+```
+
+## No running server, no real network
+
+Tests use `httpx.AsyncClient` with `ASGITransport(app=app)` (see
+`tests/conftest.py`{% if database != "none" %} / `tests/test_main.py`{% endif %}) — requests go
+directly into the FastAPI app in-process, no socket, no `fastapi dev`
+running in the background. This is faster and more deterministic than
+hitting a real port, and it's why `client` is an `async` fixture and
+every test function using it is `async def`.
+
+{% if database != "none" %}
+## The database is swapped, not the real one
+
+`tests/conftest.py` builds its own `test_engine` pointed at
+`sqlite+aiosqlite:///:memory:` and overrides the `get_session`
+dependency (`app.dependency_overrides[get_session] = ...`) so every
+request during a test uses that isolated in-memory database — never
+whatever `DATABASE_URL` is configured in `.env`. This is deliberate:
+the suite must be runnable with zero external services, regardless of
+which database was chosen at generation time. Schema for that
+in-memory database is created directly in an autouse fixture
+(`SQLModel.metadata.create_all`/`Base.metadata.create_all`), not
+through `init_db()` — `init_db()` is never called during tests at all
+(see the gotcha below).
+
+## `lifespan` doesn't run during tests, on purpose
+
+`ASGITransport` does not trigger FastAPI's `lifespan` startup/shutdown
+hooks by default, so `init_db()` (and, {% if worker == "taskiq" %}Taskiq's `broker.startup()`{% else %}any broker startup{% endif %}, if applicable) never
+executes during the test suite — which is exactly why `conftest.py`
+manages its own test database instead of relying on `init_db()`. If a
+test genuinely needs the lifespan to run (rare — usually only if you're
+testing startup/shutdown behavior itself), wrap the client fixture in
+`asgi_lifespan.LifespanManager`; don't reach for it by default, since
+it would mean the suite touches whatever `init_db()` touches.
+{% endif %}
+
+## Adding a test for a new endpoint
+
+Mirror `tests/test_main.py`: an `async def test_...(client)` function
+using the `client` fixture, asserting on `response.status_code` and
+`response.json()`. One test per behavior (create, list, get-by-id,
+404-when-missing, delete) rather than one large test asserting
+everything — a failure then points at exactly what broke.
