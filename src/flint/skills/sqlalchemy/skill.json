@@ -1,0 +1,5 @@
+{
+  "id": "sqlalchemy",
+  "label": "SQLAlchemy",
+  "description": "Declarative models, session lifecycle, and query conventions for this project's SQLAlchemy data layer — async with FastAPI, sync with Flask."
+}

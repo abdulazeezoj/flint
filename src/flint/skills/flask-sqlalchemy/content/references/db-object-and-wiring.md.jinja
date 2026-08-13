@@ -1,0 +1,105 @@
+# The `db` object and how it gets wired up
+
+## Module-scope, app-less, at first
+
+`src/{{ package_name }}/core/db.py` starts with:
+
+```python
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+{% if migrations %}from flask_migrate import Migrate
+{% endif %}
+
+db = SQLAlchemy()
+{% if migrations %}migrate = Migrate()
+{% endif %}
+```
+
+`db = SQLAlchemy()` at import time does **no I/O** — it just builds an
+unconfigured extension instance. This is what makes it safe to import
+`db` from anywhere (`models.py` does, to subclass `db.Model`) without
+accidentally requiring a live database connection just to import a
+module. It's the same reason `create_app()` is a factory function
+instead of a module-level `app = Flask(__name__)`: see the `flask`
+skill for that half of the pattern.
+
+## `init_db(app, *, testing=False)` does the real binding
+
+```python
+def init_db(app: Flask, *, testing: bool = False) -> None:
+    database_url = app.config["SQLALCHEMY_DATABASE_URI"]
+    if database_url.startswith("sqlite"):
+        engine_options = {"connect_args": {"check_same_thread": False}}
+        if ":memory:" in database_url:
+            from sqlalchemy.pool import StaticPool
+            engine_options["poolclass"] = StaticPool
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
+
+    db.init_app(app)
+{% if migrations %}    migrate.init_app(app, db)
+{% endif %}    ...
+```
+
+Called from `create_app()` in `main.py`, after
+`app.config["SQLALCHEMY_DATABASE_URI"]` has been set from `Settings`
+(or from a test-supplied `database_url` — see `tests/conftest.py`).
+`db.init_app(app)` is the step that actually reads that config key and
+attaches engine/session machinery to *this* `Flask` instance — before
+this call, `db` exists but isn't pointed at any database.
+
+Two things worth knowing about the SQLite branch:
+
+- `SQLALCHEMY_ENGINE_OPTIONS` is set on `app.config` *before*
+  `db.init_app(app)` runs, because that's when Flask-SQLAlchemy reads
+  it to build the engine — setting it after `init_app` has no effect.
+- `StaticPool` only kicks in for `sqlite:///:memory:` specifically (the
+  test suite's database, see `tests/conftest.py`). A `:memory:`
+  database only exists for the lifetime of a single connection; the
+  default pool hands out a fresh connection per checkout, which would
+  silently lose every table and row between requests. A real
+  file-based SQLite path or a Postgres URL doesn't need this.
+
+{% if migrations %}
+## `migrate.init_app(app, db)` needs the bound `db`
+
+Because this project has `migrations=true`, `core/db.py` also creates
+`migrate = Migrate()` and calls `migrate.init_app(app, db)` right after
+`db.init_app(app)`. `Migrate` needs a reference to the *same* `db`
+object your models are defined against so Alembic's autogenerate can
+diff your `db.Model` subclasses against the live database schema.
+`migrate.init_app` is also what registers the `flask db ...` CLI
+command group in the first place — without it, `flask db migrate`/
+`flask db upgrade` don't exist as commands at all.
+
+The actual migration workflow (`flask db migrate -m "..."`,
+`flask db upgrade`, editing a generated migration file) is the
+`flask-migrate` skill's territory, not this one — this skill only
+covers the object wiring that makes those commands available.
+{% endif %}
+
+## `db.Model` vs. a bare `DeclarativeBase`
+
+`models.py` subclasses `db.Model`, not a plain SQLAlchemy
+`DeclarativeBase`:
+
+```python
+class Item(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str | None] = mapped_column(default=None)
+```
+
+`db.Model` is Flask-SQLAlchemy's declarative base, pre-wired to the
+same `db` instance that `init_db()` binds to the app — that's what
+lets `db.session`, `db.select(...)`, and table metadata
+(`db.metadata`, used by `db.create_all()`) all agree on the same set
+of models without you having to pass anything explicitly. Defining a
+model against a *different* `SQLAlchemy()` instance than the one
+`init_app`-bound to your app is a common way to get "table not found"
+errors that look like a migrations problem but aren't — always import
+`db` from `core/db.py` for every model.
+
+Column syntax (`Mapped[...]` + `mapped_column(...)`, relationships via
+`db.relationship(...)`) is plain SQLAlchemy 2.0 declarative syntax —
+see the `sqlalchemy` skill for the general patterns; nothing about it
+changes because the base class happens to be `db.Model`.

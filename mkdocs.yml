@@ -1,0 +1,77 @@
+site_name: Flint
+site_description: "create-next-app, for Python — interactive project scaffolding for FastAPI and Flask."
+site_url: https://abdulazeezoj.github.io/flint/
+repo_url: https://github.com/abdulazeezoj/flint
+repo_name: abdulazeezoj/flint
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+# docs/_product/ holds internal product-decision docs (spec/flow/arch) that
+# guide development but aren't user-facing — fully excluded from the built
+# site, not just left out of nav (see CHANGELOG.md v0.11.0).
+exclude_docs: |
+  _product/
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI Reference: cli-reference.md
+  - Templates:
+      - Overview: project-templates/index.md
+      - FastAPI · Hello World: project-templates/fastapi-hello-world.md
+      - FastAPI · REST API: project-templates/fastapi-rest-api.md
+      - Flask · Hello World: project-templates/flask-hello-world.md
+      - Flask · REST API: project-templates/flask-rest-api.md
+  - Agent Skills: agent-skills.md
+  - Remembered Preferences: preferences.md
+  - Contributing: contributing.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/abdulazeezoj/flint
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/flint-cli/

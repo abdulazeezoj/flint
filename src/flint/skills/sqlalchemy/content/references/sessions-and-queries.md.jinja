@@ -1,0 +1,153 @@
+# Sessions & queries
+
+{% if framework == "fastapi" %}
+## Session lifecycle: one per request, via a dependency
+
+`core/db.py` builds the engine and session factory once, at module
+scope:
+
+```python
+engine = create_async_engine(settings.database_url, echo=settings.debug)
+async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+```
+
+`get_session` is a generator dependency — FastAPI re-evaluates
+`Depends(get_session)` on every request, so each request opens its own
+session inside the `async with` block and closes it when the handler
+returns, whether it succeeds or raises. Never construct a session any
+other way in a route handler (no ad hoc `async_session_maker()` calls
+outside this dependency) and never stash a session on a variable that
+outlives the request.
+
+`expire_on_commit=False` matters here specifically because handlers
+return ORM instances after committing (e.g. `create_item` returns
+`db_item` after `await session.commit()`); with the default
+`expire_on_commit=True`, every attribute access after that commit would
+trigger a fresh (now-closed-session) lazy load and raise.
+
+## Query patterns
+
+From `routes/items.py`, the shapes to copy:
+
+```python
+# List
+result = await session.execute(select(Item))
+items = list(result.scalars().all())
+
+# Get by primary key (returns None if missing — check it yourself)
+item = await session.get(Item, item_id)
+if item is None:
+    raise HTTPException(status_code=404, detail="Item not found")
+
+# Create
+db_item = Item(**item.model_dump())
+session.add(db_item)          # sync — no await, just marks it pending
+await session.commit()
+await session.refresh(db_item)  # re-read server-generated fields (e.g. id)
+
+# Delete
+await session.delete(item)
+await session.commit()
+```
+
+Three things every one of these has in common that's easy to get
+backwards:
+
+- `session.execute(...)`, `session.get(...)`, `session.commit()`,
+  `session.refresh(...)`, and `session.delete(...)` are all coroutines
+  — every one of them needs `await`. `session.add(...)` is the one
+  exception: it's synchronous, it only stages the object.
+- `select(Item)` returns a `Select` construct, not results — you
+  always run it through `await session.execute(...)` and then pull
+  rows out with `.scalars().all()` (a list of `Item`) or
+  `.scalar_one_or_none()` (zero-or-one).
+- `session.get(Item, item_id)` is the direct primary-key shortcut —
+  reach for it instead of `select(Item).where(Item.id == item_id)`
+  whenever you're looking up by primary key.
+
+## Schema creation
+
+`init_db()` calls `await conn.run_sync(Base.metadata.create_all)` —
+`create_all` itself is sync (it's plain metadata/DDL work), so it's
+wrapped in `run_sync` to execute on the async connection. You will not
+call this directly outside `core/db.py`/tests; see `references/gotchas.md`
+for when `init_db()` does and doesn't run.
+{% else %}
+## Session lifecycle: one per request, via `scoped_session`
+
+`core/db.py` builds an *unconfigured* session factory at module scope,
+then binds it to a real engine once the app factory knows the database
+URL:
+
+```python
+SessionLocal = scoped_session(sessionmaker())
+
+
+def init_db(app: Flask, *, testing: bool = False) -> None:
+    engine = create_engine(database_url, connect_args=connect_args, **engine_kwargs)
+    SessionLocal.configure(bind=engine)
+    Base.metadata.create_all(engine)          # (or skipped when migrations own the schema)
+    app.teardown_appcontext(lambda exc=None: SessionLocal.remove())
+
+
+def get_session() -> Session:
+    return SessionLocal()
+```
+
+`scoped_session` hands back a **thread-local** session: every call to
+`SessionLocal()` (i.e. every call to `get_session()`) within the same
+request/thread returns the *same* underlying session object, so calling
+`get_session()` from multiple places inside one request handler is
+free — you don't need to thread a session through as a parameter.
+`app.teardown_appcontext(...)` calls `SessionLocal.remove()` after
+every request, which discards that thread-local session so the next
+request (possibly reusing the same worker thread) starts clean. Don't
+skip registering this, and don't call `SessionLocal.remove()` yourself
+mid-request — teardown owns it.
+
+There is no FastAPI-style `Depends()` here: `get_session()` is called
+directly, inline, in each route handler.
+
+## Query patterns
+
+From `routes/items.py`, the shapes to copy:
+
+```python
+# List
+session = get_session()
+items = session.execute(select(Item)).scalars().all()
+
+# Get by primary key (returns None if missing — check it yourself)
+item = session.get(Item, item_id)
+if item is None:
+    return jsonify({"detail": "Item not found"}), 404
+
+# Create
+item = Item(**payload.model_dump())
+session.add(item)
+session.commit()
+
+# Delete
+session.delete(item)
+session.commit()
+```
+
+Nothing here is awaited — this is plain sync SQLAlchemy, matching
+Flask's sync request handling. The API shape is otherwise the same as
+2.0-style async SQLAlchemy: `select(Item)` still goes through
+`session.execute(...)` and `.scalars().all()`/`.scalar_one_or_none()`,
+and `session.get(Item, id)` is still the primary-key shortcut — reach
+for it instead of `select(Item).where(Item.id == item_id)`.
+
+## Schema creation
+
+`init_db()` calls `Base.metadata.create_all(engine)` directly (no
+`run_sync` needed — everything here is already sync). Whether this
+runs for real usage depends on whether migrations are on; see
+`references/gotchas.md`.
+{% endif %}

@@ -1,0 +1,102 @@
+---
+name: pytest
+description: Fixtures, async test setup (pytest-asyncio), the isolated-test-database pattern, and parametrize — how this project's test suite is built and how to extend it. Use when adding a test, writing a fixture, debugging an async fixture that hands back a coroutine instead of a value, or a test that only fails depending on what ran before it.
+---
+
+# pytest
+
+Every generated project's test suite runs on pytest (`uv run pytest`),
+{% if framework == "fastapi" %}
+regardless of which ORM or worker was chosen. This skill covers pytest
+itself — fixtures, async test setup, the isolated-test-database
+pattern, parametrize — the parts that are the same shape across this
+project no matter what you're testing. For how `client` actually talks
+to the FastAPI app in-process (`ASGITransport`, why `lifespan` doesn't
+run during tests), see the `fastapi` skill's `guides/testing.md`
+instead of this one.
+{% else %}
+regardless of which ORM or worker was chosen. This skill covers pytest
+itself — fixtures, sync test setup, the isolated-test-database pattern,
+parametrize — the parts that are the same shape across this project no
+matter what you're testing. For how `client` actually talks to the
+Flask app in-process (the `create_app()` factory, `app.test_client()`),
+see the `flask` skill's `guides/testing.md` instead of this one.
+{% endif %}
+
+## When to reach for this
+
+- Adding a new test for an endpoint{% if framework == "flask" %}/route{% endif %} and unsure how many
+  test functions it should be, or what to assert.
+- Writing a fixture — shared setup/teardown more than one test needs.
+{% if framework == "fastapi" %}
+- An async fixture is behaving strangely — e.g. the value your test
+  receives looks like a coroutine object instead of the thing the
+  fixture was supposed to build (see `references/gotchas.md`).
+{% endif %}
+- A test only fails when run after another one, or only when the whole
+  file runs together but not alone — almost always a shared-state /
+  fixture-scope issue (see `references/gotchas.md`).
+- The same test logic needs to run against several inputs (e.g. several
+  invalid payloads that should all 422) — see `guides/parametrize.md`
+  before writing near-duplicate test functions.
+
+## Quick reference
+
+- **Run it**: `uv run pytest` (`-k <expr>` to filter by test name, `-x`
+  to stop at the first failure, `-v` for per-test output).
+- **Config**: `[tool.pytest.ini_options]` in `pyproject.toml` sets
+  `pythonpath = ["src"]`, so tests can `import {{ package_name }}`
+  without installing the package first{% if framework == "fastapi" %}{% if database is defined and database != "none" %}, and
+  `asyncio_mode = "auto"`, so an `async def test_...` function is
+  automatically treated as an asyncio test — no
+  `@pytest.mark.asyncio` needed on every one{% endif %}{% endif %}.
+{% if framework == "fastapi" %}
+- **Async, because the client is async**: tests that hit the app are
+  `async def test_...(client)` — the `client` fixture is an
+  `httpx.AsyncClient`, and only `async def` functions can `await` its
+  calls. This is also why fixtures that build async resources (the test
+  database engine, the client itself) are `@pytest_asyncio.fixture`,
+  not the plain `@pytest.fixture` — see `references/gotchas.md` for
+  what happens if you mix those up.
+{% else %}
+- **Sync — no `pytest-asyncio` here**: Flask's `app.test_client()` is
+  synchronous, so tests are plain `def test_...(client)` and fixtures
+  are plain `@pytest.fixture` — there's nothing to `await`, and nothing
+  extra to install. Don't add `pytest-asyncio` to this project's
+  `pyproject.toml` on the assumption a test suite needs it; this one
+  doesn't.
+{% endif %}
+{% if database is defined and database != "none" %}
+- **Fixtures live in `tests/conftest.py`**{% if framework == "fastapi" %} — an async `client`
+  fixture plus an autouse `_prepare_database` fixture that resets the
+  schema around every test{% else %} — a `client` fixture that builds a
+  fresh app (and fresh in-memory database) per test via
+  `create_app(...)`{% endif %}. Both exist to deliver the same
+  guarantee: every test runs against an isolated database, never the
+  one configured in `.env`. See `references/database-isolation.md`.
+{% else %}
+- **No `tests/conftest.py` here**: this template has no database
+  configured, so there's no fixture-managed database to isolate —
+  `tests/test_main.py` builds its client directly
+  {% if framework == "fastapi" %}(`TestClient(app)`){% else %}(`app.test_client()`){% endif %}
+  at module scope. If you add a database later, see
+  `references/database-isolation.md` for the pattern to copy from the
+  `rest-api` template.
+{% endif %}
+
+## Go deeper
+
+- `references/database-isolation.md` — the isolated-test-database
+  guarantee: why it's a hard requirement (not a convenience), and how
+  this project's fixtures deliver it.
+- `references/gotchas.md` — {% if framework == "fastapi" %}the plain-`@pytest.fixture`-on-an-`async def`
+  mistake, and how fixture scope controls whether database state leaks
+  between tests{% else %}how fixture scope controls whether database state
+  leaks between tests{% endif %}.
+- `guides/writing-a-good-test.md` — one test per behavior, asserting
+  status code *and* response body shape, once the endpoint itself
+  exists (see the {% if framework == "fastapi" %}`fastapi`{% else %}`flask`{% endif %} skill's
+  {% if framework == "fastapi" %}`guides/add-an-endpoint.md`{% else %}`guides/add-a-resource.md`{% endif %} for the
+  routing/schema half).
+- `guides/parametrize.md` — testing the same logic against multiple
+  inputs without copy-pasting near-identical test functions.

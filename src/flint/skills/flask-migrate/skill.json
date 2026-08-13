@@ -1,0 +1,5 @@
+{
+  "id": "flask-migrate",
+  "label": "Flask-Migrate",
+  "description": "The `flask db ...` CLI, the `Migrate`/`db` wiring in core/db.py, and the create_all()-vs-migrations gotcha for this project's Flask-SQLAlchemy app."
+}

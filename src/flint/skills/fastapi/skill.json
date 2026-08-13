@@ -1,0 +1,5 @@
+{
+  "id": "fastapi",
+  "label": "FastAPI",
+  "description": "Routing, dependency injection, request/response models, lifespan, and testing conventions for this project's FastAPI app."
+}

@@ -1,0 +1,205 @@
+# Guide: add a new model and query
+
+Walks through adding a `widgets` table, following the same shape as
+the existing `Item` model — copy that shape for any new model rather
+than inventing a new one.
+
+## 1. Define the model
+
+In `src/{{ package_name }}/models.py`, add a class next to `Item`,
+using the same `Mapped[...]`/`mapped_column(...)` style:
+
+```python
+class Widget(Base):
+    __tablename__ = "widgets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    quantity: Mapped[int] = mapped_column(default=0)
+```
+
+`Mapped[str]` alone is a required column; `Mapped[str | None]` makes
+it nullable; reach for `mapped_column(...)` when you need a default, a
+`primary_key=True`, a `ForeignKey`, or an explicit column name.
+
+{% if migrations %}
+This project has `migrations=true` — this class change is only a
+*definition*. It doesn't touch the actual database schema until you
+generate and run a migration (see the `alembic` skill's
+`guides/first-migration.md`) — do this before the routes below can
+work against a real (non-test) database.
+{% else %}
+This project has `migrations=false` — `init_db()`'s `create_all()`
+picks up the new table automatically on the next app start, no
+migration step needed.
+{% endif %}
+
+## 2. Add request/response schemas
+
+In `src/{{ package_name }}/schemas.py`, mirroring `ItemCreate`/`ItemRead`:
+
+```python
+class WidgetCreate(BaseModel):
+    name: str
+    quantity: int = 0
+
+
+class WidgetRead(BaseModel):
+    id: int
+    name: str
+    quantity: int
+
+    model_config = {"from_attributes": True}
+```
+
+## 3. Write the queries
+
+{% if framework == "fastapi" %}
+Create `src/{{ package_name }}/routes/widgets.py`, following
+`routes/items.py`'s shape exactly:
+
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Widget
+from {{ package_name }}.schemas import WidgetCreate, WidgetRead
+
+router = APIRouter(prefix="/widgets", tags=["widgets"])
+
+
+@router.get("/", response_model=list[WidgetRead])
+async def list_widgets(session: AsyncSession = Depends(get_session)) -> list[Widget]:
+    result = await session.execute(select(Widget))
+    return list(result.scalars().all())
+
+
+@router.post("/", response_model=WidgetRead, status_code=201)
+async def create_widget(widget: WidgetCreate, session: AsyncSession = Depends(get_session)) -> Widget:
+    db_widget = Widget(**widget.model_dump())
+    session.add(db_widget)
+    await session.commit()
+    await session.refresh(db_widget)
+    return db_widget
+
+
+@router.get("/{widget_id}", response_model=WidgetRead)
+async def get_widget(widget_id: int, session: AsyncSession = Depends(get_session)) -> Widget:
+    widget = await session.get(Widget, widget_id)
+    if widget is None:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return widget
+
+
+@router.delete("/{widget_id}", status_code=204)
+async def delete_widget(widget_id: int, session: AsyncSession = Depends(get_session)) -> None:
+    widget = await session.get(Widget, widget_id)
+    if widget is None:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    await session.delete(widget)
+    await session.commit()
+```
+
+Every session call here is a coroutine except `session.add(...)` —
+missing an `await` on `execute`/`get`/`commit`/`refresh`/`delete`
+returns a coroutine object instead of the result, which surfaces as a
+confusing type error, not a silent bug.
+
+## 4. Register the router
+
+In `src/{{ package_name }}/main.py`:
+
+```python
+from {{ package_name }}.routes.widgets import router as widgets_router
+...
+app.include_router(widgets_router)
+```
+
+## 5. Test it
+
+Add `tests/test_widgets.py`, mirroring `tests/test_main.py`'s `client`
+fixture (async, hits the app via `ASGITransport` — see the `fastapi`
+skill's `guides/testing.md`) — one CRUD-cycle test (create, list, get,
+delete, and the 404 case) rather than one large test asserting
+everything.
+{% else %}
+Create `src/{{ package_name }}/routes/widgets.py`, following
+`routes/items.py`'s shape exactly:
+
+```python
+from flask import Blueprint, jsonify, request
+from pydantic import ValidationError
+from sqlalchemy import select
+
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Widget
+from {{ package_name }}.schemas import WidgetCreate, WidgetRead
+
+bp = Blueprint("widgets", __name__, url_prefix="/widgets")
+
+
+@bp.get("/")
+def list_widgets():
+    session = get_session()
+    widgets = session.execute(select(Widget)).scalars().all()
+    return jsonify([WidgetRead.model_validate(w).model_dump() for w in widgets])
+
+
+@bp.post("/")
+def create_widget():
+    try:
+        payload = WidgetCreate.model_validate(request.get_json(force=True, silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"detail": exc.errors()}), 422
+    session = get_session()
+    widget = Widget(**payload.model_dump())
+    session.add(widget)
+    session.commit()
+    return jsonify(WidgetRead.model_validate(widget).model_dump()), 201
+
+
+@bp.get("/<int:widget_id>")
+def get_widget(widget_id: int):
+    session = get_session()
+    widget = session.get(Widget, widget_id)
+    if widget is None:
+        return jsonify({"detail": "Widget not found"}), 404
+    return jsonify(WidgetRead.model_validate(widget).model_dump())
+
+
+@bp.delete("/<int:widget_id>")
+def delete_widget(widget_id: int):
+    session = get_session()
+    widget = session.get(Widget, widget_id)
+    if widget is None:
+        return jsonify({"detail": "Widget not found"}), 404
+    session.delete(widget)
+    session.commit()
+    return "", 204
+```
+
+Nothing here is awaited — this is plain sync SQLAlchemy, matching
+Flask's sync handlers. `get_session()` returns the same thread-local
+session for the whole request (see `references/sessions-and-queries.md`),
+so calling it again in each handler is cheap and normal, not wasteful.
+
+## 4. Register the blueprint
+
+In `src/{{ package_name }}/main.py`:
+
+```python
+from {{ package_name }}.routes.widgets import bp as widgets_bp
+...
+app.register_blueprint(widgets_bp)
+```
+
+## 5. Test it
+
+Add `tests/test_widgets.py`, mirroring `tests/test_main.py`'s `client`
+fixture (`create_app(database_url="sqlite:///:memory:", testing=True)`,
+see the `flask` skill) — one CRUD-cycle test (create, list, get,
+delete, and the 404 case) rather than one large test asserting
+everything.
+{% endif %}

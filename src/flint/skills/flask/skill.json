@@ -1,0 +1,5 @@
+{
+  "id": "flask",
+  "label": "Flask",
+  "description": "App-factory, Blueprint, and manual-validation conventions for this project's Flask app, including the WSGI dev-server-vs-gunicorn split."
+}

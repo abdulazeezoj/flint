@@ -1,0 +1,12 @@
+from flask import Flask
+
+from {{ package_name }}.core.config import settings
+
+app = Flask(__name__)
+app.config["APP_NAME"] = settings.app_name
+app.config["DEBUG"] = settings.debug
+
+
+@app.get("/")
+def read_root() -> dict[str, str]:
+    return {"message": "Hello, World!"}

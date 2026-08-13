@@ -1,0 +1,49 @@
+from flask import Blueprint, jsonify, request
+from pydantic import ValidationError
+from sqlalchemy import select
+
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Item
+from {{ package_name }}.schemas import ItemCreate, ItemRead
+
+bp = Blueprint("items", __name__, url_prefix="/items")
+
+
+@bp.get("/")
+def list_items():
+    session = get_session()
+    items = session.execute(select(Item)).scalars().all()
+    return jsonify([ItemRead.model_validate(item).model_dump() for item in items])
+
+
+@bp.post("/")
+def create_item():
+    try:
+        payload = ItemCreate.model_validate(request.get_json(force=True, silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"detail": exc.errors()}), 422
+    session = get_session()
+    item = Item(**payload.model_dump())
+    session.add(item)
+    session.commit()
+    return jsonify(ItemRead.model_validate(item).model_dump()), 201
+
+
+@bp.get("/<int:item_id>")
+def get_item(item_id: int):
+    session = get_session()
+    item = session.get(Item, item_id)
+    if item is None:
+        return jsonify({"detail": "Item not found"}), 404
+    return jsonify(ItemRead.model_validate(item).model_dump())
+
+
+@bp.delete("/<int:item_id>")
+def delete_item(item_id: int):
+    session = get_session()
+    item = session.get(Item, item_id)
+    if item is None:
+        return jsonify({"detail": "Item not found"}), 404
+    session.delete(item)
+    session.commit()
+    return "", 204

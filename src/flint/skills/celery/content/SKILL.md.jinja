@@ -1,0 +1,83 @@
+---
+name: celery
+description: Task definition, enqueuing, and result-checking conventions for this project's Celery background worker. Use when adding a background task, wiring an endpoint to enqueue one, or debugging why a task never runs.
+---
+
+# Celery
+
+This project offloads work to Celery: a task is a plain Python function
+decorated with `@celery_app.task`, enqueued from {% if framework == "fastapi" %}the FastAPI app{% else %}the Flask app{% endif %} via `.delay(...)`, and actually executed by a separate `celery worker` process. This skill covers how *this project* wires that up — not the whole Celery surface — so you extend it the same way it's already built.
+
+## When to reach for this
+
+- Adding a new background job (anything slow, retryable, or that
+  shouldn't block a request/response cycle).
+- Wiring an endpoint to enqueue an existing task.
+- Checking a task's status/result after enqueuing it.
+- Debugging a task that's enqueued but never seems to run.
+
+## The two-process model
+
+Nothing in this project executes a task inline. `POST /tasks/add`
+enqueues via `add.delay(a, b)` and returns immediately with a task id —
+the addition itself only happens in a separate `celery worker` process,
+which pulls the job off the broker ({{ broker }}) and runs it. If that
+worker process isn't running, tasks queue up but never execute; the API
+process staying healthy tells you nothing about whether jobs are
+actually being processed.
+
+## Quick reference
+
+- **Worker entrypoint**: `src/{{ package_name }}/worker.py` — builds the
+  `celery_app = Celery(...)` instance from `{{ broker }}` broker/backend
+  URLs in `core/config.py`, then imports `tasks/example` at the *bottom*
+  of the file (see `references/gotchas.md` for why the import has to go
+  there and not at the top).
+- **Tasks**: one module per job under `src/{{ package_name }}/tasks/`,
+  each function decorated with `@celery_app.task`
+  (`tasks/example.py`'s `add` is the template for this).
+- **Enqueue a task**: `add.delay(a, b)` — this project's own
+  `/tasks/add` endpoint uses this shorthand. Reach for
+  `add.apply_async(args=(a, b), ...)` instead when you need more than
+  "run it now" — a delay (`countdown=`), a specific queue, or a retry
+  policy.
+{% if framework == "fastapi" %}
+- **Enqueuing is sync, even here**: `main.py`'s `enqueue_add` is a plain
+  `def`, not `async def` — `.delay()` is a synchronous call (it just
+  publishes a message to the broker), so there's nothing to `await`,
+  even though the rest of this FastAPI app is async-first.
+{% else %}
+- **Enqueuing is sync**, matching the rest of this Flask app —
+  `main.py`'s `enqueue_add` reads `a`/`b` from `request.args` and calls
+  `add.delay(a, b)` directly.
+{% endif %}
+- **Checking a result**: `task = add.delay(a, b)` gives you `task.id`
+  immediately. Later, from any process, `AsyncResult(task.id,
+  app=celery_app).status` / `.result` looks it up via the result
+  backend{% if broker == "rabbitmq" %} — this project uses
+  `backend="rpc://"` when the broker is RabbitMQ, which has a real
+  limitation, see `references/gotchas.md`{% else %} — this project
+  points the result backend at the same `{{ broker }}` Redis instance as
+  the broker (`settings.redis_url`), so results just sit in Redis until
+  read or expired{% endif %}.
+- **Run the worker**:
+  ```
+  PYTHONPATH=src uv run celery -A {{ package_name }}.worker.celery_app worker --loglevel=info
+  ```
+  `PYTHONPATH=src` is required because the app lives under `src/` —
+  without it the worker process can't import `{{ package_name }}`.
+- **Broker**: `{{ broker }}` — just the transport `.delay()` publishes
+  onto and the worker consumes from; day-to-day operation of
+  {{ "Redis" if broker == "redis" else "RabbitMQ" }} itself is out of
+  scope here.
+
+## Go deeper
+
+- `references/gotchas.md` — task discovery (why a new `tasks/` module
+  needs a line in `worker.py`), the sync-client-in-an-async-app point in
+  more detail{% if broker == "rabbitmq" %}, and the `rpc://` backend's
+  one-consumer limitation{% endif %}.
+- `references/tasks-and-results.md` — `@celery_app.task`, `.delay()` vs
+  `.apply_async()`, and reading a result back out after enqueuing.
+- `guides/add-a-task.md` — the concrete steps to add a new task and wire
+  an endpoint to enqueue it, end to end.

@@ -1,0 +1,94 @@
+---
+name: flask
+description: App-factory, Blueprint, and manual-validation conventions for this project's Flask app, including the WSGI dev-server-vs-gunicorn split. Use when adding or changing a route, touching app/database construction, or debugging why a test or migration command reached a real database.
+---
+
+# Flask
+
+This project's web layer is Flask. This skill covers how *this project*
+uses it — not the whole library surface — so you can add code that
+matches the existing conventions instead of introducing a second style.
+
+## When to reach for this
+
+- Adding, changing, or removing an HTTP route{% if template == "rest-api" %} or Blueprint{% endif %}.
+- Touching `src/{{ package_name }}/main.py` — app construction{% if template == "rest-api" %}, the
+  `create_app()` factory, blueprint registration{% endif %}.
+{% if template == "rest-api" %}
+- Wiring a new extension (a database, a cache client) into the app.
+- Debugging why `pytest`, `flask db ...`, or a migration command tried
+  to reach the real, `.env`-configured database.
+{% endif %}
+- Deciding between the `flask run` dev server and gunicorn for
+  something that touches how the app boots.
+
+## Quick reference
+
+{% if template == "rest-api" %}
+- **App entrypoint**: `src/{{ package_name }}/main.py`, via an
+  **application-factory** — `create_app(*, database_url=None, testing=False)
+  -> Flask`. There is deliberately no module-level `app = create_app()`:
+  see `references/gotchas.md` for why. `flask run`/`flask db ...`
+  auto-detect the factory from `--app`; the Dockerfile's `gunicorn`
+  points at `{{ package_name }}.main:create_app()`.
+- **Routes**: one Blueprint per resource under
+  `src/{{ package_name }}/routes/` (e.g. `routes/items.py` exports
+  `bp = Blueprint("items", __name__, url_prefix="/items")`), registered
+  once in `create_app()` via `app.register_blueprint(bp)`. Don't add
+  routes directly on `app` outside `main.py`'s own `/` route — every
+  resource gets its own Blueprint file, even a small one.
+- **Request/response models**: `src/{{ package_name }}/schemas.py` holds
+  plain Pydantic models (`ItemCreate`, `ItemRead`). Flask has no
+  built-in equivalent of FastAPI's automatic request parsing — every
+  handler calls `Model.model_validate(request.get_json(...))` itself
+  and returns `jsonify(model.model_dump())`. Never accept or return a
+  bare, unvalidated `dict` for a real resource.
+{% else %}
+- **App entrypoint**: `src/{{ package_name }}/main.py`. Just
+  `app = Flask(__name__)` at module scope, with routes decorated
+  directly on it (`@app.get("/")`) — there's no database or other
+  I/O-on-import concern yet, so there's no need for the application-factory
+  pattern the `rest-api` template uses (see `references/gotchas.md` for
+  when that pattern becomes necessary).
+{% endif %}
+- **Run it (dev)**: `uv run flask --app src/{{ package_name }}/main{% if template == "rest-api" %}.py{% endif %} run`
+  — Flask's own dev server: autoreload-capable (`--debug`), single-threaded
+  by default, never what production uses.
+{% if docker %}
+- **Run it (prod)**: the Dockerfile's `CMD` runs `gunicorn`, not
+  `flask run` — see `references/gotchas.md`.
+{% endif %}
+- **Sync, not async**: Flask here is WSGI, not ASGI — route handlers
+  are plain `def`, never `async def`, and there is no `await` anywhere
+  in this codebase's routes. A blocking call inside a handler blocks
+  that worker thread/process, not an event loop; see
+  `references/gotchas.md` for what that means for concurrency.
+- **JSON**: return `jsonify(...)`{% if template == "rest-api" %} (or a `(jsonify(...), status_code)`
+  tuple for non-200 responses){% endif %}, not a raw dict-returning shortcut you half-remember
+  from another framework — Flask itself will auto-serialize a returned
+  `dict` on `2xx` routes, but this project uses `jsonify` explicitly
+  everywhere{% if template == "rest-api" %} so non-2xx error bodies (422, 404) look the same as
+  success bodies{% endif %}.
+
+## Go deeper
+
+{% if template == "rest-api" %}
+- `references/app-factory-and-config.md` — the `create_app()` pattern,
+  how `Settings` flows into `app.config`, and how extensions
+  (`db`{% if migrations %}, `migrate`{% endif %}) get initialized.
+- `references/routing-and-blueprints.md` — Blueprint structure, manual
+  request validation, status codes, error responses.
+{% else %}
+- `references/app-factory-and-config.md` — how `Settings` flows into
+  `app.config`, and why this template has no `create_app()` factory.
+- `references/routing-and-blueprints.md` — route structure and where
+  this template's conventions diverge from `rest-api`'s.
+{% endif %}
+- `references/gotchas.md` — real mistakes this project's own templates
+  hit while being built, and why the fix looks the way it does.
+{% if template == "rest-api" %}
+- `guides/add-a-resource.md` — the concrete steps to add a new resource
+  end-to-end (schema{% if database != "none" %}, model{% endif %}, Blueprint, registration, test).
+{% endif %}
+- `guides/testing.md` — how this project's test suite talks to the app
+  without a running server.

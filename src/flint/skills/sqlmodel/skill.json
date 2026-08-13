@@ -1,0 +1,5 @@
+{
+  "id": "sqlmodel",
+  "label": "SQLModel",
+  "description": "Model definition, async session/query patterns, and Pydantic-vs-table-model conventions for this project's SQLModel data layer."
+}

@@ -1,0 +1,92 @@
+# Guide: add a new background task
+
+Walks through adding a `multiply` task and an endpoint to enqueue it,
+following the same shape as the existing `add` task/`/tasks/add`
+endpoint — copy that shape for any new task rather than inventing a new
+one.
+
+## 1. Write the task
+
+Add to `src/{{ package_name }}/tasks/example.py` (or a new module under
+`tasks/` for a less closely-related job):
+
+```python
+@celery_app.task
+def multiply(a: int, b: int) -> int:
+    return a * b
+```
+
+If this is a new module rather than an addition to `example.py`, it
+needs its own `from {{ package_name }}.worker import celery_app` at the
+top, exactly like `example.py` does.
+
+## 2. Register the module with the worker
+
+Only needed if you created a new module in step 1 — if you added
+`multiply` to the existing `tasks/example.py`, skip this step, since
+that module is already imported.
+
+Add a line to the bottom of `src/{{ package_name }}/worker.py`, next to
+the existing `tasks.example` import:
+
+```python
+from {{ package_name }}.tasks import example  # noqa: E402,F401
+from {{ package_name }}.tasks import your_new_module  # noqa: E402,F401
+```
+
+Skipping this is the single most common way a new task silently never
+runs — see `references/gotchas.md` for why the worker needs this line
+at all.
+
+## 3. Wire up an endpoint to enqueue it
+
+{% if framework == "fastapi" %}
+In `src/{{ package_name }}/main.py`, following `enqueue_add`'s shape —
+plain `def`, not `async def` (see `references/gotchas.md` for why):
+
+```python
+from {{ package_name }}.tasks.example import add, multiply
+
+
+@app.post("/tasks/multiply")
+def enqueue_multiply(a: int, b: int) -> dict[str, str]:
+    task = multiply.delay(a, b)
+    return {"task_id": task.id}
+```
+{% else %}
+In `src/{{ package_name }}/main.py`, following `enqueue_add`'s shape —
+reading query args via `request.args`, same as the existing endpoint:
+
+```python
+from {{ package_name }}.tasks.example import add, multiply
+
+
+@app.post("/tasks/multiply")
+def enqueue_multiply():
+    a = int(request.args["a"])
+    b = int(request.args["b"])
+    task = multiply.delay(a, b)
+    return jsonify({"task_id": task.id})
+```
+{% endif %}
+
+## 4. Try it
+
+With the worker running (see `SKILL.md`'s run command) and
+{{ "Redis" if broker == "redis" else "RabbitMQ" }} up:
+
+```
+{% if framework == "fastapi" %}
+uv run fastapi dev src/{{ package_name }}/main.py
+{% else %}
+uv run flask --app src/{{ package_name }}/main.py run
+{% endif %}
+```
+
+```
+curl -X POST "http://127.0.0.1:{{ "8000" if framework == "fastapi" else "5000" }}/tasks/multiply?a=3&b=4"
+```
+
+should return a `task_id`. Check it landed by tailing the `celery
+worker` process's `--loglevel=info` output, or by looking the id up
+with `AsyncResult` (see `references/tasks-and-results.md`).

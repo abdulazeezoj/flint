@@ -1,0 +1,84 @@
+---
+name: flask-sqlalchemy
+description: The db = SQLAlchemy() extension object, init_app wiring, db.Model definitions, and app-context-bound sessions for this project's Flask data layer. Use when touching core/db.py, defining or changing a model, or debugging a "working outside of application context" error.
+---
+
+# Flask-SQLAlchemy
+
+This project's ORM is **Flask-SQLAlchemy** — the Flask extension that
+wraps SQLAlchemy, not raw SQLAlchemy wired up by hand (that's a
+different choice, `orm=sqlalchemy`, covered by the `sqlalchemy` skill).
+This skill covers the *integration layer* specific to this extension:
+the `db` object, how it gets bound to the app, `db.Model`, and why
+queries need an app context. For query syntax, `select()`, joins, and
+session semantics that apply to SQLAlchemy generally, see the
+`sqlalchemy` skill — this skill doesn't repeat that material.
+
+## When to reach for this
+
+- Touching `src/{{ package_name }}/core/db.py` — the `db`/`migrate`
+  objects, `init_db()`, engine options.
+- Defining or changing a model in `src/{{ package_name }}/models.py`.
+- Debugging `RuntimeError: Working outside of application context` (or
+  of request context) coming from a `db.session` call.
+{% if migrations %}
+- Debugging why `flask db migrate` produces an empty migration, or why
+  `flask db upgrade` fails against a fresh database — see
+  `references/gotchas.md`, this is a real bug this project's own
+  templates hit.
+{% endif %}
+
+## Quick reference
+
+- **The extension object**: `src/{{ package_name }}/core/db.py` creates
+  `db = SQLAlchemy()` at **module scope** — no `Flask` instance exists
+  yet at that point, and none is needed. `db` is a plain importable
+  singleton; `from {{ package_name }}.models import Item` (which imports
+  `db` transitively) is always safe with no app running.
+- **Binding to the app**: `init_db(app, *, testing=False)` calls
+  `db.init_app(app)` inside `create_app()` — this is the step that
+  actually attaches `db` to *this* `Flask` instance (reads
+  `app.config["SQLALCHEMY_DATABASE_URI"]`, sets up the engine/session
+  machinery). Never called at import time; see `references/gotchas.md`
+  for why `create_app()` itself stays lazy about this. For the
+  `create_app()` factory pattern itself, see the `flask` skill.
+{% if migrations %}
+- **Migrations wiring**: this project has `migrations=true`, so
+  `core/db.py` also creates `migrate = Migrate()` and calls
+  `migrate.init_app(app, db)` right after `db.init_app(app)` —
+  `Migrate` needs the bound `db` object to introspect models against
+  the database. This is the only place `flask-migrate` touches this
+  skill; the `flask db migrate`/`flask db upgrade` workflow itself is
+  the `flask-migrate` skill's territory.
+{% endif %}
+- **Models**: `src/{{ package_name }}/models.py` — subclass `db.Model`,
+  declare columns with `Mapped[...]` type hints and `mapped_column(...)`
+  (SQLAlchemy 2.0 style), e.g. `Item`'s
+  `id: Mapped[int] = mapped_column(primary_key=True)`. `db.Model`
+  (rather than a bare `DeclarativeBase`) is what makes a class usable
+  with the rest of the Flask-SQLAlchemy API (`db.session`, the
+  `.query` attribute, `Model.__tablename__` defaulting).
+- **Queries in a route**: `routes/items.py` uses
+  `db.session.execute(db.select(Item)).scalars().all()` for reads,
+  `db.session.get(Item, item_id)` for a primary-key lookup, and
+  `db.session.add(item)` / `db.session.commit()` / `db.session.delete(item)`
+  for writes — `db.select`/`db.session` are Flask-SQLAlchemy's
+  re-exports of plain SQLAlchemy, so the query syntax itself is exactly
+  what the `sqlalchemy` skill documents. Don't reach for the legacy
+  `Model.query` shorthand here; this codebase is consistent about the
+  `db.session.execute(db.select(...))` form.
+- **Context requirement**: every `db.session` call above runs inside a
+  Flask route handler, which always has an active application context.
+  Outside a request (a CLI script, a background task, a REPL) you must
+  open one yourself — see `references/gotchas.md`.
+
+## Go deeper
+
+- `references/db-object-and-wiring.md` — the extension pattern in full:
+  `db = SQLAlchemy()`, `init_app`, engine options (including the SQLite
+  `:memory:` `StaticPool` case), and how `migrate.init_app` fits in.
+- `references/gotchas.md` — the `db.create_all()`-vs-migrations bug
+  this project's own templates hit, and the app-context requirement for
+  code that runs outside a request.
+- `guides/add-a-model.md` — the concrete steps to add a new `db.Model`
+  and query it, mirroring the existing `Item` model.

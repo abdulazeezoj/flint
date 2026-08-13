@@ -1,0 +1,5 @@
+{
+  "id": "pytest",
+  "label": "pytest",
+  "description": "Fixtures, async test setup, the isolated-test-database pattern, and parametrize — how this project's test suite is built and how to extend it."
+}

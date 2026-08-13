@@ -1,0 +1,53 @@
+[project]
+name = "flint-cli"
+version = "0.11.0"
+description = "Interactive project scaffolding for Python frameworks — create-next-app, for FastAPI, Flask, and friends."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "abdulazeezoj" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.15.1",
+    "questionary>=2.1.0",
+    "rich>=13.9.4",
+    "jinja2>=3.1.4",
+    "pydantic>=2.10.3",
+]
+keywords = ["scaffolding", "fastapi", "cli", "project-generator", "create-next-app"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Code Generators",
+]
+
+[project.urls]
+Repository = "https://github.com/abdulazeezoj/flint"
+
+[project.scripts]
+flint = "flint.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "flint"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-cov>=7.1.0",
+]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.5.49",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=flint --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+source = ["flint"]

@@ -1,0 +1,113 @@
+# Gotchas
+
+Real failure modes worth knowing before you hit them, not hypothetical
+edge cases.
+
+{% if framework == "fastapi" %}
+## Forgetting `@pytest_asyncio.fixture` on an async fixture
+
+`tests/conftest.py`'s fixtures are `async def` and decorated with
+`@pytest_asyncio.fixture`, not the plain `@pytest.fixture`:
+
+```python
+@pytest_asyncio.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+```
+
+If you add a new async fixture of your own (say, one that creates a
+test user via an async database call) and decorate it with the plain
+`@pytest.fixture` instead, you get one of two confusing outcomes
+depending on plugin configuration: either an explicit error telling you
+async fixtures aren't natively supported by plain `@pytest.fixture`, or
+— more dangerously — the fixture silently "succeeds" but hands your
+test the **unawaited coroutine object itself**, not the value the
+fixture was supposed to build. A test that depends on it then fails
+with an unrelated-looking error (e.g. an `AttributeError` on a
+coroutine object where you expected a client or a model instance),
+nowhere near the actual mistake.
+
+This project sets `asyncio_mode = "auto"` in `pyproject.toml`, which
+lets `async def test_...` *functions* skip an explicit
+`@pytest.mark.asyncio` marker — but it does not change what a *fixture*
+needs. Always pair an `async def` fixture body with `@pytest_asyncio.fixture`
+explicitly, the same way `tests/conftest.py`'s `client` and
+`_prepare_database` fixtures do.
+{% else %}
+## There's no async here — don't add `pytest-asyncio`
+
+This project's Flask routes are plain `def` handlers (WSGI, not ASGI —
+see the `flask` skill), and `app.test_client()` is synchronous, so
+every fixture in `tests/conftest.py` is a plain `@pytest.fixture` and
+every test is a plain `def test_...(client)`. If you're porting a test
+or fixture from an async codebase, don't bring `async def` or
+`pytest-asyncio` along with it — there's nothing to `await`, the
+project's `pyproject.toml` doesn't declare `pytest-asyncio` as a
+dependency, and adding `async def` to a fixture here would just leave
+you with an unawaited coroutine instead of the value you meant to
+build.
+{% endif %}
+
+## Fixture scope controls whether database state leaks between tests
+
+{% if database is defined and database != "none" %}
+{% if framework == "fastapi" %}
+`_prepare_database` is `@pytest_asyncio.fixture(autouse=True)` with the
+default (function) scope — no test even names it as a parameter, it
+just runs automatically before *and after every single test*,
+recreating the schema each time and dropping it again once the test
+finishes:
+
+```python
+@pytest_asyncio.fixture(autouse=True)
+async def _prepare_database() -> AsyncGenerator[None, None]:
+    async with test_engine.begin() as conn:
+        await conn.run_sync({{ "SQLModel" if orm == "sqlmodel" else "Base" }}.metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync({{ "SQLModel" if orm == "sqlmodel" else "Base" }}.metadata.drop_all)
+```
+
+The per-test `drop_all` is what makes tests order-independent: test B
+never sees rows test A inserted. If you change this fixture's `scope`
+to `"module"` or `"session"` — e.g. to avoid rebuilding the schema
+repeatedly — `create_all`/`drop_all` then only run once for the whole
+module/session, and every test in that scope starts sharing one live
+copy of the tables. The symptom is a test that only fails once you add
+a second, unrelated test to the same file, or that passes alone but
+fails as part of the full suite — a count assertion like
+`len(list_response.json()) == 1` is exactly what breaks first, since
+now it also counts rows an earlier test left behind. Keep this fixture
+function-scoped (the default — don't add a `scope=` argument at all)
+unless you have a specific reason and are prepared to reset state by
+hand.
+{% else %}
+`client` is a plain `@pytest.fixture` (function-scoped by default) that
+builds a brand-new `create_app(database_url="sqlite:///:memory:",
+testing=True)` inside the fixture body — a fresh app, and therefore a
+fresh empty database, every time a test asks for `client`. That's what
+keeps tests order-independent here.
+
+If you're tempted to hoist this to `scope="module"` or
+`scope="session"` to avoid rebuilding the app repeatedly, every test in
+that scope would then share one Flask app and one live in-memory
+database — rows one test creates are still there for the next test in
+the same module. The symptom is a test that only fails once another
+test runs before it in the same file, or a count assertion that's off
+by however many rows earlier tests left behind. Keep `client`
+function-scoped (the default) unless you're deliberately writing tests
+that are meant to share state.
+{% endif %}
+{% else %}
+This template has no database, so there's no fixture-managed schema to
+leak between tests — but the principle generalizes to any shared or
+autouse fixture you add: its *scope* (function/class/module/session)
+determines how often its setup/teardown runs, and a scope wider than
+the fixture's own setup code assumes is the most common source of a
+test that only fails depending on what ran before it. If you add a
+database later, mirror the `rest-api` template's `tests/conftest.py` —
+function-scoped fixtures, nothing shared across tests by default —
+rather than inventing a shared-connection shortcut.
+{% endif %}

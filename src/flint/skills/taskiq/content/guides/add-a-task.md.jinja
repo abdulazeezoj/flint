@@ -1,0 +1,88 @@
+# Guide: add a new background task
+
+Walks through adding a `send_email` task end-to-end, following the same
+shape as the existing `add` task in `tasks/example.py` — copy that
+shape for any new task rather than inventing a new one.
+
+## 1. Write the task
+
+Create `src/{{ package_name }}/tasks/email.py`:
+
+```python
+from {{ package_name }}.worker import broker
+
+
+@broker.task
+async def send_email(to: str, subject: str, body: str) -> None:
+    ...  # do the actual send here
+```
+
+Import `broker` from `worker.py` — never construct a second broker, and
+never import a *different* task module from here (that risks the same
+circular-import shape `worker.py` avoids by importing tasks last; see
+`references/gotchas.md`).
+
+## 2. Wire it into `worker.py`
+
+In `src/{{ package_name }}/worker.py`, add an import for the new module
+at the **bottom** of the file, alongside the existing `tasks.example`
+import:
+
+```python
+from {{ package_name }}.tasks import example  # noqa: E402,F401
+from {{ package_name }}.tasks import email  # noqa: E402,F401
+```
+
+This is the step it's easiest to forget — nothing else in the project
+will catch a missed import here (see `references/gotchas.md`). Do this
+in the same commit as step 1, not as a follow-up.
+
+## 3. Enqueue it from a route
+
+Wherever the task should be triggered from, import the task function
+and call `.kiq(...)` — mirror `main.py`'s `/tasks/add` endpoint:
+
+```python
+from {{ package_name }}.tasks.email import send_email
+
+@router.post("/notify")
+async def notify(to: str) -> dict[str, str]:
+    task = await send_email.kiq(to, "Welcome", "Thanks for signing up!")
+    return {"task_id": task.task_id}
+```
+
+Don't `await send_email(...)` directly from a route unless you actually
+want the request to block until the send completes — that defeats the
+point of having a worker.
+
+## 4. Run a worker to pick it up
+
+```
+uv run taskiq worker {{ package_name }}.worker:broker --app-dir src
+```
+
+{% if broker == "rabbitmq" %}
+Needs RabbitMQ running and reachable at `RABBITMQ_URL` (see `.env`).
+{% else %}
+Needs Redis running and reachable at `REDIS_URL` (see `.env`).
+{% endif %}
+Watch the worker's own startup log for the new task's name — if
+`send_email` doesn't show up in what it reports knowing about, the
+import in step 2 is the first thing to check.
+
+## 5. Test it
+
+Add a test that calls the task function directly (not `.kiq(...)`,
+since nothing consumes the queue during `uv run pytest` — see
+`references/broker-and-tasks.md`):
+
+```python
+async def test_send_email():
+    await send_email("user@example.com", "Welcome", "Thanks for signing up!")
+    # assert on whatever side effect send_email has (mock the actual send)
+```
+
+For the endpoint itself, assert on the response shape the same way
+`tests/test_main.py` does for `/tasks/add` — a `200` and a `task_id` in
+the body, not that the task actually ran (it won't, in-process, during
+tests).

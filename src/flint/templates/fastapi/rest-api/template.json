@@ -1,0 +1,91 @@
+{
+  "id": "rest-api",
+  "label": "REST API",
+  "description": "A layered FastAPI REST API with pydantic-settings, and your choice of database/ORM, migrations, background worker (Redis or RabbitMQ), and Redis caching.",
+  "enabled": true,
+  "options": [
+    {
+      "key": "database",
+      "label": "Database",
+      "type": "select",
+      "default": "sqlite",
+      "choices": [
+        { "value": "none", "label": "None (in-memory store)" },
+        { "value": "sqlite", "label": "SQLite" },
+        { "value": "postgres", "label": "PostgreSQL" }
+      ]
+    },
+    {
+      "key": "orm",
+      "label": "ORM",
+      "type": "select",
+      "default": "sqlmodel",
+      "choices": [
+        { "value": "sqlmodel", "label": "SQLModel" },
+        { "value": "sqlalchemy", "label": "SQLAlchemy" }
+      ],
+      "when": { "database": ["sqlite", "postgres"] },
+      "skip_value": "none"
+    },
+    {
+      "key": "migrations",
+      "label": "Add Alembic migrations?",
+      "type": "confirm",
+      "default": true,
+      "when": { "database": ["sqlite", "postgres"] },
+      "skip_value": false
+    },
+    {
+      "key": "worker",
+      "label": "Background worker",
+      "type": "select",
+      "default": "none",
+      "choices": [
+        { "value": "none", "label": "None" },
+        { "value": "taskiq", "label": "Taskiq" },
+        { "value": "celery", "label": "Celery" }
+      ]
+    },
+    {
+      "key": "broker",
+      "label": "Message broker",
+      "type": "select",
+      "default": "redis",
+      "choices": [
+        { "value": "redis", "label": "Redis" },
+        { "value": "rabbitmq", "label": "RabbitMQ" }
+      ],
+      "when": { "worker": ["taskiq", "celery"] },
+      "skip_value": "none"
+    },
+    {
+      "key": "redis",
+      "label": "Add Redis (caching)?",
+      "type": "confirm",
+      "default": false,
+      "when": { "broker": ["rabbitmq", "none"] },
+      "skip_value": true
+    }
+  ],
+  "layers": [
+    { "dir": "docker", "when": { "docker": [true] } },
+    { "dir": "db-sqlmodel", "when": { "orm": ["sqlmodel"] } },
+    { "dir": "db-sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "dir": "migrations-sqlmodel", "when": { "orm": ["sqlmodel"], "migrations": [true] } },
+    { "dir": "migrations-sqlalchemy", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
+    { "dir": "worker-taskiq", "when": { "worker": ["taskiq"] } },
+    { "dir": "worker-celery", "when": { "worker": ["celery"] } },
+    { "dir": "redis", "when": { "redis": [true] } }
+  ],
+  "skills": [
+    { "id": "fastapi" },
+    { "id": "pydantic-settings" },
+    { "id": "pytest" },
+    { "id": "sqlmodel", "when": { "orm": ["sqlmodel"] } },
+    { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "id": "alembic", "when": { "migrations": [true] } },
+    { "id": "taskiq", "when": { "worker": ["taskiq"] } },
+    { "id": "celery", "when": { "worker": ["celery"] } },
+    { "id": "redis", "when": { "redis": [true] } }
+  ]
+}

@@ -1,0 +1,140 @@
+# Gotchas
+
+{% if framework == "fastapi" %}
+## A sync driver silently blocks the whole event loop
+
+This project's async session setup only works because the driver
+underneath it is actually async: `sqlite+aiosqlite://` for SQLite,
+`postgresql+asyncpg://` for PostgreSQL (see
+`src/{{ package_name }}/core/config.py` and `.env`). If you ever change
+a `database_url` to a sync driver — `sqlite://` (plain `sqlite3`) or
+`postgresql+psycopg://`/`postgresql+psycopg2://` — `create_async_engine`
+will raise immediately on startup (it validates the driver supports
+`asyncio`), so this particular mistake doesn't linger silently.
+
+The more dangerous version of this mistake is hand-rolling a database
+call *outside* this project's session pattern — e.g. reaching for a
+sync driver library directly, or calling a third-party client that
+does blocking I/O, from inside an `async def` route handler. Unlike a
+misconfigured engine, that won't raise: it will just block the entire
+event loop for the duration of the call, stalling *every other
+in-flight request*, not only the one that made the call. Low local
+traffic hides this completely; it shows up as mysterious latency
+spikes under real load. Stay inside `get_session()`/`AsyncSession` for
+all database access and this can't happen.
+
+## `expire_on_commit=False` is deliberate — don't "fix" it
+
+`async_session_maker` is built with `expire_on_commit=False`. The
+default (`True`) expires every attribute on a committed object, so the
+next attribute access re-fetches from the database — but with an
+*async* session, that re-fetch requires an `await`, and ordinary
+attribute access (`item.name`) can't await anything. Route handlers
+here return ORM instances right after `await session.commit()` (see
+`create_item` in `routes/items.py`), so leaving the default in place
+would break attribute access on the response the moment FastAPI tries
+to serialize it. If you're debugging a `MissingGreenlet` error, this
+setting (or the lack of it, in code that builds its own session
+factory) is the first thing to check.
+
+## Schema creation and migrations don't coexist
+
+{% if migrations %}
+This project has `migrations=true`: `main.py` deliberately does **not**
+call `init_db()` at all (it's not even imported) — schema comes solely
+from `alembic upgrade head`. `init_db()` in `core/db.py` still contains
+a `create_all()` call, but nothing in the running app invokes it. If
+you're seeing "table does not exist" errors, run the migration first
+(see the `alembic` skill's `guides/first-migration.md`) — don't wire
+`init_db()` back into `main.py`'s `lifespan` to "fix" it.
+{% else %}
+This project has `migrations=false`: `init_db()`'s `create_all()` runs
+on every startup via the `lifespan` hook, so the schema always matches
+the current models — convenient, but only correct because there's no
+migration history to fall out of sync with. If you later turn
+migrations on, this call is removed from `main.py`'s `lifespan`
+entirely (see the `alembic` skill). `create_all()` and a real migration
+history must never both run against the same database: if the tables
+already exist by the time `alembic revision --autogenerate` runs
+first, it permanently reports "No changes in schema detected" instead
+of capturing the real schema.
+{% endif %}
+
+## Tests never call `init_db()`
+
+`tests/conftest.py` builds its own `test_engine` pointed at
+`sqlite+aiosqlite:///:memory:` and overrides the `get_session`
+dependency directly — schema for it comes from an autouse fixture
+calling `Base.metadata.create_all`/`drop_all` against that engine, not
+from `init_db()`. This keeps the suite runnable with zero external
+services regardless of what `DATABASE_URL` is configured to in `.env`.
+See the `fastapi` skill's `guides/testing.md` for why `lifespan` (and
+therefore `init_db()`) doesn't run during tests at all.
+{% else %}
+## `scoped_session` is thread-local — teardown is what keeps it safe
+
+`SessionLocal = scoped_session(sessionmaker())` hands back the *same*
+session object for every `SessionLocal()`/`get_session()` call on a
+given thread, until something calls `SessionLocal.remove()`. `init_db()`
+registers that removal as `app.teardown_appcontext(lambda exc=None:
+SessionLocal.remove())` — if that registration is ever missing or
+removed, sessions stop being cleaned up between requests: a WSGI worker
+thread that handles request A then request B would hand request B
+the *same* session object A used, still holding A's identity map,
+possibly still holding A's uncommitted state or stale query results.
+This is easy to miss in dev (one worker, low traffic, requests rarely
+interleave in a way that exposes it) and shows up in production as data
+from one request leaking into another, or `DetachedInstanceError`s that
+only happen under concurrent load. Don't call `get_session()` (or
+`SessionLocal()`) anywhere that isn't inside a request — a call at
+import/module scope binds a session before `teardown_appcontext` exists
+to clean it up.
+
+## Sync driver mismatch still exists, just inverted
+
+There's no async-vs-sync driver trap here the way there is for the
+FastAPI/async setup — this project's sync engine expects a sync driver
+by design, and both configured options are sync: plain `sqlite3` for
+SQLite (`sqlite:///...`), `psycopg` (v3) for PostgreSQL
+(`postgresql+psycopg://...`, see
+`src/{{ package_name }}/core/config.py`). The mistake to watch for is
+the opposite direction: don't reach for an async driver
+(`asyncpg`, `aiosqlite`) or an async engine (`create_async_engine`)
+anywhere in this codebase — Flask's request handling is sync end to
+end, so an async engine would need an event loop nothing here provides,
+not a performance win.
+
+## `:memory:` SQLite needs `StaticPool`
+
+`init_db()` special-cases a `:memory:` database URL: the default
+connection pool hands out a *new* connection per checkout, and a
+SQLite `:memory:` database only exists for the lifetime of a single
+connection — so without `StaticPool` (which keeps one connection alive
+for the app's lifetime), every checkout would silently see an empty,
+freshly-created database. This only ever triggers for `:memory:` (used
+by `tests/conftest.py`'s `create_app(database_url="sqlite:///:memory:")`);
+a real file-based SQLite database doesn't need it, which is why it's
+gated behind the `:memory:` check rather than applied unconditionally.
+
+## Schema creation and migrations don't coexist
+
+{% if migrations %}
+This project has `migrations=true`. `init_db()` only calls
+`Base.metadata.create_all(engine)` directly when `testing=True` — real
+runs get their schema solely from `flask db upgrade`/`alembic upgrade
+head` (see the `alembic` skill). If you're seeing "table does not
+exist" errors outside of tests, run the migration — don't remove the
+`testing` guard to make `create_all()` run unconditionally, or
+`alembic revision --autogenerate` will permanently report "No changes
+in schema detected" once the tables already exist without a migration
+having created them.
+{% else %}
+This project has `migrations=false`: `init_db()` always calls
+`Base.metadata.create_all(engine)`, so the schema matches the current
+models on every app start — convenient, but only correct because
+there's no migration history to fall out of sync with. If you later
+turn migrations on, this becomes conditional on `testing` (see the
+`alembic` skill) — `create_all()` and a real migration history must
+never both run against the same non-test database.
+{% endif %}
+{% endif %}

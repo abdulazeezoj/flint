@@ -1,0 +1,58 @@
+# Guide: the first migration on a fresh database
+
+Run this once, before starting the app for the first time — the same
+two commands the project's own `README.md` documents:
+
+```
+uv run alembic revision --autogenerate -m "describe your change"
+uv run alembic upgrade head
+```
+
+The first run captures the initial schema straight from
+`src/{{ package_name }}/models.py` (the `Item` model, plus anything else
+you've added there) and applies it — after this, the database has both
+the tables *and* a migration history that starts from a real revision,
+not from tables that happen to already exist (see
+`references/gotchas.md` for why that distinction matters).
+
+## Why both commands, every time
+
+- `alembic revision --autogenerate -m "..."` only **writes a migration
+  file** to `alembic/versions/` — it diffs the current models against
+  the last-known schema state and generates `upgrade()`/`downgrade()`
+  functions to bridge the difference (see
+  `guides/reading-a-migration.md` for what that file looks like). It
+  does not touch the database.
+- `alembic upgrade head` is what actually **applies** pending migrations
+  to the database and stamps `alembic_version` with the new revision.
+
+Skipping the second command leaves you with a migration file on disk and
+an untouched database — running the app will fail with "table does not
+exist" errors, which is a common enough mix-up to check first if that
+happens.
+
+## Repeat both commands whenever you change a model
+
+Add a column, add a table, change a constraint — every model change
+gets its own migration, generated and applied the same way, with a
+message describing that specific change:
+
+```
+uv run alembic revision --autogenerate -m "add email to item"
+uv run alembic upgrade head
+```
+
+**Review the generated file before running `upgrade head`** — see
+`guides/reading-a-migration.md`. Don't skip this because the first
+migration "just worked": autogenerate is diffing your models against
+schema state, and a rename, a subtle constraint change, or a
+multi-column index can autogenerate into something other than what you
+intended.
+
+## Rolling back
+
+`uv run alembic downgrade -1` undoes exactly one revision (runs that
+revision's `downgrade()`). `uv run alembic history` shows the full
+chain of revisions in order; `uv run alembic current` shows which one
+the database is actually on right now — useful when the two have drifted
+(e.g. after pulling a teammate's new migration you haven't applied yet).
