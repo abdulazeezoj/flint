@@ -7,11 +7,36 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.14.2 — 2026-08-13
+
+### Fixed
+
+- **`v0.14.1`'s release automation tagged correctly but never actually
+  published** — PyPI rejected the upload with `400 Invalid attestations
+  supplied during upload`. Root cause: `release.yml` called `cd.yml`
+  directly via `workflow_call`, and PyPI's Trusted Publishing OIDC
+  verification checks the *top-level* workflow that actually ran, not
+  any reusable workflow it calls — so the certificate said `release.yml`
+  while the registered Trusted Publisher expects `cd.yml`, and PyPI
+  correctly refused the mismatch. Fixed by switching `cd.yml` from
+  `workflow_call` to a `workflow_run` trigger (`workflows: ["Release"]`)
+  instead: `cd.yml` now runs as its own genuinely top-level workflow
+  when `release.yml` finishes, matching what's registered on PyPI.
+  Since there's no `workflow_call` `ref` input to rely on anymore, the
+  "does this commit's tag match `pyproject.toml`" safety check now uses
+  `git describe --tags --exact-match HEAD` (with `fetch-depth: 0` so the
+  tag is actually present locally) instead of parsing the triggering
+  ref — this works identically whether `cd.yml` was triggered by a
+  direct tag push or by `release.yml` finishing.
+
 ## v0.14.1 — 2026-08-13
 
 ### Added
 
-- **`.github/workflows/release.yml`: tags releases automatically.** Fires
+- **`.github/workflows/release.yml`: tags releases automatically**
+  (its `workflow_call` chaining into `cd.yml` turned out to break PyPI's
+  Trusted Publishing verification — never actually published under this
+  version; fixed in `v0.14.2`). Fires
   on any push to `main` that touches `pyproject.toml`; reads the version,
   and — if `vX.Y.Z` doesn't already exist as a tag — creates and pushes
   it using the workflow's own `GITHUB_TOKEN`. Exists because a plain

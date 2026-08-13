@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.14.1: automated release tagging via `release.yml` — see PRODUCT_ARCH.md §8)
+**Last updated:** 2026-08-13 (v0.14.2: fixed release automation's PyPI Trusted Publishing verification — see PRODUCT_ARCH.md §8)
 
 ## 1. Vision
 
@@ -313,15 +313,24 @@ hold for every project shape a generated app might end up living in
   See PRODUCT_ARCH.md §2.
 - `v0.14.1` — release tagging is automated (`.github/workflows/release.yml`):
   pushing a version bump to `main` now creates and pushes the `vX.Y.Z`
-  tag on its own, then chains straight into `cd.yml`'s test-then-publish
-  jobs as a reusable workflow rather than depending on the tag push to
-  re-trigger it (GitHub suppresses new workflow runs triggered by the
-  default `GITHUB_TOKEN`). Added after a manual `git tag && git push`
-  from outside GitHub Actions hit a plain 403 — this repo's tag
-  protection allows tag creation from CI but not from that external
-  credential, even though the same credential could push ordinary
-  branch commits fine. See PRODUCT_ARCH.md §8. No change to the `flint`
-  CLI itself.
+  tag on its own. Added after a manual `git tag && git push` from
+  outside GitHub Actions hit a plain 403 — this repo's tag protection
+  allows tag creation from CI but not from that external credential,
+  even though the same credential could push ordinary branch commits
+  fine. Its first design chained straight into `cd.yml` as a reusable
+  workflow (`workflow_call`); that part turned out to break PyPI's
+  Trusted Publishing verification and never actually published — see
+  `v0.14.2`.
+- `v0.14.2` — fixes `v0.14.1`'s publish step. PyPI's Trusted Publishing
+  OIDC check verifies the *top-level* workflow that ran, not any
+  reusable workflow it calls — `workflow_call`-ing `cd.yml` from
+  `release.yml` made the certificate say `release.yml`, which never
+  matches a Trusted Publisher registered for `cd.yml`. `cd.yml` now
+  triggers on `workflow_run` (listening for `release.yml`'s completion)
+  instead, so it always runs as its own top-level workflow; its
+  original `push: tags: v*` trigger is unchanged, so a tag pushed by a
+  human still works too. See PRODUCT_ARCH.md §8. No change to the
+  `flint` CLI itself.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

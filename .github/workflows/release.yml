@@ -9,15 +9,11 @@ on:
 
 permissions:
   contents: write # required to create and push the release tag
-  id-token: write # propagated to cd.yml's publish job for PyPI trusted publishing (OIDC)
 
 jobs:
   tag:
     name: Tag release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      created: ${{ steps.check.outputs.exists == 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,12 +45,3 @@ jobs:
         run: |
           git tag "v${{ steps.version.outputs.version }}"
           git push origin "v${{ steps.version.outputs.version }}"
-
-  publish:
-    name: Test and publish
-    needs: tag
-    if: needs.tag.outputs.created == 'true'
-    uses: ./.github/workflows/cd.yml
-    with:
-      ref: v${{ needs.tag.outputs.version }}
-    secrets: inherit

@@ -4,21 +4,20 @@ on:
   push:
     tags:
       - "v*"
-  workflow_call:
-    inputs:
-      ref:
-        description: Tag to test and publish (e.g. v1.2.3) — defaults to the triggering tag push
-        required: false
-        type: string
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 jobs:
   test:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0 # full history + tags, so "git describe" below can find the release tag
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -44,22 +43,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0 # full history + tags, so "git describe" below can find the release tag
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
 
-      - name: Verify tag matches pyproject.toml version
+      - name: Verify a release tag points at this commit, and matches pyproject.toml
         run: |
-          tag_ref="${{ inputs.ref || github.ref_name }}"
-          tag_version="${tag_ref#v}"
+          tag_name="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+          if [ -z "$tag_name" ]; then
+            echo "::error::No tag points exactly at this commit — refusing to publish an untagged commit."
+            exit 1
+          fi
+          tag_version="${tag_name#v}"
           pkg_version="$(uv run --no-project python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          echo "Tag version: $tag_version"
+          echo "Tag: $tag_name"
           echo "pyproject.toml version: $pkg_version"
           if [ "$tag_version" != "$pkg_version" ]; then
-            echo "::error::Tag v$tag_version does not match pyproject.toml version $pkg_version — refusing to publish a mismatched release."
+            echo "::error::Tag $tag_name does not match pyproject.toml version $pkg_version — refusing to publish a mismatched release."
             exit 1
           fi
 
