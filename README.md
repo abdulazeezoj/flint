@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml)
 [![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
-[![PyPI](https://img.shields.io/pypi/v/flint-cli)](https://pypi.org/project/flint-cli/)
+[![PyPI](https://img.shields.io/pypi/v/flint-kit)](https://pypi.org/project/flint-kit/)
 
 `create-next-app`, for Python. One command, a short interactive wizard,
 and you have a running project — no hand-written boilerplate. Pick a
@@ -10,7 +10,7 @@ richer template and the same wizard wires up a real database,
 migrations, and a background worker too.
 
 ```
-uvx flint
+uvx --from flint-kit flint
 ```
 
 ```
@@ -49,9 +49,9 @@ remembered preferences, and how to contribute.
 ## Install
 
 ```
-uv tool install flint-cli   # persistent `flint` on PATH
+uv tool install flint-kit   # persistent `flint` on PATH
 # or run it ephemerally, no install:
-uvx flint
+uvx --from flint-kit flint
 ```
 
 ## Usage

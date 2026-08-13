@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
+**Last updated:** 2026-08-13 (v0.14: project renamed to Flint, third time, split brand/PyPI name — see PRODUCT_SPEC.md §11; docs-site grid-cards gotcha)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -26,10 +26,14 @@ is a contained change, not a rewrite.
 
 ## 2. Distribution
 
-- PyPI distribution name: `flint-cli` (see PRODUCT_SPEC §10 for why).
+- PyPI distribution name: `flint-kit` — plain `flint` is an unrelated,
+  already-published package, so `pyproject.toml`'s `[project] name` and
+  the console script diverge on purpose (see PRODUCT_SPEC §10/§11 for
+  why). `[tool.uv.build-backend] module-name` and every `[project.scripts]`
+  entry stay `flint`; only the PyPI-facing string carries the suffix.
 - Console script entry point: `flint`.
-- Primary usage is via `uvx flint` (ephemeral run, no install) or
-  `uv tool install flint-cli` (persistent `flint` on PATH) — mirrors how
+- Primary usage is via `uvx --from flint-kit flint` (ephemeral run, no install) or
+  `uv tool install flint-kit` (persistent `flint` on PATH) — mirrors how
   `npx create-next-app` is normally invoked.
 - Build backend: `hatchling` via `uv`'s default `uv init --package`
   project shape (src layout).
@@ -579,6 +583,22 @@ and is what fails the build on any broken internal link, missing nav
 target, or other structural issue (this is `--strict`'s job — content
 *quality* is still a human/review concern, `--strict` only catches
 structural breakage). See §8 for the deploy workflow itself.
+
+**Gotcha: Material's grid-cards recipe needs two extensions, and
+`--strict` won't catch a missing one.** `docs/index.md`'s "Where to go
+next" section uses `<div class="grid cards" markdown>` — Material's
+documented way to lay out linked cards. That recipe only renders if
+`markdown_extensions` includes both `attr_list` (lets the `markdown`
+attribute opt a raw HTML block into markdown processing) and
+`md_in_html` (the extension that actually processes markdown nested
+inside raw HTML — without it, Python-Markdown leaves the block's
+contents untouched). Missing either one isn't a build error: the page
+still builds and passes `--strict`, it just renders the card block as a
+literal run of `**[text](link.md)**` markdown syntax instead of cards —
+only caught by actually looking at the rendered page (found via a
+Playwright screenshot pass, not the build log). Worth remembering for
+any future page that reaches for a Material "recipe" requiring raw HTML
+with nested markdown.
 
 ## 5. Remembered preferences (`prefs.py`)
 

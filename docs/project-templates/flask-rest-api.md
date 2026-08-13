@@ -1,18 +1,20 @@
 # Flask · REST API
 
-A layered Flask REST API with `pydantic-settings`, your choice of
-database/ORM, migrations, and a Celery background worker (Redis or
-RabbitMQ), with optional Redis caching. This is the Flask counterpart to
-[FastAPI · REST API](fastapi-rest-api.md) — same opinionated layout, same
-spirit of "pick what you need, skip what you don't" — but not a mechanical
-port. Flask is sync/WSGI, not async, and that forced a handful of genuine
-design differences covered below: an application-factory entrypoint, two
-different migration tools depending on which ORM you pick, and a
-background-worker choice that's deliberately Celery-only.
+The Flask counterpart to [FastAPI · REST API](fastapi-rest-api.md) — same
+opinionated layout, same spirit of "pick what you need, skip what you
+don't": `pydantic-settings` config, your choice of database and ORM,
+migrations, a Celery background worker over Redis or RabbitMQ, and
+optional Redis caching on top — each piece independently optional. But
+it's not a mechanical port. Flask is sync/WSGI, not async, and that
+forced a handful of genuine design differences covered below: an
+application-factory entrypoint, two different migration tools depending
+on which ORM you pick, and a background-worker choice that's
+deliberately Celery-only.
 
 Generated with a single `items` resource (`GET/POST /items/`,
 `GET/DELETE /items/{id}`) backed by an in-memory store by default, or a
-real database once you pick one.
+real database once you pick one — enough to see every layer wired
+together, not just declared.
 
 ## Quick start
 
@@ -25,11 +27,12 @@ flint new my-api \
 ```
 
 Because `broker=redis`, the `redis` (caching) option is never asked — it
-resolves to `true` automatically (see [Redis](#redis-caching) below).
-Resolved options: `database=postgres, orm=flask-sqlalchemy,
-migrations=True, worker=celery, broker=redis, redis=True`.
+resolves to `true` automatically (see [Redis](#redis-caching) below),
+leaving these options resolved: `database=postgres,
+orm=flask-sqlalchemy, migrations=True, worker=celery, broker=redis,
+redis=True`.
 
-What you'd do next:
+Once it's generated:
 
 ```bash
 cd my-api
@@ -404,8 +407,9 @@ to add.
 
 ## `--docker`
 
-Adds a `Dockerfile` (`uv`-based, matching every other flint template) and
-`.dockerignore`. The one Flask-specific detail: the container runs under
+Pass `--docker` and Flint adds a `Dockerfile` (`uv`-based, matching
+every other flint template) plus `.dockerignore`. The one
+Flask-specific detail: the container runs under
 **gunicorn**, not the Flask dev server, and points it at the factory using
 gunicorn's own factory-call syntax — one more place the
 [application-factory pattern](#the-core-idea-create_app-not-app-flask__name__)

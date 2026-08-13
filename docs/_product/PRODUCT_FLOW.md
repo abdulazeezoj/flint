@@ -12,7 +12,7 @@ flow depends on.
 
 | Command | Behavior |
 |---|---|
-| `uvx flint` / `flint` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
+| `uvx --from flint-kit flint` / `flint` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
 | `flint new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
 | `flint new NAME --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
 | `flint new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.flint/last.json` for this run (§6). |
@@ -269,7 +269,7 @@ how a template decides which skills to include.
 ## 8. Example transcript (interactive, rest-api with a real stack)
 
 ```
-$ uvx flint
+$ uvx --from flint-kit flint
 ? What is your project named? my-api
 ? Which framework? FastAPI
 ? Which template? REST API

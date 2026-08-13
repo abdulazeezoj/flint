@@ -3,13 +3,13 @@
 ## Install
 
 ```bash
-uv tool install flint-cli   # persistent `flint` on PATH
+uv tool install flint-kit   # persistent `flint` on PATH
 ```
 
 Or run it without installing anything:
 
 ```bash
-uvx flint
+uvx --from flint-kit flint
 ```
 
 Flint needs [uv](https://docs.astral.sh/uv/) — every generated project is
@@ -19,7 +19,7 @@ optional "install dependencies now" step. If you don't have `uv` yet,
 
 ## Your first project, interactively
 
-Run `flint` (or `uvx flint`) with no arguments and answer the prompts:
+Run `flint` (or `uvx --from flint-kit flint`) with no arguments and answer the prompts:
 
 ```text
 $ flint
@@ -87,8 +87,9 @@ reading and writing that file.
 
 ## What you get, every time
 
-Regardless of which framework, template, or options you chose, every
-generated project includes:
+The prompts change with every run; what lands in the project doesn't.
+Regardless of framework, template, or options chosen, every generated
+project includes:
 
 - A `uv`-managed, `src/`-layout package with a passing `pytest` test
 - A `README.md` with the exact run/test commands for what was actually generated

@@ -11,8 +11,8 @@ it next — human or AI coding agent:
   Not a replacement for `AGENTS.md` — the complementary layer you reach for
   when you're actually touching that library, not before.
 
-This page covers the second one: what's in it, how a project ends up with
-exactly the skills it has, and the full catalog.
+Skills are the layer worth unpacking: what's actually inside one, how a
+project ends up with exactly the set it has, and the full catalog on offer.
 
 ## What's inside one skill
 
@@ -176,11 +176,11 @@ The gotchas folded into each skill's `references/gotchas.md` aren't
 speculative either — they're bugs flint's own templates hit while being
 built and verified, written down once so the next person (or agent)
 doesn't rediscover them the hard way. A few examples: task-discovery
-mistakes in the `taskiq`/`celery` skills, and the `create_all()`-vs-real-
-migrations bug — running both means Alembic permanently reports "No
-changes in schema detected" instead of capturing the real schema — folded
-into `alembic`, `flask-migrate`, `flask-sqlalchemy`, and `sqlalchemy`
-wherever it's relevant.
+mistakes baked into the `taskiq` and `celery` skills, and the
+`create_all()`-vs-real-migrations bug that shows up in `alembic`,
+`flask-migrate`, `flask-sqlalchemy`, and `sqlalchemy` alike — run both and
+Alembic permanently reports "No changes in schema detected" instead of
+capturing the real schema.
 
 ## Next
 

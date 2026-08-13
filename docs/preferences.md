@@ -1,9 +1,10 @@
 # Remembered Preferences
 
 Flint remembers what you picked last time and uses it as the new default —
-so a project you generate often (or a CI job you run repeatedly) tends to
-need fewer and fewer flags. This page covers the whole mechanism: what's
-saved, when, how it's used, and how to turn it off.
+so a project you generate often, or a CI job you run on repeat, needs fewer
+and fewer flags each time. The interesting part isn't the remembering; it's
+the forgetting — a stale value, a missing file, a corrupted one — none of it
+is allowed to interrupt a run.
 
 ## What gets remembered
 
@@ -57,9 +58,8 @@ interactive-only convenience.
 ## Precedence
 
 An explicit flag or `-o key=value` **always** wins over a remembered
-value — no exceptions, every time. Remembering only changes what happens
-when nothing else specifies a value; it never overrides something you
-actually typed.
+value — no exceptions. Remembering only changes what happens when nothing
+else specifies a value; it never overrides something you actually typed.
 
 ## Staleness — never an error
 

@@ -6,7 +6,7 @@ template and the same wizard wires up a real database, migrations, and a
 background worker too.
 
 ```bash
-uvx flint
+uvx --from flint-kit flint
 ```
 
 ```text
@@ -41,7 +41,9 @@ Then open http://127.0.0.1:8000
 
 ## Why Flint
 
-Every new FastAPI or Flask project starts with the same repetitive setup —
+Strike it and it throws a spark — that's the whole idea: one command,
+and a real project catches. Every new FastAPI or Flask project starts
+with the same repetitive setup —
 `pyproject.toml`, a `src/` layout, a first endpoint, a test, a `.gitignore`,
 a README nobody gets around to writing — and, past the toy stage, the same
 recurring decisions: which database, which ORM, whether to bother with
@@ -49,8 +51,8 @@ migrations yet, whether background work needs a queue. Flint answers the
 short list of decisions that actually matter and generates a project that's
 already wired for them, instead of a blank slate you have to wire yourself.
 
-- **Zero to running in under a minute.** `uvx flint` needs no install, no
-  config file, and produces a project you can `uv run` immediately.
+- **Zero to running in under a minute.** No install, no config file — run
+  `uvx --from flint-kit flint` and you have a project you can `uv run` immediately.
 - **Real head-start choices, not just a skeleton.** The `rest-api` template
   offers a database (SQLite/PostgreSQL), an ORM, Alembic migrations, a
   background worker (Taskiq/Celery), and Redis — pick what you need, skip
@@ -62,8 +64,8 @@ already wired for them, instead of a blank slate you have to wire yourself.
   generated layout philosophy — so switching between them isn't a
   relearn.
 - **Agent-ready by default.** Every generated project ships an `AGENTS.md`
-  plus a `.agents/skills/` catalog of deeper, library-specific reference
-  material for exactly the stack it uses — see [Agent Skills](agent-skills.md).
+  plus a `.agents/skills/` catalog scoped to exactly the stack it generated
+  — see [Agent Skills](agent-skills.md).
 
 ## Where to go next
 
@@ -87,12 +89,13 @@ already wired for them, instead of a blank slate you have to wire yourself.
 ## Install
 
 ```bash
-uv tool install flint-cli   # persistent `flint` on PATH
+uv tool install flint-kit   # persistent `flint` on PATH
 # or run it ephemerally, no install:
-uvx flint
+uvx --from flint-kit flint
 ```
 
-Flint is a CLI, not a library — installing `flint-cli` puts a `flint`
-command on your `PATH` (the PyPI distribution name differs from the command
-itself only because the plain `flint` name on PyPI belongs to an unrelated
-package).
+Flint is a CLI, not a library: installing it puts a `flint` command on
+your `PATH`. The PyPI distribution is named `flint-kit` rather than
+plain `flint` — the bare name was already taken by an unrelated
+package — but the command itself, everything in these docs, and every
+generated project's attribution all just say `flint`.

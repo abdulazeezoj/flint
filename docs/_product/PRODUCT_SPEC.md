@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.11.0: public docs site (MkDocs + GitHub Pages); internal product docs moved to `docs/_product/`)
+**Last updated:** 2026-08-13 (v0.14.0: project renamed to Flint, third time, split brand/PyPI name — see §11)
 
 ## 1. Vision
 
@@ -13,7 +13,7 @@ scaffolded with modern tooling, sane defaults, and zero boilerplate to
 hand-write.
 
 ```
-uvx flint
+uvx --from flint-kit flint
 ```
 
 ...and 60 seconds later you're looking at `Hello, World!` from a real,
@@ -69,7 +69,7 @@ template — without any axis blocking the others.
 
 ## 4. Goals — v0
 
-1. Zero-arg interactive wizard: `flint` (or `uvx flint`) prompts for the
+1. Zero-arg interactive wizard: `flint` (or `uvx --from flint-kit flint`) prompts for the
    handful of decisions that matter — including a template's own options
    — and generates a project.
 2. The wizard produces a runnable "Hello World" FastAPI app in under 60
@@ -179,9 +179,9 @@ hold for every project shape a generated app might end up living in
 ## 10. Distribution & Naming
 
 - CLI command: `flint`
-- PyPI distribution name: `flint-cli` (the plain `flint` name is used by
+- PyPI distribution name: `flint-kit` (the plain `flint` name is used by
   an unrelated existing package on PyPI); the installed console script is
-  still `flint`, so end-user usage (`uvx flint`, `flint new ...`) is
+  still `flint`, so end-user usage (`uvx --from flint-kit flint`, `flint new ...`) is
   unaffected by the distribution name.
 
 ## 11. Release Process
@@ -262,6 +262,55 @@ hold for every project shape a generated app might end up living in
   (`PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/`PRODUCT_ARCH.md`) moved to
   `docs/_product/` — internal, excluded from the built site, still the
   source of truth for development direction. See PRODUCT_ARCH.md §4.6.
+- `v0.12.0` — the project's name is finalized as **Conjure** (superseded
+  one release later, see `v0.13.0`), confirmed available and unclaimed
+  on PyPI before any release ever publishes under it; `pyproject.toml`'s
+  `[project] name` and the console script were both plainly `conjure`,
+  no `-cli` suffix. Two docs-site rendering bugs fixed: the homepage's
+  card grid rendered as raw markdown for want of two MkDocs extensions
+  (see PRODUCT_ARCH.md §4.6), and `mkdocs.yml`'s `repo_name` pointed at
+  the wrong slug — both found and verified fixed via a Playwright visual
+  pass across all 11 pages in both themes, not just `mkdocs build
+  --strict` (which caught neither). Also an editorial pass tightening
+  prose on every page.
+- `v0.13.0` — the project is renamed a second time, to **Spindle**
+  (superseded one release later, see `v0.14.0`). `conjure` passed a
+  plain PyPI-availability check but was rejected outright by PyPI's
+  actual project-creation flow: separate from "is it taken," PyPI blocks
+  new names within edit-distance 2 of an existing project to deter
+  typosquatting, and `conjure` is one character from `conjur` (CyberArk's
+  published secrets-management package) — a check that only surfaces at
+  real registration time, not from a plain availability lookup, so the
+  original candidate sweep never caught it. `spindle` passed PyPI's
+  actual registration flow cleanly at the time. Same scope as the
+  `flint`→`conjure` rename, plus the GitHub repository itself
+  (`abdulazeezoj/flint` → `abdulazeezoj/spindle`).
+- `v0.14.0` — the project is renamed a third time, back to **Flint**,
+  this time splitting the brand from the PyPI distribution name.
+  `spindle` turned out to already be a real, unrelated, published PyPI
+  package (a classical-magnetism library) — a plain collision, not a
+  squat-guard block, that a direct availability check would have caught
+  immediately (and should have, before committing to it). A ~300-candidate
+  search across a dozen semantic domains — craft/tool words, birds,
+  mythology, whimsical animals, food, invented syllables, 2–3 letter
+  abbreviations — found almost nothing both short and genuinely
+  unclaimed; PyPI's namespace for short, pronounceable English words is
+  overwhelmingly pre-claimed. Rather than continue searching for an
+  available bare word, this adopts the pattern real projects use in
+  exactly this situation — e.g. GitHub's `spec-kit` ships on PyPI as
+  `specify-cli` while the command is `specify`. Brand and CLI command
+  are `flint` (reverting `v0.13.0`'s `spindle`→`flint` rename: package,
+  command, `~/.spindle/last.json` → `~/.flint/last.json`,
+  generated-project attribution, all docs); the PyPI distribution name
+  is `flint-kit`, since plain `flint` and `flint-cli` are both real,
+  unrelated, already-published packages. `uvx flint` alone no longer
+  resolves correctly since distribution and command names differ — the
+  ephemeral-run form is `uvx --from flint-kit flint` (`uv tool install
+  flint-kit` needs no such adjustment). The GitHub repository is also
+  renamed back, `abdulazeezoj/spindle` → `abdulazeezoj/flint` — closing
+  out the naming saga with brand, command, and repository all aligned
+  again, and only the PyPI distribution name carrying the `-kit` suffix.
+  See PRODUCT_ARCH.md §2.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

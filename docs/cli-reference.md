@@ -23,10 +23,10 @@ reference to flip back to.
 flint new [NAME] [OPTIONS]
 ```
 
-`NAME` is a free-text project name, e.g. `my-api`. It's turned into a
-directory slug and an importable Python package name — see
-[Name validation](#name-validation) below. If omitted, you're prompted for
-it interactively, or it falls back to `my-app` in non-interactive mode.
+`NAME` is a free-text project name, e.g. `my-api` — Flint turns it into
+a directory slug and an importable Python package name (see
+[Name validation](#name-validation) below). Omit it and you're prompted
+interactively, or it falls back to `my-app` in non-interactive mode.
 
 ### Flags
 
@@ -54,17 +54,17 @@ nothing is asked at all.
 
 ### Non-interactive mode
 
-Non-interactive mode is triggered by either:
+Two things trigger non-interactive mode:
 
 - passing `--yes` / `-y`, or
 - Flint detecting that stdin isn't a TTY (e.g. running in CI, or piped
   input).
 
-In that mode, every prompt resolves without blocking on input: use the
-flag/`-o` value if one was given, else the remembered value if one exists
-and is still valid, else the template's own documented default. Framework
-defaults to the first enabled framework; template defaults to the first
-enabled template within it.
+Every prompt still resolves in that mode — it just never blocks on input.
+Flint works down a fallback chain: the flag or `-o` value if you gave
+one, the remembered value if it exists and is still valid, otherwise the
+template's own documented default. Framework falls back to the first
+enabled framework; template, to the first enabled one within it.
 
 ### Name validation
 
@@ -76,8 +76,8 @@ Your project name goes through two independent transforms:
   (a valid Python identifier), prefixed with `_` if it would otherwise
   start with a digit (e.g. `my-api` → `my_api`).
 
-A name is rejected — with a specific reason, never silently mutated or a
-stack trace — if it:
+Flint rejects a name outright — with a specific reason, never a silent
+mutation or a stack trace — if it:
 
 - normalizes to an empty string (no letters or numbers at all),
 - can't form a valid Python identifier,
@@ -123,7 +123,7 @@ flint new my-api --framework fastapi --template hello-world \
   -o config=true --yes
 ```
 
-Each value is validated against the chosen template's own declared
+Flint validates each value against the chosen template's own declared
 options:
 
 - **Unknown key** — `--option key=value` where `key` isn't one this
@@ -138,12 +138,12 @@ options:
 - **Missing `=`** — `--option database` with no value: exit 1, `--option
   'database' must be in key=value form.`
 
-Some options depend on an earlier one and are silently resolved to a
-documented value — never asked, never left unset — when their dependency
-isn't satisfied. For example, `rest-api`'s `orm` option is skipped
-entirely (and resolves to its documented value) if `database=none`. This
-applies whether the dependency was set via `-o`, a remembered value, or a
-prompt answer.
+Some options depend on an earlier one, and when that dependency isn't
+satisfied, Flint resolves them silently to a documented value — never
+asked, never left unset. For example, `rest-api`'s `orm` option is
+skipped entirely (and resolves to its documented value) if
+`database=none`. That holds whether the dependency was set via `-o`, a
+remembered value, or a prompt answer.
 
 See [Templates](project-templates/index.md) for the exact option keys,
 types, and choices each framework/template pair declares.
@@ -223,7 +223,7 @@ every resolved option (plus `--docker`/`--git`/`--install`) to
 `~/.flint/last.json`, and uses them as the new default next time — both
 for what the wizard preselects and what a flagless `--yes` run falls back
 to. An explicit flag or `-o` always overrides a remembered value, and
-stale/invalid remembered values are silently ignored. Pass
+Flint quietly ignores anything stale or invalid. Pass
 `--remember`/`--no-remember` to control whether a given run reads or
 writes this file at all (default: on). See
 [Remembered Preferences](preferences.md) for the full mechanism.

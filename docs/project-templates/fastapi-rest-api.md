@@ -260,9 +260,9 @@ three; the full example above pulls in `fastapi`, `pydantic-settings`,
 
 ## Docker
 
-Pass `--docker` and a `Dockerfile` (plus a matching `.dockerignore`) is
-added to the project root, alongside a `Docker` section in the generated
-`README.md` with the exact build/run commands:
+Pass `--docker` and Flint adds a `Dockerfile` (plus a matching
+`.dockerignore`) to the project root, alongside a `Docker` section in the
+generated `README.md` with the exact build/run commands:
 
 ```bash
 docker build -t my-api .

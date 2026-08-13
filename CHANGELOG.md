@@ -7,12 +7,93 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.14.0 — 2026-08-13
+
+### Changed
+
+- **Project renamed a third time — back to `flint`, this time with a
+  split brand/distribution name.** `spindle` (see `v0.13.0`) turned out
+  to already be a published, unrelated PyPI package (a classical-magnetism
+  library) — a real collision the plain-availability check couldn't have
+  caught any earlier, since it's a straightforward already-taken name,
+  not a similarity/squat-guard block. A ~300-candidate sweep across a
+  dozen semantic domains (craft/tool words, birds, mythology, whimsical
+  animals, food, invented syllables, 2–3 letter abbreviations) turned up
+  essentially nothing both short and clean: PyPI's namespace for
+  short, pronounceable English words is almost entirely pre-claimed.
+  Rather than keep hunting for an available bare word, this settles the
+  question with the pattern real projects actually use when the bare
+  name isn't available — e.g. GitHub's own `spec-kit` ships on PyPI as
+  `specify-cli` while the command is `specify`; the web framework Sillo
+  ships as `sillo-framework` while the brand and command are `sillo`.
+  Same here: **brand and command are `flint`** (reverting the
+  `spindle`→`flint` half of `v0.13.0`'s rename — package, CLI,
+  `~/.spindle/last.json` → `~/.flint/last.json`, generated-project
+  attribution, all docs), while **the PyPI distribution name is
+  `flint-kit`**, since plain `flint` is a real, unrelated, already-
+  published package (a Fortran analysis tool) and `flint-cli` also
+  turned out to be taken (an unrelated data-connector CLI). Because the
+  distribution and command names now differ, `uvx flint` alone won't
+  resolve correctly — the ephemeral-run form is `uvx --from flint-kit
+  flint`, same shape as `uvx --from httpie http`. `uv tool install
+  flint-kit` needs no such adjustment; it installs the `flint` console
+  script under its own name regardless of the distribution name. The
+  GitHub repository is also renamed back, `abdulazeezoj/spindle` →
+  `abdulazeezoj/flint` — the third rename of that slug this project has
+  been through in one day.
+
+## v0.13.0 — 2026-08-13
+
+### Changed
+
+- **Project renamed again, to `spindle`.** `conjure` cleared a plain
+  availability check but PyPI's project-creation flow rejected it
+  outright — separate from "is it taken," PyPI blocks new names within
+  edit-distance 2 of an existing project to deter typosquatting, and
+  `conjure` is one character from `conjur` (CyberArk's published
+  secrets-management package). That block only surfaces when actually
+  registering a name (via the trusted-publisher form), not from a plain
+  `pypi.org/pypi/<name>/json` check, so the original ~80-candidate sweep
+  never caught it. `spindle` passed PyPI's real registration flow
+  cleanly and has no similar near-miss. Same scope as the `flint`→
+  `conjure` rename: package, CLI, `~/.conjure/last.json` →
+  `~/.spindle/last.json`, generated-project attribution, all docs, and
+  this time the GitHub repository itself too
+  (`abdulazeezoj/flint` → `abdulazeezoj/spindle`). (Superseded one
+  release later — see `v0.14.0`: `spindle` turned out to already be a
+  real, unrelated published package, a plain collision the earlier
+  check should have — and, in hindsight, easily could have — caught.)
+
+## v0.12.0 — 2026-08-13
+
+### Changed
+
+- **Project name finalized as `conjure`.** Confirmed available and
+  unclaimed on PyPI, pronounceable, and free of collisions with
+  established tools — locked in before any release ever publishes under
+  it. The PyPI distribution name and the `conjure` console script are
+  the same string; no `-cli` suffix, no alias to remember. (Superseded
+  one release later — see v0.13.0.)
+- **Two docs-site rendering bugs, fixed and verified visually.** The
+  homepage's "Where to go next" card grid was rendering as raw,
+  unprocessed markdown — `mkdocs.yml` was missing the `attr_list` and
+  `md_in_html` extensions Material's grid-cards recipe requires (see
+  PRODUCT_ARCH.md §4.6). Separately, `mkdocs.yml`'s `repo_name` pointed
+  at the wrong slug. Neither broke `mkdocs build --strict`, which checks
+  structure, not rendered output — both were only caught by an actual
+  Playwright visual pass across all 11 pages in both light and dark
+  themes, which is now how this site gets QA'd, not just build-checked.
+- **Editorial pass across all 11 docs pages** — tightened flat/listy
+  prose, fixed passive voice, and sharpened section openings for rhythm
+  and directness, without changing any code block, table, link, or
+  heading.
+
 ## v0.11.0 — 2026-08-13
 
 ### Added
 
 - **A public documentation site** at
-  [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)
+  [abdulazeezoj.github.io/spindle](https://abdulazeezoj.github.io/spindle/)
   (MkDocs, Material theme, deployed via `.github/workflows/docs.yml`
   on every push to `main` that touches `docs/**`): a Getting Started
   guide, a full CLI reference, one page per template (options,

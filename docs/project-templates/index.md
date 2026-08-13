@@ -31,8 +31,9 @@ without any one axis blocking the others.
 You don't need to know this to use Flint, but it explains why the pages
 below look the way they do. Each template directory bundles:
 
-- **`files/`** — always rendered. The base project: entrypoint, tests,
-  `pyproject.toml`, `README.md`, `AGENTS.md`, `.gitignore`.
+- **`files/`** — always rendered, no conditions attached: the base project
+  every template starts from — entrypoint, tests, `pyproject.toml`,
+  `README.md`, `AGENTS.md`, `.gitignore`.
 - **Extra layers** — directories rendered *in addition to* `files/`, only
   when a condition matches (e.g. a `docker` layer that's added only when
   you pass `--docker`, or a `db-sqlmodel` layer added only when you pick

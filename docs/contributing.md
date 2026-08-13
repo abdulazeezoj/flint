@@ -10,8 +10,8 @@ Flint's own code is intentionally thin: `cli.py` parses flags,
 onto disk. Almost everything a contributor does day-to-day —
 adding a template, adding a skill, tweaking generated output — is a
 **content change under `src/flint/templates/` or `src/flint/skills/`**,
-not a code change. Keep that distinction in mind; it's what makes most
-contributions low-risk.
+not a code change — the distinction that keeps most contributions
+low-risk.
 
 ## Local setup
 
@@ -47,8 +47,9 @@ uv run flint --help
 
 ## Working on the docs site
 
-The docs live in `docs/` and build with MkDocs Material. Install the
-docs dependency group separately from the dev one:
+The docs live in `docs/` and build with MkDocs Material, using a
+dependency group kept separate from the dev one — install it before
+you serve or build the site:
 
 ```bash
 uv sync --group docs
@@ -214,8 +215,8 @@ A **template**-level `template.json` (sits beside `files/`):
   than sprinkling `{% if %}` through shared code.
 - **`skills`** — see [Adding a skill](#adding-a-skill) below.
 
-Both **file/directory names** and **file contents** inside any layer
-are run through Jinja2:
+Jinja2 processes both **file/directory names** and **file contents**
+inside any layer:
 
 - A path segment named literally `{{ "{{package_name}}" }}` becomes e.g.
   `my_api`.
@@ -254,7 +255,7 @@ in the codebase needs to change — the CLI and generator discover new
 frameworks/templates by reading `template.json`, not by any registry.
 Add real coverage to `tests/test_generator.py` (or a new
 `tests/test_<framework>_<template>.py`, following the pattern of
-`test_flask_hello_world.py`) rendering representative option
+`test_flask_hello_world.py`) that renders representative option
 combinations.
 
 ## Adding a skill
@@ -280,8 +281,8 @@ reason a template's own `template.json` sits beside `files/` — the
 renderer walks everything under the directory it's given, so metadata
 that shouldn't ship in the generated project has to live outside it.
 
-`content/` is rendered through the exact same Jinja2 machinery template
-layers use, just pointed at `.agents/skills/<id>/` in the generated
+The same Jinja2 machinery that renders template layers renders
+`content/` too, just pointed at `.agents/skills/<id>/` in the generated
 project instead of the project root — so a skill's code examples get
 real `{{ package_name }}` substitution and can branch on resolved
 options with `{% if %}` (the shared `sqlalchemy` skill, for instance,
@@ -309,6 +310,10 @@ See [Agent Skills](agent-skills.md) for what this looks like from the
 generated-project side.
 
 ## Testing philosophy
+
+A green `pytest` run and a generated project that actually boots are
+two different claims, and Flint's test suite is built in layers
+precisely because no single layer can make both of them at once.
 
 - **All-or-nothing generation.** `generator.render()` writes a layer at
   a time; if anything raises partway through, everything written so far
@@ -375,6 +380,10 @@ jobs:
 
 ## Releasing
 
+Cutting a release is three manual steps ending in a `git push`;
+everything after that — testing, verifying, publishing — is `cd.yml`'s
+job, not yours.
+
 1. Bump `__version__` in `src/flint/__init__.py` **and** `version` in
    `pyproject.toml` — these are kept in sync manually, there's no
    version-sync tooling yet.
@@ -394,7 +403,8 @@ release.
 
 ## Versioning scheme
 
-Flint uses `v{release}.{feature}.{fixes}`:
+The three numbers in `v{release}.{feature}.{fixes}` each answer a
+different question about what changed:
 
 - **`release`** — the major epoch. Starts at `0` (pre-1.0, still finding
   product shape); bumps when the product's scope or promise materially

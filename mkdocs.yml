@@ -58,6 +58,8 @@ theme:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.tabbed:
@@ -74,4 +76,4 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/abdulazeezoj/flint
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/flint-cli/
+      link: https://pypi.org/project/flint-kit/
