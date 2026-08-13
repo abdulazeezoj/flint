@@ -54,6 +54,7 @@ flint new my-api \
   --framework fastapi --template rest-api \
   -o database=sqlite -o orm=sqlmodel \
   --docker --git --install --yes            # fully non-interactive, for scripts/CI
+flint list-templates                       # what's available, without generating anything
 flint --version
 flint --help
 ```
@@ -62,7 +63,9 @@ Every prompt has a matching flag: `--framework`, `--template`,
 `--option`/`-o key=value` (repeatable — one per template-specific
 choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
 --no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
-(accept all defaults), `--force` (generate into a non-empty dir).
+(accept all defaults), `--force` (generate into a non-empty dir — in
+interactive mode without `--force`, Flint asks "Overwrite?" instead of
+failing outright; non-interactive runs still require the flag).
 
 Flint remembers your last framework/template and per-template choices in
 `~/.flint/last.json`, and uses them as the new default the next time you

@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 import questionary
 import typer
 from typer.testing import CliRunner
@@ -177,6 +178,70 @@ def test_run_new_interactive_full_flow(tmp_path: Path, monkeypatch, capsys):
     assert "Using uv to manage dependencies." in out
     assert "Success!" in out
     assert (tmp_path / "my-api" / "Dockerfile").is_file()
+
+
+def test_run_new_interactive_force_overwrite_confirmed_proceeds(
+    tmp_path: Path, monkeypatch, capsys
+):
+    # Interactive + a non-empty target dir + no --force: the very first
+    # confirm() prompt encountered (before framework/template/etc.) is
+    # the overwrite question (see cli._run_new) — answering yes lets
+    # generation proceed exactly as --force would have.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "stdin", type("FakeStdin", (), {"isatty": lambda self: True})())
+    (tmp_path / "my-api").mkdir()
+    (tmp_path / "my-api" / "existing.txt").write_text("hi")
+
+    monkeypatch.setattr(
+        questionary, "text", lambda *a, **k: type("Q", (), {"ask": lambda self: "my-api"})()
+    )
+    monkeypatch.setattr(
+        questionary,
+        "select",
+        lambda *a, **k: type(
+            "Q", (), {"ask": lambda self: next(c.value for c in k["choices"] if not c.disabled)}
+        )(),
+    )
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: True})()
+    )
+    monkeypatch.setattr(postgen, "git_init", lambda target_dir: True)
+    monkeypatch.setattr(postgen, "install_dependencies", lambda target_dir: True)
+
+    cli._run_new(
+        name=None, framework=None, template=None, option=[], docker=None, git=None,
+        install=None, yes=False, force=False, remember=True,
+    )
+
+    out = capsys.readouterr().out
+    assert "Success!" in out
+    assert (tmp_path / "my-api" / "pyproject.toml").is_file()
+    assert (tmp_path / "my-api" / "existing.txt").is_file()  # untouched, not wiped
+
+
+def test_run_new_interactive_force_overwrite_declined_aborts(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "stdin", type("FakeStdin", (), {"isatty": lambda self: True})())
+    (tmp_path / "my-api").mkdir()
+    (tmp_path / "my-api" / "existing.txt").write_text("hi")
+
+    monkeypatch.setattr(
+        questionary, "text", lambda *a, **k: type("Q", (), {"ask": lambda self: "my-api"})()
+    )
+    # The overwrite question is the first confirm() the interactive flow
+    # reaches, before framework/template selection — declining it must
+    # abort before any of those prompts ever fire.
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: False})()
+    )
+
+    with pytest.raises(typer.Exit) as exc_info:
+        cli._run_new(
+            name=None, framework=None, template=None, option=[], docker=None, git=None,
+            install=None, yes=False, force=False, remember=True,
+        )
+    assert exc_info.value.exit_code == 1
+    assert not (tmp_path / "my-api" / "pyproject.toml").exists()
 
 
 def test_new_reraises_typer_exit_unchanged(tmp_path: Path, monkeypatch):
@@ -530,3 +595,31 @@ def test_new_prints_options_summary_line(tmp_path: Path, monkeypatch):
     )
     assert result.exit_code == 0, result.stdout
     assert "Options: config=False" in result.stdout
+
+
+def test_list_templates_cmd_lists_real_frameworks_and_templates():
+    result = runner.invoke(app, ["list-templates"])
+    assert result.exit_code == 0, result.stdout
+    assert "FastAPI" in result.stdout
+    assert "Flask" in result.stdout
+    assert "Hello World" in result.stdout
+    assert "REST API" in result.stdout
+    assert "flint new my-api" in result.stdout
+
+
+def test_list_templates_cmd_marks_disabled_entries(tmp_path: Path, monkeypatch):
+    templates_dir = tmp_path / "templates"
+    (templates_dir / "widget").mkdir(parents=True)
+    (templates_dir / "widget" / "template.json").write_text(
+        '{"id": "widget", "label": "Widget", "description": "d", "enabled": false}'
+    )
+    (templates_dir / "widget" / "basic").mkdir()
+    (templates_dir / "widget" / "basic" / "template.json").write_text(
+        '{"id": "basic", "label": "Basic", "description": "d", "enabled": false}'
+    )
+    monkeypatch.setattr(generator, "TEMPLATES_DIR", templates_dir)
+
+    result = runner.invoke(app, ["list-templates"])
+    assert result.exit_code == 0, result.stdout
+    assert "Widget (coming soon)" in result.stdout
+    assert "Basic (coming soon)" in result.stdout

@@ -7,6 +7,36 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.10.0 — 2026-08-13
+
+### Added
+
+- **Interactive `--force` overwrite confirmation.** Running into a
+  non-empty target directory without `--force` used to hard-error
+  unconditionally. Now, in interactive mode, Flint asks "Directory 'x'
+  already exists and is not empty. Overwrite?" instead of failing
+  outright — confirming proceeds exactly as `--force` would have,
+  declining aborts cleanly with no files written. Non-interactive runs
+  (`--yes`/piped stdin/CI) are unchanged: no prompt, same hard error
+  unless `--force` was already passed.
+- **`flint list-templates`**: a new introspection command listing every
+  framework/template pair — label, description, whether it supports
+  `--docker` — including disabled/"coming soon" entries, so the roadmap
+  stays visible outside the wizard too. Generates nothing.
+
+### Changed
+
+- **Package manager and template distribution are formally closed, not
+  left open.** Both were long-standing "Open Questions" in
+  PRODUCT_SPEC.md §12 with no code changes attached. Flint stays
+  `uv`-only (every template's `pyproject.toml`/README/`AGENTS.md`/skill
+  already assumes it end to end — supporting pip/poetry would mean a
+  second rendering of every template, not a small addition) and
+  bundled-templates-only (no remote/git-based sources — simplest model,
+  no network dependency, no supply-chain exposure from executing a
+  fetched Jinja template). Neither is a capability change; this just
+  documents that they were decided, not forgotten.
+
 ## v0.9.0 — 2026-08-13
 
 ### Added

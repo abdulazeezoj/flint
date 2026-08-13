@@ -154,6 +154,26 @@ def prompt_install(
     return answer
 
 
+def prompt_force_overwrite(slug: str, force: bool, interactive: bool) -> bool:
+    """Whether generation should proceed into a non-empty target directory.
+
+    Only called once the caller has already confirmed the directory is
+    non-empty. Already `--force`d or non-interactive: returned as-is,
+    no prompt — a non-interactive run can't prompt, so the caller hard-
+    errors instead (PRODUCT_FLOW.md §5). Interactive and not yet forced:
+    ask before overwriting rather than failing outright.
+    """
+    if force or not interactive:
+        return force
+    answer = questionary.confirm(
+        f"Directory '{slug}' already exists and is not empty. Overwrite?",
+        default=False,
+    ).ask()
+    if answer is None:
+        raise FlintUserError("Cancelled.")
+    return answer
+
+
 def parse_option_flags(raw_options: list[str]) -> dict[str, str]:
     """Parse repeatable ``--option key=value`` flags into a dict."""
     parsed: dict[str, str] = {}

@@ -621,7 +621,7 @@ remembering).
 | Template option resolution | `prompts.prompt_template_options(template, provided, interactive, last)` — walks `template.options` in order, honoring an explicit `--option`/`-o key=value` override first (validated against the option's `type`/`choices`), else `when`-gating (§4), else a remembered value (§5) if still valid, else prompting or defaulting. `cli.py` parses the repeatable `--option` flag into a `dict[str, str]` via `prompts.parse_option_flags` and rejects unknown keys before resolution. |
 | Remembered preferences | `prefs.py` (§5) — `cli.py` loads once per run and passes slices into each `prompts.*` call; records once, after a successful render. |
 | Name validation | `naming.py` — pure functions, no I/O, exhaustively unit tested |
-| Directory existence check | `generator.py` (single source of truth, both interactive and non-interactive paths call it) |
+| Directory existence check | `cli.py` checks first — non-empty + no `--force` is a hard error in non-interactive mode, or (since v0.10) an interactive confirmation prompt (`prompts.prompt_force_overwrite`) that promotes `force` to `True` on "yes"; `generator.render()` re-checks the same condition regardless of caller, as a final safety net |
 | File generation | `generator.py` |
 | git init / uv sync | `postgen.py` — each step wrapped so a missing `git`/`uv` binary warns and continues rather than raising |
 | Summary / next steps | `postgen.py` (`print_summary`), using `rich`; prints a leading `Options: k=v, ...` line when the template declared any |
@@ -636,6 +636,17 @@ if docker was requested but `chosen_template.supports_docker` is false —
 downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
 matches what was actually generated.
+
+`flint list-templates` (since v0.10) is a separate, standalone `@app.
+command`, deliberately outside `_run_new`'s flow entirely — it's pure
+introspection (`generator.list_frameworks()` × `generator.
+list_templates()`, rendered as a `rich.table.Table`), generates
+nothing, touches no filesystem beyond reading bundled `template.json`
+files, and needs none of `_run_new`'s state (`Answers`, `prefs`,
+`postgen`). Disabled frameworks/templates are listed too, annotated
+"(coming soon)" — same convention `prompts._select_enabled` uses in the
+wizard — so the command stays a complete, accurate picture of the
+roadmap rather than just what's usable today.
 
 ## 7. Testing strategy
 
@@ -845,12 +856,19 @@ surfaced by actually running the generated tooling:
 
 ## 9. Explicitly deferred (tracked, not forgotten)
 
-- Remote/pluggable template sources (would live behind the same
-  `generator.render(framework_id, template_id, ...)` interface — the ids
-  could become a path/URL instead of a bundled-package lookup without
-  changing callers).
-- Package-manager choice (pip/poetry) — `postgen.py`'s install step is
-  already isolated behind one function, swappable per an `Answers.pm`
-  field if that's ever added.
-- `--force` overwrite confirmation UX polish, `flint list-templates`
-  introspection command.
+Nothing is currently deferred — as of v0.10.0 every item previously
+tracked here is resolved (see PRODUCT_SPEC.md §12 and CHANGELOG.md):
+`--force` overwrite confirmation and `flint list-templates` shipped;
+package-manager choice and template distribution were closed as
+deliberate design decisions (uv-only, bundled-only) rather than left
+open. This section exists so a *new* non-goal has a documented home —
+not every future idea needs one; only things worth explicitly saying
+"not now, but not forgotten either."
+
+Package-manager choice, if ever revisited: `postgen.py`'s install step
+is already isolated behind one function, swappable per an `Answers.pm`
+field without touching the rest of the pipeline. Remote/pluggable
+template sources, if ever revisited: would live behind the same
+`generator.render(framework_id, template_id, ...)` interface — the ids
+could become a path/URL instead of a bundled-package lookup without
+changing callers. Neither is planned work.

@@ -1,7 +1,7 @@
 # Flint — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
+**Last updated:** 2026-08-13 (v0.10: interactive `--force` confirmation, `flint list-templates`)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
 runs Flint, in both interactive and non-interactive modes. See
@@ -16,6 +16,7 @@ flow depends on.
 | `flint new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
 | `flint new NAME --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
 | `flint new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.flint/last.json` for this run (§6). |
+| `flint list-templates` | Prints a table of every framework/template pair (label, description, `--docker` support), including disabled/"coming soon" entries. Generates nothing — pure introspection. |
 | `flint --version` | Prints version, exits. |
 | `flint --help` / `flint new --help` | Prints usage, exits. |
 
@@ -44,10 +45,15 @@ falls back to.
      reason, never a stack trace.
 
 2. Target directory check
-   - Derived as ./<slug> relative to cwd. Not an interactive prompt.
-   - If it exists and is non-empty → hard stop with a clear error
-     ("Directory 'my-api' already exists and is not empty.") and a
-     pointer to --force. No silent overwrite, ever.
+   - Derived as ./<slug> relative to cwd.
+   - If it exists and is non-empty and --force wasn't passed:
+     ? Directory 'my-api' already exists and is not empty. Overwrite? › (y/N)
+     Interactive only — confirming proceeds exactly as --force would;
+     declining hard-stops with a clear error ("Directory 'my-api'
+     already exists and is not empty. Use --force to generate into it
+     anyway.") and no files written. Non-interactive (--yes/piped
+     stdin): no prompt, straight to the same hard error unless --force
+     was already passed. No silent overwrite, ever.
 
 3. Framework
    ? Which framework? › (Use arrow keys)
@@ -184,8 +190,9 @@ TTY (e.g. running in CI). In that mode:
 
 | Situation | Behavior |
 |---|---|
-| Target directory exists, non-empty, no `--force` | Exit 1, no files written. |
-| Target directory exists, non-empty, `--force` | Overwrite, but only after an explicit interactive confirmation (or the flag itself counts as confirmation in `--yes`/non-interactive mode). |
+| Target directory exists, non-empty, no `--force`, non-interactive (`--yes`/piped stdin) | Exit 1, no files written — can't prompt without a TTY. |
+| Target directory exists, non-empty, no `--force`, interactive | Prompts "Overwrite? (y/N)" before proceeding. Declining exits 1, no files written; confirming proceeds exactly as `--force` would have. |
+| Target directory exists, non-empty, `--force` | Overwrites immediately, no prompt — the flag itself is the confirmation. |
 | Invalid project name | Re-prompt (interactive) or exit 1 with reason (non-interactive). |
 | Unknown/disabled `--framework` or `--template` | Exit 1 with reason (non-interactive); interactive select lists disable the entry so it can't be chosen. |
 | `--option key=value` with an unknown key for the chosen template | Exit 1 listing the unknown key(s). |

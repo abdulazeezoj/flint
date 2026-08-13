@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.9.0: `.agents/skills/` catalog — deeper, library-specific agent reference material)
+**Last updated:** 2026-08-13 (v0.10.0: interactive `--force` confirmation, `flint list-templates`; package manager and template distribution closed as uv-only/bundled-only)
 
 ## 1. Vision
 
@@ -153,7 +153,7 @@ hold for every project shape a generated app might end up living in
 | ID | Requirement |
 |----|-------------|
 | FR1 | Interactive wizard order: project name → target directory check → framework → template within that framework → the chosen template's own options, in the order it declares them → add a Dockerfile? (default no) → initialize git repo? (default yes) → install dependencies now? (default yes) |
-| FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force` |
+| FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force`. In interactive mode, offer a confirmation prompt to overwrite instead of failing outright — declining aborts with no changes made; non-interactive runs are unaffected (`--force` or hard error, no prompt) |
 | FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
 | FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run` — whichever apply) |
 | FR5 | `flint --version` prints the current version |
@@ -163,6 +163,7 @@ hold for every project shape a generated app might end up living in
 | FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
 | FR11 | After a successful generation, Flint remembers the chosen framework, the chosen template per framework, and — per `<framework>/<template>` — the resolved options plus docker/git/install, in `~/.flint/last.json`. The next run uses these as the new default (both for what the wizard preselects and what a flagless non-interactive run falls back to); an explicit flag or `--option` always overrides a remembered value, and a stale remembered value (no longer valid for the current template) is silently ignored in favor of the template's own default. `--remember/--no-remember` (default on) opts a single run out of reading and writing this file |
+| FR12 | `flint list-templates` prints every framework/template pair (label, description, whether it supports `--docker`), including disabled/"coming soon" entries — an introspection command, generates nothing |
 
 ## 9. Non-Functional Requirements
 
@@ -244,18 +245,32 @@ hold for every project shape a generated app might end up living in
   `template.json`, same `when`-gating as layers) — plus a generated
   `.agents/skills/README.md` index and an `AGENTS.md` section pointing
   at whichever skills apply. See PRODUCT_ARCH.md §4.5.
+- `v0.10.0` — closes out the remaining open items from §12: an
+  interactive confirmation prompt before overwriting a non-empty target
+  directory (FR2), a new `flint list-templates` introspection command
+  (FR12), and the package-manager/template-distribution open questions
+  are formally closed (uv-only, bundled-only) rather than left open.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
 ## 12. Open Questions / Risks
 
-- **Package manager choice**: v0 hardcodes `uv` rather than letting users
-  pick pip/poetry, to keep scope small. Revisit post-v0 if requested.
-- **Template distribution**: templates ship bundled inside the `flint`
-  package for v0 (simplest, no network dependency). Externalizing to a
-  registry/remote-template model is a plausible v0.x/v1 direction, see
-  `PRODUCT_ARCH.md` for how the template system is kept decoupled to
-  allow this later.
+- **Package manager choice**: closed as of v0.10 — staying `uv`-only by
+  design, not left open. `uv` is fast, single-tool, and every template
+  already assumes it end to end (`pyproject.toml`, `uv.lock`, `uv run`,
+  `uv sync`); every generated file, README instruction, and `AGENTS.md`/
+  skill snippet across both frameworks is written in terms of it.
+  Supporting pip/poetry would mean a second (or third) rendering of
+  every template's dependency file and install/run instructions, not a
+  small addition. Revisit only if there's real demand, not speculatively.
+- **Template distribution**: closed as of v0.10 — staying bundled-only
+  by design. Templates ship inside the `flint` package itself: simplest
+  possible model, no network dependency to generate a project, and no
+  supply-chain exposure from executing a fetched, unreviewed Jinja
+  template against the local filesystem. `PRODUCT_ARCH.md` documents
+  how the template system stays decoupled enough that a remote/pluggable
+  source could be added later without changing `generator.render()`'s
+  interface — but it's not planned work, just an option kept open.
 - **`AGENTS.md` vs. `.agents/skills/<framework>`**: resolved in v0.9 —
   both ship, as complementary layers rather than a choice between them.
   `AGENTS.md` (since v0.2) stays the always-on, lightweight layer (run/

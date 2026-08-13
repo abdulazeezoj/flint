@@ -14,6 +14,7 @@ from typing import Annotated, Optional
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from flint import __version__
 from flint import generator, postgen, prefs, prompts
@@ -125,6 +126,39 @@ def new(
     )
 
 
+@app.command("list-templates")
+def list_templates_cmd() -> None:
+    """List available framework/template combinations."""
+    table = Table()
+    table.add_column("Framework")
+    table.add_column("Template")
+    table.add_column("Description")
+    table.add_column("Docker", justify="center")
+
+    for framework in generator.list_frameworks():
+        framework_label = (
+            framework.label if framework.enabled else f"{framework.label} (coming soon)"
+        )
+        for template in generator.list_templates(framework.id):
+            template_label = (
+                template.label if template.enabled else f"{template.label} (coming soon)"
+            )
+            table.add_row(
+                framework_label,
+                template_label,
+                template.description,
+                "✓" if template.supports_docker else "—",
+            )
+
+    console.print(table)
+    console.print(
+        "\nPass a pair with e.g. [bold]flint new my-api --framework fastapi "
+        "--template rest-api[/bold]. Templates with their own choices "
+        "(database, ORM, ...) take -o key=value — see the wizard or each "
+        "template's README for available keys."
+    )
+
+
 def _run_new(
     *,
     name: Optional[str],
@@ -145,11 +179,13 @@ def _run_new(
         project_name, slug, package_name = prompts.prompt_project_name(name, interactive)
 
         target_dir = Path.cwd() / slug
-        if target_dir.exists() and any(target_dir.iterdir()) and not force:
-            raise FlintUserError(
-                f"Directory '{slug}' already exists and is not empty. "
-                "Use --force to generate into it anyway."
-            )
+        if target_dir.exists() and any(target_dir.iterdir()):
+            force = prompts.prompt_force_overwrite(slug, force, interactive)
+            if not force:
+                raise FlintUserError(
+                    f"Directory '{slug}' already exists and is not empty. "
+                    "Use --force to generate into it anyway."
+                )
 
         frameworks = generator.list_frameworks()
         framework_id = prompts.prompt_framework(

@@ -247,6 +247,48 @@ def test_prompt_git_init_cancelled_raises(monkeypatch):
         prompts.prompt_git_init(None, interactive=True)
 
 
+def test_prompt_force_overwrite_already_forced_skips_prompt(monkeypatch):
+    monkeypatch.setattr(
+        questionary,
+        "confirm",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not prompt")),
+    )
+    assert prompts.prompt_force_overwrite("my-api", force=True, interactive=True) is True
+
+
+def test_prompt_force_overwrite_non_interactive_returns_force_unprompted():
+    assert prompts.prompt_force_overwrite("my-api", force=False, interactive=False) is False
+
+
+def test_prompt_force_overwrite_interactive_confirmed(monkeypatch):
+    seen = {}
+
+    def fake_confirm(question, default):
+        seen["question"] = question
+        seen["default"] = default
+        return type("Q", (), {"ask": lambda self: True})()
+
+    monkeypatch.setattr(questionary, "confirm", fake_confirm)
+    assert prompts.prompt_force_overwrite("my-api", force=False, interactive=True) is True
+    assert "my-api" in seen["question"]
+    assert seen["default"] is False
+
+
+def test_prompt_force_overwrite_interactive_declined(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: False})()
+    )
+    assert prompts.prompt_force_overwrite("my-api", force=False, interactive=True) is False
+
+
+def test_prompt_force_overwrite_cancelled_raises(monkeypatch):
+    monkeypatch.setattr(
+        questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
+    )
+    with pytest.raises(FlintUserError):
+        prompts.prompt_force_overwrite("my-api", force=False, interactive=True)
+
+
 def test_prompt_install_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
