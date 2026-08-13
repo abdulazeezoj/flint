@@ -6,7 +6,7 @@ without a merge conflict.
 
 `flask`'s own `template.json` ships with `"enabled": false` (the Flask
 framework isn't switched on for end users yet — see
-`src/conjure/templates/flask/template.json`). `generator.render()` refuses
+`src/spindle/templates/flask/template.json`). `generator.render()` refuses
 to render *any* template under a disabled framework, so every test here
 uses the `enable_flask` fixture below to monkeypatch
 `generator.get_framework` for the duration of the test, exactly the way
@@ -22,14 +22,14 @@ from pathlib import Path
 
 import pytest
 
-import conjure.generator as generator_module
-from conjure.generator import Answers, get_template, render
+import spindle.generator as generator_module
+from spindle.generator import Answers, get_template, render
 
 
 @pytest.fixture(autouse=True)
 def enable_flask(monkeypatch):
     """Make the `flask` framework resolve as enabled for this test only,
-    without touching `src/conjure/templates/flask/template.json` (which must
+    without touching `src/spindle/templates/flask/template.json` (which must
     stay `"enabled": false` until the orchestrating session flips it after
     both Flask templates have landed)."""
     real_get_framework = generator_module.get_framework
@@ -94,7 +94,7 @@ class TestTemplateMetadata:
         # list_templates() itself doesn't care about framework.enabled —
         # only render() does — so this exercises the template.json parse
         # path without needing the enable_flask fixture's monkeypatch.
-        from conjure.generator import list_templates
+        from spindle.generator import list_templates
 
         ids = {t.id for t in list_templates("flask")}
         assert "rest-api" in ids

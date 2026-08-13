@@ -9,7 +9,7 @@ to keep this hermetic — no real git/uv/network involved.
 import subprocess
 from pathlib import Path
 
-from conjure import postgen
+from spindle import postgen
 
 
 def _summary_kwargs(**overrides):

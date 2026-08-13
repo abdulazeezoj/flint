@@ -1,11 +1,30 @@
 # Changelog
 
-All notable changes to Conjure are documented here.
+All notable changes to Spindle are documented here.
 
 Versions follow `v{release}.{feature}.{fixes}` (see
 `docs/_product/PRODUCT_SPEC.md` §11): `release` is the major epoch
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
+
+## v0.13.0 — 2026-08-13
+
+### Changed
+
+- **Project renamed again, to `spindle`.** `conjure` cleared a plain
+  availability check but PyPI's project-creation flow rejected it
+  outright — separate from "is it taken," PyPI blocks new names within
+  edit-distance 2 of an existing project to deter typosquatting, and
+  `conjure` is one character from `conjur` (CyberArk's published
+  secrets-management package). That block only surfaces when actually
+  registering a name (via the trusted-publisher form), not from a plain
+  `pypi.org/pypi/<name>/json` check, so the original ~80-candidate sweep
+  never caught it. `spindle` passed PyPI's real registration flow
+  cleanly and has no similar near-miss. Same scope as the `flint`→
+  `conjure` rename: package, CLI, `~/.conjure/last.json` →
+  `~/.spindle/last.json`, generated-project attribution, all docs, and
+  this time the GitHub repository itself too
+  (`abdulazeezoj/flint` → `abdulazeezoj/spindle`).
 
 ## v0.12.0 — 2026-08-13
 
@@ -15,7 +34,8 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   unclaimed on PyPI, pronounceable, and free of collisions with
   established tools — locked in before any release ever publishes under
   it. The PyPI distribution name and the `conjure` console script are
-  the same string; no `-cli` suffix, no alias to remember.
+  the same string; no `-cli` suffix, no alias to remember. (Superseded
+  one release later — see v0.13.0.)
 - **Two docs-site rendering bugs, fixed and verified visually.** The
   homepage's "Where to go next" card grid was rendering as raw,
   unprocessed markdown — `mkdocs.yml` was missing the `attr_list` and
@@ -35,7 +55,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 ### Added
 
 - **A public documentation site** at
-  [abdulazeezoj.github.io/conjure](https://abdulazeezoj.github.io/conjure/)
+  [abdulazeezoj.github.io/spindle](https://abdulazeezoj.github.io/spindle/)
   (MkDocs, Material theme, deployed via `.github/workflows/docs.yml`
   on every push to `main` that touches `docs/**`): a Getting Started
   guide, a full CLI reference, one page per template (options,
@@ -76,7 +96,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   using Trusted Publishing (OIDC) — no API token stored as a repo
   secret. Publishing requires a one-time PyPI-side setup (see
   PRODUCT_ARCH.md §8 for exactly what to register). No change to the
-  `conjure` CLI itself — this is release infrastructure only.
+  `spindle` CLI itself — this is release infrastructure only.
 
 ## v0.10.0 — 2026-08-13
 
@@ -84,13 +104,13 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Interactive `--force` overwrite confirmation.** Running into a
   non-empty target directory without `--force` used to hard-error
-  unconditionally. Now, in interactive mode, Conjure asks "Directory 'x'
+  unconditionally. Now, in interactive mode, Spindle asks "Directory 'x'
   already exists and is not empty. Overwrite?" instead of failing
   outright — confirming proceeds exactly as `--force` would have,
   declining aborts cleanly with no files written. Non-interactive runs
   (`--yes`/piped stdin/CI) are unchanged: no prompt, same hard error
   unless `--force` was already passed.
-- **`conjure list-templates`**: a new introspection command listing every
+- **`spindle list-templates`**: a new introspection command listing every
   framework/template pair — label, description, whether it supports
   `--docker` — including disabled/"coming soon" entries, so the roadmap
   stays visible outside the wizard too. Generates nothing.
@@ -99,7 +119,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Package manager and template distribution are formally closed, not
   left open.** Both were long-standing "Open Questions" in
-  PRODUCT_SPEC.md §12 with no code changes attached. Conjure stays
+  PRODUCT_SPEC.md §12 with no code changes attached. Spindle stays
   `uv`-only (every template's `pyproject.toml`/README/`AGENTS.md`/skill
   already assumes it end to end — supporting pip/poetry would mean a
   second rendering of every template, not a small addition) and
@@ -124,7 +144,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `taskiq`, `celery`, `redis`, `pytest`. Selection is declarative — a
   new `skills` list in `template.json`, gated by the exact same `id`/
   `when` shape `layers` already use — and the catalog lives once, flat,
-  at `src/conjure/skills/<id>/`, decoupled from any one framework/
+  at `src/spindle/skills/<id>/`, decoupled from any one framework/
   template so a skill used by both (e.g. `pytest`, `redis`) isn't
   duplicated. Rendered through the same Jinja mechanism as everything
   else, so skill content gets real `{{ package_name }}` substitution
@@ -227,7 +247,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `rest-api`, to match the hyphenated id style used elsewhere (e.g.
   `hello-world`) instead of being the odd one out. `--template restapi`
   is no longer recognized — use `--template rest-api`. Anything already
-  remembered in `~/.conjure/last.json` under the old `fastapi/restapi` key
+  remembered in `~/.spindle/last.json` under the old `fastapi/restapi` key
   (§ v0.5.0) is simply never looked up again under the new id and falls
   back to the template's own defaults, same as any other stale entry —
   no manual migration needed.
@@ -236,8 +256,8 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 ### Added
 
-- **Remembered preferences** (`~/.conjure/last.json`): after a successful
-  generation, Conjure saves the last framework, the last template picked
+- **Remembered preferences** (`~/.spindle/last.json`): after a successful
+  generation, Spindle saves the last framework, the last template picked
   per framework, and — per `<framework>/<template>` — the resolved
   options plus `docker`/`git`/`install`. The next run uses these as the
   new default: the interactive wizard preselects them, and a flagless
@@ -247,12 +267,12 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   choice no longer valid for the current template) is silently ignored
   in favor of the template's own default rather than erroring.
 - `--remember/--no-remember` flag (default on) to opt a single run out
-  of both reading and writing `~/.conjure/last.json` — for anyone who
+  of both reading and writing `~/.spindle/last.json` — for anyone who
   wants a fully stateless run.
 
 ### Changed
 
-- Reading/writing `~/.conjure/last.json` is entirely best-effort: a
+- Reading/writing `~/.spindle/last.json` is entirely best-effort: a
   missing, corrupt, or unwritable prefs file never fails or warns during
   generation — it's silently treated as "nothing remembered yet."
 
@@ -361,7 +381,7 @@ full write-up of why each was invisible to lighter checks:
 ### Fixed
 
 - `generator.render` now rolls back a partially-written target directory
-  when a `ConjureError` (not just any other exception) is raised mid-render
+  when a `SpindleError` (not just any other exception) is raised mid-render
   — previously that branch re-raised without cleaning up, breaking the
   documented all-or-nothing generation guarantee. Currently unreachable
   via any real input, but would have mattered the moment a future layer
@@ -371,8 +391,8 @@ full write-up of why each was invisible to lighter checks:
 
 - Test suite now enforces 100% statement + branch coverage
   (`--cov-fail-under=100` in `pyproject.toml`, branch coverage on) —
-  every module in `src/conjure/` is fully covered, including the
-  `python -m conjure` entry points, `git`/`uv` subprocess failure paths,
+  every module in `src/spindle/` is fully covered, including the
+  `python -m spindle` entry points, `git`/`uv` subprocess failure paths,
   and every prompt cancellation branch.
 
 ## v0.2.0 — 2026-08-12
@@ -403,12 +423,12 @@ full write-up of why each was invisible to lighter checks:
 
 ## v0.1.0 — 2026-08-12
 
-First release. `conjure` scaffolds a runnable project from a short
+First release. `spindle` scaffolds a runnable project from a short
 interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 
 ### Added
 
-- `conjure` / `conjure new [NAME]` — interactive wizard: project name,
+- `spindle` / `spindle new [NAME]` — interactive wizard: project name,
   framework, git init, dependency install.
 - Fully non-interactive mode via `--framework`, `--git/--no-git`,
   `--install/--no-install`, `--yes`, and `--force`; auto-detected when
@@ -416,7 +436,7 @@ interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 - `fastapi-hello-world` template: a `uv`-managed, `src/`-layout FastAPI
   project with a passing `pytest` test, ready to run with
   `uv run fastapi dev src/<package>/main.py`.
-- `conjure --version`.
+- `spindle --version`.
 - Project name validation: derives a filesystem-safe slug and a valid,
   importable Python package name; rejects empty/keyword/stdlib-shadowing
   names instead of silently mutating them.

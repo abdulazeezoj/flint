@@ -19,7 +19,7 @@ together, not just declared.
 ## Quick start
 
 ```bash
-conjure new my-api \
+spindle new my-api \
   --framework flask --template rest-api \
   -o database=postgres -o orm=flask-sqlalchemy -o migrations=true \
   -o worker=celery -o broker=redis \
@@ -170,7 +170,7 @@ Dockerfile                iff --docker
 ```
 
 `routes/` — not `blueprints/` — on purpose: a developer moving between a
-conjure-generated FastAPI project and a conjure-generated Flask project should
+spindle-generated FastAPI project and a spindle-generated Flask project should
 find the same landmark folder for "where HTTP resources live," even
 though the *contents* are genuinely different (`Blueprint(...)` objects
 registered via `app.register_blueprint(...)` in `create_app()`, not
@@ -389,7 +389,7 @@ RabbitMQ support is just a few `{% if broker == "rabbitmq" %}` branches in
 
 `redis` is a separate, decoupled question from `worker`/`broker` — picking
 Celery doesn't automatically mean you want Redis for caching, and picking
-Redis as your broker shouldn't make Conjure ask twice. The rule: `redis`
+Redis as your broker shouldn't make Spindle ask twice. The rule: `redis`
 resolves to `true` automatically whenever `broker == redis` (no prompt);
 otherwise it's asked as its own independent "add Redis for caching?"
 question (default `false`), whether or not a worker is configured at all.
@@ -407,8 +407,8 @@ to add.
 
 ## `--docker`
 
-Pass `--docker` and Conjure adds a `Dockerfile` (`uv`-based, matching
-every other conjure template) plus `.dockerignore`. The one
+Pass `--docker` and Spindle adds a `Dockerfile` (`uv`-based, matching
+every other spindle template) plus `.dockerignore`. The one
 Flask-specific detail: the container runs under
 **gunicorn**, not the Flask dev server, and points it at the factory using
 gunicorn's own factory-call syntax — one more place the

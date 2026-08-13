@@ -1,4 +1,4 @@
-# Conjure
+# Spindle
 
 `create-next-app`, for Python. One command, a short interactive wizard, and
 you have a running project — no hand-written boilerplate. Pick a richer
@@ -6,7 +6,7 @@ template and the same wizard wires up a real database, migrations, and a
 background worker too.
 
 ```bash
-uvx conjure
+uvx spindle
 ```
 
 ```text
@@ -39,24 +39,24 @@ Next steps:
 Then open http://127.0.0.1:8000
 ```
 
-## Why Conjure
+## Why Spindle
 
 Every new FastAPI or Flask project starts with the same repetitive setup —
 `pyproject.toml`, a `src/` layout, a first endpoint, a test, a `.gitignore`,
 a README nobody gets around to writing — and, past the toy stage, the same
 recurring decisions: which database, which ORM, whether to bother with
-migrations yet, whether background work needs a queue. Conjure answers the
+migrations yet, whether background work needs a queue. Spindle answers the
 short list of decisions that actually matter and generates a project that's
 already wired for them, instead of a blank slate you have to wire yourself.
 
 - **Zero to running in under a minute.** No install, no config file — run
-  `uvx conjure` and you have a project you can `uv run` immediately.
+  `uvx spindle` and you have a project you can `uv run` immediately.
 - **Real head-start choices, not just a skeleton.** The `rest-api` template
   offers a database (SQLite/PostgreSQL), an ORM, Alembic migrations, a
   background worker (Taskiq/Celery), and Redis — pick what you need, skip
   what you don't.
 - **Fully scriptable.** Every interactive prompt has a matching flag, so
-  `conjure new` works identically in CI with zero prompts.
+  `spindle new` works identically in CI with zero prompts.
 - **Two frameworks today, more later.** FastAPI and Flask ship with
   matching template shapes — same options, same conventions, same
   generated layout philosophy — so switching between them isn't a
@@ -70,7 +70,7 @@ already wired for them, instead of a blank slate you have to wire yourself.
 <div class="grid cards" markdown>
 
 - **[Getting Started](getting-started.md)**
-  Install Conjure and generate your first project, interactively or
+  Install Spindle and generate your first project, interactively or
   non-interactively.
 
 - **[CLI Reference](cli-reference.md)**
@@ -87,11 +87,11 @@ already wired for them, instead of a blank slate you have to wire yourself.
 ## Install
 
 ```bash
-uv tool install conjure   # persistent `conjure` on PATH
+uv tool install spindle   # persistent `spindle` on PATH
 # or run it ephemerally, no install:
-uvx conjure
+uvx spindle
 ```
 
-Conjure is a CLI, not a library: installing it puts a `conjure` command on
+Spindle is a CLI, not a library: installing it puts a `spindle` command on
 your `PATH`, from a PyPI package of the same name — no `-cli` suffix, no
 alias to remember.

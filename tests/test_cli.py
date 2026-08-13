@@ -6,8 +6,8 @@ import questionary
 import typer
 from typer.testing import CliRunner
 
-from conjure import __version__, cli, generator, postgen, prefs
-from conjure.cli import app
+from spindle import __version__, cli, generator, postgen, prefs
+from spindle.cli import app
 
 runner = CliRunner()
 
@@ -21,7 +21,7 @@ def test_version():
 def test_help():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "conjure" in result.stdout.lower()
+    assert "spindle" in result.stdout.lower()
 
 
 def test_new_non_interactive_happy_path(tmp_path: Path, monkeypatch):
@@ -119,7 +119,7 @@ def test_new_docker_unsupported_warns_and_continues(tmp_path: Path, monkeypatch)
 
 
 def test_bare_invocation_defaults_to_new(tmp_path: Path, monkeypatch):
-    # Bare `conjure` defaults git-init and install to True (FR1); stub both
+    # Bare `spindle` defaults git-init and install to True (FR1); stub both
     # out so this test stays hermetic (no real subprocess/network calls)
     # while still verifying the defaults are wired through.
     monkeypatch.chdir(tmp_path)
@@ -604,7 +604,7 @@ def test_list_templates_cmd_lists_real_frameworks_and_templates():
     assert "Flask" in result.stdout
     assert "Hello World" in result.stdout
     assert "REST API" in result.stdout
-    assert "conjure new my-api" in result.stdout
+    assert "spindle new my-api" in result.stdout
 
 
 def test_list_templates_cmd_marks_disabled_entries(tmp_path: Path, monkeypatch):

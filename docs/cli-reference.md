@@ -1,6 +1,6 @@
 # CLI Reference
 
-Every `conjure` command, flag, and exit code. If you just want the fast
+Every `spindle` command, flag, and exit code. If you just want the fast
 path, see [Getting Started](getting-started.md) — this page is the
 reference to flip back to.
 
@@ -8,22 +8,22 @@ reference to flip back to.
 
 | Command | What it does |
 |---|---|
-| `conjure` | Alias for `conjure new` with no name — full interactive wizard. |
-| `conjure new [NAME]` | Generate a new project. `NAME` pre-fills the project-name prompt (or is used directly with `--yes`/non-interactive). |
-| `conjure list-templates` | Print every framework/template pair. Generates nothing. |
-| `conjure --version` | Print the installed version and exit. |
-| `conjure --help` / `conjure new --help` | Print usage and exit. |
+| `spindle` | Alias for `spindle new` with no name — full interactive wizard. |
+| `spindle new [NAME]` | Generate a new project. `NAME` pre-fills the project-name prompt (or is used directly with `--yes`/non-interactive). |
+| `spindle list-templates` | Print every framework/template pair. Generates nothing. |
+| `spindle --version` | Print the installed version and exit. |
+| `spindle --help` / `spindle new --help` | Print usage and exit. |
 
-`conjure` with no subcommand behaves exactly like `conjure new` — the same
+`spindle` with no subcommand behaves exactly like `spindle new` — the same
 `create-next-app` muscle memory of "just run the command" applies.
 
-## `conjure new [NAME]`
+## `spindle new [NAME]`
 
 ```bash
-conjure new [NAME] [OPTIONS]
+spindle new [NAME] [OPTIONS]
 ```
 
-`NAME` is a free-text project name, e.g. `my-api` — Conjure turns it into
+`NAME` is a free-text project name, e.g. `my-api` — Spindle turns it into
 a directory slug and an importable Python package name (see
 [Name validation](#name-validation) below). Omit it and you're prompted
 interactively, or it falls back to `my-app` in non-interactive mode.
@@ -40,11 +40,11 @@ interactively, or it falls back to `my-app` in non-interactive mode.
 | `--install` / `--no-install` | `--install` | Install dependencies with `uv`. |
 | `--yes`, `-y` | off | Accept defaults for anything not given as a flag — skips all prompts. |
 | `--force` | off | Generate even if the target directory already exists and is non-empty. |
-| `--remember` / `--no-remember` | `--remember` | Remember these choices in `~/.conjure/last.json` as the default for next time. |
+| `--remember` / `--no-remember` | `--remember` | Remember these choices in `~/.spindle/last.json` as the default for next time. |
 
 !!! note "Defaults above are the template's own hardcoded defaults"
     Every flag's "prompted" default can instead resolve to a **remembered**
-    value from `~/.conjure/last.json`, if one exists and is still valid. An
+    value from `~/.spindle/last.json`, if one exists and is still valid. An
     explicit flag or `-o` always wins regardless. See
     [Remembered preferences](#remembered-preferences).
 
@@ -57,11 +57,11 @@ nothing is asked at all.
 Two things trigger non-interactive mode:
 
 - passing `--yes` / `-y`, or
-- Conjure detecting that stdin isn't a TTY (e.g. running in CI, or piped
+- Spindle detecting that stdin isn't a TTY (e.g. running in CI, or piped
   input).
 
 Every prompt still resolves in that mode — it just never blocks on input.
-Conjure works down a fallback chain: the flag or `-o` value if you gave
+Spindle works down a fallback chain: the flag or `-o` value if you gave
 one, the remembered value if it exists and is still valid, otherwise the
 template's own documented default. Framework falls back to the first
 enabled framework; template, to the first enabled one within it.
@@ -76,7 +76,7 @@ Your project name goes through two independent transforms:
   (a valid Python identifier), prefixed with `_` if it would otherwise
   start with a digit (e.g. `my-api` → `my_api`).
 
-Conjure rejects a name outright — with a specific reason, never a silent
+Spindle rejects a name outright — with a specific reason, never a silent
 mutation or a stack trace — if it:
 
 - normalizes to an empty string (no letters or numbers at all),
@@ -91,7 +91,7 @@ Non-interactively, it's an exit-1 error.
 ### Overwriting an existing directory
 
 If the target directory (`./<slug>`) already exists and is **non-empty**,
-Conjure refuses to touch it by default:
+Spindle refuses to touch it by default:
 
 - **Interactive**, no `--force`: you're asked
   `Directory '<slug>' already exists and is not empty. Overwrite?` (default
@@ -107,23 +107,23 @@ An empty or non-existent target directory never triggers any of this.
 ### `--option` / `-o key=value`
 
 Templates declare their own options (database, ORM, migrations, worker,
-broker, and so on) — Conjure's core has no built-in knowledge of what any
+broker, and so on) — Spindle's core has no built-in knowledge of what any
 given template accepts. Use `-o key=value` to set one, and repeat the
 flag for each option you want to set:
 
 ```bash
-conjure new my-api --framework fastapi --template rest-api \
+spindle new my-api --framework fastapi --template rest-api \
   -o database=postgres -o orm=sqlmodel -o migrations=true \
   -o worker=celery -o broker=redis \
   --yes
 ```
 
 ```bash
-conjure new my-api --framework fastapi --template hello-world \
+spindle new my-api --framework fastapi --template hello-world \
   -o config=true --yes
 ```
 
-Conjure validates each value against the chosen template's own declared
+Spindle validates each value against the chosen template's own declared
 options:
 
 - **Unknown key** — `--option key=value` where `key` isn't one this
@@ -139,7 +139,7 @@ options:
   'database' must be in key=value form.`
 
 Some options depend on an earlier one, and when that dependency isn't
-satisfied, Conjure resolves them silently to a documented value — never
+satisfied, Spindle resolves them silently to a documented value — never
 asked, never left unset. For example, `rest-api`'s `orm` option is
 skipped entirely (and resolves to its documented value) if
 `database=none`. That holds whether the dependency was set via `-o`, a
@@ -148,13 +148,13 @@ remembered value, or a prompt answer.
 See [Templates](project-templates/index.md) for the exact option keys,
 types, and choices each framework/template pair declares.
 
-## `conjure list-templates`
+## `spindle list-templates`
 
 ```bash
-conjure list-templates
+spindle list-templates
 ```
 
-Prints a table of every framework/template combination Conjure knows
+Prints a table of every framework/template combination Spindle knows
 about — including any disabled/"coming soon" entries — with each
 template's label, description, and whether it supports `--docker`:
 
@@ -168,7 +168,7 @@ template's label, description, and whether it supports `--docker`:
 │ Flask     │ REST API    │ A layered Flask REST API...       │   ✓    │
 └──────────┴─────────────┴───────────────────────────────────┴────────┘
 
-Pass a pair with e.g. conjure new my-api --framework fastapi --template rest-api.
+Pass a pair with e.g. spindle new my-api --framework fastapi --template rest-api.
 Templates with their own choices (database, ORM, ...) take -o key=value —
 see the wizard or each template's README for available keys.
 ```
@@ -178,18 +178,18 @@ full. See [Templates](project-templates/index.md) for the complete text.)
 
 This is pure introspection — it generates nothing, no matter what.
 
-## `conjure --version`
+## `spindle --version`
 
 Prints the installed version and exits, e.g.:
 
 ```text
-$ conjure --version
-conjure 0.10.0
+$ spindle --version
+spindle 0.10.0
 ```
 
-## `conjure --help`
+## `spindle --help`
 
-Prints top-level usage (and `conjure new --help` for the `new` subcommand's
+Prints top-level usage (and `spindle new --help` for the `new` subcommand's
 own flags), then exits — standard Typer/Click help output.
 
 ## Exit codes
@@ -198,7 +198,7 @@ own flags), then exits — standard Typer/Click help output.
 |---|---|---|
 | `0` | Success | Project generated. Docker/git/install steps failing independently (e.g. `uv`/`git` not found) does **not** change this — generation itself is what's graded. |
 | `1` | User/input error | Invalid project name; non-empty target dir with no `--force` and no interactive confirmation; unknown or disabled `--framework`/`--template`; unknown `-o` key; invalid `-o` value (bad select choice or non-boolean); `-o` missing `=`; cancelling an interactive prompt (Ctrl-C). |
-| `2` | Unexpected/internal error | Anything not caught as a user error. Conjure rolls back — deletes the partially-written target directory — before exiting, so a failed run never leaves a half-generated project behind. |
+| `2` | Unexpected/internal error | Anything not caught as a user error. Spindle rolls back — deletes the partially-written target directory — before exiting, so a failed run never leaves a half-generated project behind. |
 
 A few situations look like errors but are **not** — they warn and still
 exit `0`, because they're optional extras rather than the point of the
@@ -218,12 +218,12 @@ run:
 
 ## Remembered preferences
 
-After a successful generation, Conjure saves the framework, template, and
+After a successful generation, Spindle saves the framework, template, and
 every resolved option (plus `--docker`/`--git`/`--install`) to
-`~/.conjure/last.json`, and uses them as the new default next time — both
+`~/.spindle/last.json`, and uses them as the new default next time — both
 for what the wizard preselects and what a flagless `--yes` run falls back
 to. An explicit flag or `-o` always overrides a remembered value, and
-Conjure quietly ignores anything stale or invalid. Pass
+Spindle quietly ignores anything stale or invalid. Pass
 `--remember`/`--no-remember` to control whether a given run reads or
 writes this file at all (default: on). See
 [Remembered Preferences](preferences.md) for the full mechanism.
@@ -233,14 +233,14 @@ writes this file at all (default: on). See
 A minimal `hello-world` scaffold in CI:
 
 ```bash
-conjure new my-api --framework fastapi --template hello-world --yes
+spindle new my-api --framework fastapi --template hello-world --yes
 ```
 
 `rest-api` with an explicit stack, no git, no install (e.g. a
 generate-only CI step):
 
 ```bash
-conjure new my-api \
+spindle new my-api \
   --framework fastapi --template rest-api \
   -o database=postgres -o orm=sqlmodel -o migrations=true \
   -o worker=taskiq -o broker=rabbitmq \
@@ -248,10 +248,10 @@ conjure new my-api \
 ```
 
 Same, but forcing into an existing (non-empty) directory and opting this
-one run out of remembering/reading `~/.conjure/last.json`:
+one run out of remembering/reading `~/.spindle/last.json`:
 
 ```bash
-conjure new my-api \
+spindle new my-api \
   --framework flask --template rest-api \
   -o database=sqlite -o orm=sqlalchemy \
   --force --no-remember --yes

@@ -1,23 +1,23 @@
 # Contributing
 
-This page is for working on Conjure itself — the CLI, its bundled
-templates, and its skills catalog — not for using Conjure to scaffold a
+This page is for working on Spindle itself — the CLI, its bundled
+templates, and its skills catalog — not for using Spindle to scaffold a
 project. If you just want to generate a project, see
 [Getting Started](getting-started.md) instead.
 
-Conjure's own code is intentionally thin: `cli.py` parses flags,
+Spindle's own code is intentionally thin: `cli.py` parses flags,
 `prompts.py` asks questions, `generator.py` renders Jinja2 templates
 onto disk. Almost everything a contributor does day-to-day —
 adding a template, adding a skill, tweaking generated output — is a
-**content change under `src/conjure/templates/` or `src/conjure/skills/`**,
+**content change under `src/spindle/templates/` or `src/spindle/skills/`**,
 not a code change — the distinction that keeps most contributions
 low-risk.
 
 ## Local setup
 
 ```bash
-git clone https://github.com/abdulazeezoj/conjure
-cd conjure
+git clone https://github.com/abdulazeezoj/spindle
+cd spindle
 uv sync
 ```
 
@@ -28,9 +28,9 @@ uv run pytest
 ```
 
 This also runs coverage, and the suite **fails under 100% branch
-coverage** (`--cov=conjure --cov-report=term-missing --cov-fail-under=100`,
+coverage** (`--cov=spindle --cov-report=term-missing --cov-fail-under=100`,
 with `[tool.coverage.run] branch = true` in `pyproject.toml`) — every
-line *and* branch in `src/conjure/` has to be exercised, not just every
+line *and* branch in `src/spindle/` has to be exercised, not just every
 function.
 
 !!! tip "Iterating locally"
@@ -42,7 +42,7 @@ function.
 Confirm the CLI itself works against your checkout:
 
 ```bash
-uv run conjure --help
+uv run spindle --help
 ```
 
 ## Working on the docs site
@@ -80,15 +80,15 @@ documentation, so don't link to it from a page in `docs/`.
 The parts of the tree you'll actually touch:
 
 ```text
-conjure/
-├── src/conjure/
+spindle/
+├── src/spindle/
 │   ├── cli.py               # Typer app — `new` command, flags incl. --option
 │   ├── prompts.py            # questionary wizard steps + option resolution
 │   ├── naming.py               # project name -> slug/package_name validation
 │   ├── generator.py             # template renderer: options, layers, Jinja2
 │   ├── postgen.py                 # git init, uv sync, summary printing
-│   ├── prefs.py                     # ~/.conjure/last.json — best-effort read/write
-│   ├── errors.py                     # ConjureError and friends -> exit codes
+│   ├── prefs.py                     # ~/.spindle/last.json — best-effort read/write
+│   ├── errors.py                     # SpindleError and friends -> exit codes
 │   ├── templates/
 │   │   ├── fastapi/
 │   │   │   ├── template.json          # framework metadata
@@ -132,9 +132,9 @@ files at import time.
 
 The minimal shape is `templates/<framework>/<new-template>/` with a
 `template.json` and a `files/` directory (always rendered). See
-[`src/conjure/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/conjure/blob/main/src/conjure/templates/fastapi/hello-world/README.md)
+[`src/spindle/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/spindle/blob/main/src/spindle/templates/fastapi/hello-world/README.md)
 for that minimal layout written out in full, and
-[`src/conjure/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/conjure/blob/main/src/conjure/templates/fastapi/rest-api/template.json)
+[`src/spindle/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/spindle/blob/main/src/spindle/templates/fastapi/rest-api/template.json)
 for the richest real example — six options with `when`/`skip_value`
 chains, eight gated layers, and a `skills` list, all in one file.
 
@@ -262,11 +262,11 @@ combinations.
 
 A skill is reference material *about a library* (`.agents/skills/<id>/`
 in a generated project), not project content — that's why it lives in
-its own flat catalog at `src/conjure/skills/<id>/`, outside `templates/`
+its own flat catalog at `src/spindle/skills/<id>/`, outside `templates/`
 entirely, and why several templates can reference the same skill by
 `id` instead of each carrying their own copy.
 
-Use `src/conjure/skills/fastapi/` as the reference shape:
+Use `src/spindle/skills/fastapi/` as the reference shape:
 
 ```text
 skill.json              # {id, label, description} — maintainer metadata, not rendered
@@ -302,7 +302,7 @@ template's `template.json`:
 Same `id`/`when` shape as a layer, evaluated with the same predicate —
 a skill with no `when` is always included; one with a `when` is
 included only when it matches against the fully resolved answers.
-After rendering every matched skill, Conjure also (re)writes a generated
+After rendering every matched skill, Spindle also (re)writes a generated
 `.agents/skills/README.md` index, sourced from each included skill's
 `skill.json` — you don't need to maintain that index by hand.
 
@@ -312,7 +312,7 @@ generated-project side.
 ## Testing philosophy
 
 A green `pytest` run and a generated project that actually boots are
-two different claims, and Conjure's test suite is built in layers
+two different claims, and Spindle's test suite is built in layers
 precisely because no single layer can make both of them at once.
 
 - **All-or-nothing generation.** `generator.render()` writes a layer at
@@ -320,11 +320,11 @@ precisely because no single layer can make both of them at once.
   under the target directory is removed before the exception
   propagates — unless the target directory already existed before the
   call (e.g. a `--force` run into a directory you made), in which case
-  Conjure never deletes something it didn't create itself. A `0` exit
+  Spindle never deletes something it didn't create itself. A `0` exit
   code always means a complete, runnable project landed on disk; a
   failed run never leaves a half-generated one behind.
 - **100% branch coverage, gated in CI, not just aspirational.**
-  `uv run pytest` fails outright if any line or branch in `src/conjure/`
+  `uv run pytest` fails outright if any line or branch in `src/spindle/`
   goes unexercised. This is what makes "content-only" template changes
   safe to merge quickly — the option/layer resolution logic itself is
   fully covered, so a new `template.json` is mostly testing new *data*,
@@ -350,7 +350,7 @@ precisely because no single layer can make both of them at once.
   opened a real database connection the instant a test file merely
   *imported* it. None of those are the kind of bug a coverage number
   will ever tell you about — if you're changing generated code (not
-  just Conjure's own logic), budget time to actually run what you
+  just Spindle's own logic), budget time to actually run what you
   generated.
 
 ## CI/CD
@@ -359,8 +359,8 @@ precisely because no single layer can make both of them at once.
 request: `uv sync --locked` (fails if `uv.lock` has drifted from
 `pyproject.toml`), the full `uv run pytest` gate described above, and a
 smoke check that the installed console script runs
-(`uv run conjure --version`). It runs against a single Python version —
-3.11, the floor set by `requires-python` — since Conjure's own code has
+(`uv run spindle --version`). It runs against a single Python version —
+3.11, the floor set by `requires-python` — since Spindle's own code has
 no version-specific branches.
 
 `.github/workflows/cd.yml` fires only on pushing a `v*` tag. It has two
@@ -384,7 +384,7 @@ Cutting a release is three manual steps ending in a `git push`;
 everything after that — testing, verifying, publishing — is `cd.yml`'s
 job, not yours.
 
-1. Bump `__version__` in `src/conjure/__init__.py` **and** `version` in
+1. Bump `__version__` in `src/spindle/__init__.py` **and** `version` in
    `pyproject.toml` — these are kept in sync manually, there's no
    version-sync tooling yet.
 2. Add a `CHANGELOG.md` entry (newest first, linking the version to the

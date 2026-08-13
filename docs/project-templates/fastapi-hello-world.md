@@ -1,13 +1,13 @@
 # FastAPI · Hello World
 
 ```bash
-conjure new my-api --framework fastapi --template hello-world --yes
+spindle new my-api --framework fastapi --template hello-world --yes
 ```
 
 A minimal, `uv`-managed FastAPI app: one `GET /` route returning
 `{"message": "Hello, World!"}`, a passing `pytest` test, and everything
-else [every Conjure project ships](../getting-started.md#what-you-get-every-time).
-This is the fastest path from `uvx conjure` to a running app — reach for
+else [every Spindle project ships](../getting-started.md#what-you-get-every-time).
+This is the fastest path from `uvx spindle` to a running app — reach for
 [FastAPI · REST API](fastapi-rest-api.md) instead if you need a database,
 migrations, or a background worker from the start.
 
@@ -60,7 +60,7 @@ uv run pytest
 |---|---|---|---|
 | `-o config=<bool>` | `true` / `false` | `false` | Adds `pydantic-settings`-based configuration. |
 
-Turn on `-o config=true` and Conjure adds a `core/config.py` module, then
+Turn on `-o config=true` and Spindle adds a `core/config.py` module, then
 swaps in a version of `main.py` that reads from it instead of hardcoding
 values:
 
@@ -116,11 +116,11 @@ lives.
 
 ## Docker
 
-This template supports `--docker`: pass the flag and Conjure adds a
+This template supports `--docker`: pass the flag and Spindle adds a
 `Dockerfile` and `.dockerignore`:
 
 ```bash
-conjure new my-api --framework fastapi --template hello-world --docker --yes
+spindle new my-api --framework fastapi --template hello-world --docker --yes
 ```
 
 ```dockerfile
@@ -156,7 +156,7 @@ contains and how `AGENTS.md` points at them.
 ## Non-interactive example
 
 ```bash
-conjure new my-api \
+spindle new my-api \
   --framework fastapi --template hello-world \
   -o config=true \
   --docker --git --install --yes

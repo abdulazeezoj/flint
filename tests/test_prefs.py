@@ -1,4 +1,4 @@
-"""Unit tests for prefs.py — ~/.conjure/last.json persistence.
+"""Unit tests for prefs.py — ~/.spindle/last.json persistence.
 
 The `isolated_prefs_dir` autouse fixture (tests/conftest.py) points
 `prefs.PREFS_DIR`/`prefs.PREFS_FILE` at a per-test tmp path, so nothing
@@ -7,7 +7,7 @@ here touches the real user home directory.
 
 from __future__ import annotations
 
-from conjure import prefs
+from spindle import prefs
 
 
 def test_load_prefs_missing_file_returns_empty():
