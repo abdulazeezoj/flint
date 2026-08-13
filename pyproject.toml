@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/abdulazeezoj/spindle"
+Repository = "https://github.com/abdulazeezoj/flint"
 
 [project.scripts]
 flint = "flint.cli:main"

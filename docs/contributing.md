@@ -16,7 +16,7 @@ low-risk.
 ## Local setup
 
 ```bash
-git clone https://github.com/abdulazeezoj/spindle
+git clone https://github.com/abdulazeezoj/flint
 cd flint
 uv sync
 ```
@@ -132,9 +132,9 @@ files at import time.
 
 The minimal shape is `templates/<framework>/<new-template>/` with a
 `template.json` and a `files/` directory (always rendered). See
-[`src/flint/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/spindle/blob/main/src/flint/templates/fastapi/hello-world/README.md)
+[`src/flint/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/flint/blob/main/src/flint/templates/fastapi/hello-world/README.md)
 for that minimal layout written out in full, and
-[`src/flint/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/spindle/blob/main/src/flint/templates/fastapi/rest-api/template.json)
+[`src/flint/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/flint/blob/main/src/flint/templates/fastapi/rest-api/template.json)
 for the richest real example — six options with `when`/`skip_value`
 chains, eight gated layers, and a `skills` list, all in one file.
 

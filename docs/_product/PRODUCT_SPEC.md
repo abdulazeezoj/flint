@@ -306,10 +306,11 @@ hold for every project shape a generated app might end up living in
   unrelated, already-published packages. `uvx flint` alone no longer
   resolves correctly since distribution and command names differ — the
   ephemeral-run form is `uvx --from flint-kit flint` (`uv tool install
-  flint-kit` needs no such adjustment). The GitHub repository stays at
-  `abdulazeezoj/spindle` for this release — not reverted to `flint` —
-  as a separate decision from the package identity. See PRODUCT_ARCH.md
-  §2.
+  flint-kit` needs no such adjustment). The GitHub repository is also
+  renamed back, `abdulazeezoj/spindle` → `abdulazeezoj/flint` — closing
+  out the naming saga with brand, command, and repository all aligned
+  again, and only the PyPI distribution name carrying the `-kit` suffix.
+  See PRODUCT_ARCH.md §2.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

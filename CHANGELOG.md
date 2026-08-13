@@ -38,9 +38,9 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   flint`, same shape as `uvx --from httpie http`. `uv tool install
   flint-kit` needs no such adjustment; it installs the `flint` console
   script under its own name regardless of the distribution name. The
-  GitHub repository itself stays at `abdulazeezoj/spindle` for now (not
-  renamed back to `flint` in this pass) — a separate decision from the
-  package identity.
+  GitHub repository is also renamed back, `abdulazeezoj/spindle` →
+  `abdulazeezoj/flint` — the third rename of that slug this project has
+  been through in one day.
 
 ## v0.13.0 — 2026-08-13
 

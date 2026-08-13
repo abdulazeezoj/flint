@@ -41,7 +41,9 @@ Then open http://127.0.0.1:8000
 
 ## Why Flint
 
-Every new FastAPI or Flask project starts with the same repetitive setup —
+Strike it and it throws a spark — that's the whole idea: one command,
+and a real project catches. Every new FastAPI or Flask project starts
+with the same repetitive setup —
 `pyproject.toml`, a `src/` layout, a first endpoint, a test, a `.gitignore`,
 a README nobody gets around to writing — and, past the toy stage, the same
 recurring decisions: which database, which ORM, whether to bother with

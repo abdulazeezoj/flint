@@ -1,7 +1,7 @@
 site_name: Flint
 site_description: "create-next-app, for Python — interactive project scaffolding for FastAPI and Flask."
-site_url: https://abdulazeezoj.github.io/spindle/
-repo_url: https://github.com/abdulazeezoj/spindle
+site_url: https://abdulazeezoj.github.io/flint/
+repo_url: https://github.com/abdulazeezoj/flint
 repo_name: abdulazeezoj/flint
 edit_uri: edit/main/docs/
 
@@ -74,6 +74,6 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/abdulazeezoj/spindle
+      link: https://github.com/abdulazeezoj/flint
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/flint-kit/
