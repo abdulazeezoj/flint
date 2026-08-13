@@ -1,8 +1,8 @@
 site_name: Conjure
 site_description: "create-next-app, for Python — interactive project scaffolding for FastAPI and Flask."
-site_url: https://abdulazeezoj.github.io/flint/
-repo_url: https://github.com/abdulazeezoj/flint
-repo_name: abdulazeezoj/flint
+site_url: https://abdulazeezoj.github.io/conjure/
+repo_url: https://github.com/abdulazeezoj/conjure
+repo_name: abdulazeezoj/conjure
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -74,6 +74,6 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/abdulazeezoj/flint
+      link: https://github.com/abdulazeezoj/conjure
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/conjure/

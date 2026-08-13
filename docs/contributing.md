@@ -16,7 +16,7 @@ low-risk.
 ## Local setup
 
 ```bash
-git clone https://github.com/abdulazeezoj/flint
+git clone https://github.com/abdulazeezoj/conjure
 cd conjure
 uv sync
 ```
@@ -132,9 +132,9 @@ files at import time.
 
 The minimal shape is `templates/<framework>/<new-template>/` with a
 `template.json` and a `files/` directory (always rendered). See
-[`src/conjure/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/flint/blob/main/src/conjure/templates/fastapi/hello-world/README.md)
+[`src/conjure/templates/fastapi/hello-world/README.md`](https://github.com/abdulazeezoj/conjure/blob/main/src/conjure/templates/fastapi/hello-world/README.md)
 for that minimal layout written out in full, and
-[`src/conjure/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/flint/blob/main/src/conjure/templates/fastapi/rest-api/template.json)
+[`src/conjure/templates/fastapi/rest-api/template.json`](https://github.com/abdulazeezoj/conjure/blob/main/src/conjure/templates/fastapi/rest-api/template.json)
 for the richest real example — six options with `when`/`skip_value`
 chains, eight gated layers, and a `skills` list, all in one file.
 

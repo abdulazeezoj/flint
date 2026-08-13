@@ -35,7 +35,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 ### Added
 
 - **A public documentation site** at
-  [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)
+  [abdulazeezoj.github.io/conjure](https://abdulazeezoj.github.io/conjure/)
   (MkDocs, Material theme, deployed via `.github/workflows/docs.yml`
   on every push to `main` that touches `docs/**`): a Getting Started
   guide, a full CLI reference, one page per template (options,

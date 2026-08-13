@@ -1,7 +1,7 @@
 # conjure
 
-[![CI](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml)
-[![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
+[![CI](https://github.com/abdulazeezoj/conjure/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/conjure/actions/workflows/ci.yml)
+[![Docs](https://github.com/abdulazeezoj/conjure/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/conjure/)
 [![PyPI](https://img.shields.io/pypi/v/conjure)](https://pypi.org/project/conjure/)
 
 `create-next-app`, for Python. One command, a short interactive wizard,
@@ -41,7 +41,7 @@ Next steps:
   uv run taskiq worker my_api.worker:broker --app-dir src   # separate process
 ```
 
-**📖 Full documentation: [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)**
+**📖 Full documentation: [abdulazeezoj.github.io/conjure](https://abdulazeezoj.github.io/conjure/)**
 — getting started, a full CLI reference, one page per template
 (options, generated layout, gotchas), the `.agents/skills/` catalog,
 remembered preferences, and how to contribute.
@@ -70,8 +70,8 @@ conjure --help
 
 Every prompt has a matching flag, and Conjure remembers your last
 choices in `~/.conjure/last.json` as the new default next time. See the
-[CLI Reference](https://abdulazeezoj.github.io/flint/cli-reference/)
-and [Remembered Preferences](https://abdulazeezoj.github.io/flint/preferences/)
+[CLI Reference](https://abdulazeezoj.github.io/conjure/cli-reference/)
+and [Remembered Preferences](https://abdulazeezoj.github.io/conjure/preferences/)
 docs for the full details.
 
 ## What conjure ships
@@ -82,8 +82,8 @@ A project is always generated from a `<framework>/<template>` pair —
 migrations, a background worker, Redis). Every generated project also
 gets `.agents/skills/` — deeper, library-specific reference material
 for exactly the stack it uses. See the
-[Templates](https://abdulazeezoj.github.io/flint/project-templates/)
-and [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
+[Templates](https://abdulazeezoj.github.io/conjure/project-templates/)
+and [Agent Skills](https://abdulazeezoj.github.io/conjure/agent-skills/)
 docs for what each one actually generates.
 
 ## Contributing
@@ -96,6 +96,6 @@ uv run conjure --help
 
 Adding a framework, template, or skill is a content-only change — no
 code edits needed. See the
-[Contributing](https://abdulazeezoj.github.io/flint/contributing/)
+[Contributing](https://abdulazeezoj.github.io/conjure/contributing/)
 docs for the full local-setup, template/skill-authoring, and release
 process, or [`CHANGELOG.md`](CHANGELOG.md) for release history.

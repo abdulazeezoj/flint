@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/abdulazeezoj/flint"
+Repository = "https://github.com/abdulazeezoj/conjure"
 
 [project.scripts]
 conjure = "conjure.cli:main"
