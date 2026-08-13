@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-13 (v0.14: project renamed to Flint, third time, split brand/PyPI name — see PRODUCT_SPEC.md §11; docs-site grid-cards gotcha)
+**Last updated:** 2026-08-13 (v0.14.1: automated release tagging via `release.yml` — see §8)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -975,6 +975,22 @@ surfaced by actually running the generated tooling:
   for a different provider. Requires one manual, one-time repo setting
   (can't be done via a workflow file): **Settings → Pages → Build and
   deployment → Source: "GitHub Actions"**.
+- **Release tagging** (`.github/workflows/release.yml`, since v0.14.1):
+  fires on a push to `main` that touches `pyproject.toml`. Reads the
+  version and, if `vX.Y.Z` isn't already tagged, creates and pushes
+  that tag using the workflow's own `GITHUB_TOKEN` — needed because an
+  external git credential pushing branches fine can still get a plain
+  403 trying to push a tag if the repo has a tag-protection rule
+  scoped tighter than branch push access. Rather than let that tag
+  push try to re-trigger `cd.yml` (GitHub suppresses new workflow runs
+  triggered by the default `GITHUB_TOKEN`, so it wouldn't fire),
+  `release.yml`'s `publish` job calls `cd.yml` directly as a reusable
+  workflow (`workflow_call`, `ref: vX.Y.Z`) in the same run. `cd.yml`
+  keeps its original `push: tags: v*` trigger too, so a manually
+  pushed tag (e.g. from a contributor's own machine) still works
+  exactly as before — `workflow_call`'s optional `ref` input just lets
+  both entry points share one test-then-publish implementation instead
+  of forking it.
 
 ## 9. Explicitly deferred (tracked, not forgotten)
 

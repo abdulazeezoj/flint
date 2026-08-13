@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      ref:
+        description: Tag to test and publish (e.g. v1.2.3) — defaults to the triggering tag push
+        required: false
+        type: string
 
 jobs:
   test:
@@ -11,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -35,6 +43,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -43,7 +53,8 @@ jobs:
 
       - name: Verify tag matches pyproject.toml version
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
+          tag_ref="${{ inputs.ref || github.ref_name }}"
+          tag_version="${tag_ref#v}"
           pkg_version="$(uv run --no-project python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           echo "Tag version: $tag_version"
           echo "pyproject.toml version: $pkg_version"

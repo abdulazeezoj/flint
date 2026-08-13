@@ -1,6 +1,6 @@
 [project]
 name = "flint-kit"
-version = "0.14.0"
+version = "0.14.1"
 description = "Interactive project scaffolding for Python frameworks — create-next-app, for FastAPI, Flask, and friends."
 readme = "README.md"
 license = "MIT"

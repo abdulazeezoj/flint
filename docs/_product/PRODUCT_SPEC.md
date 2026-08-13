@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.14.0: project renamed to Flint, third time, split brand/PyPI name — see §11)
+**Last updated:** 2026-08-13 (v0.14.1: automated release tagging via `release.yml` — see PRODUCT_ARCH.md §8)
 
 ## 1. Vision
 
@@ -311,6 +311,17 @@ hold for every project shape a generated app might end up living in
   out the naming saga with brand, command, and repository all aligned
   again, and only the PyPI distribution name carrying the `-kit` suffix.
   See PRODUCT_ARCH.md §2.
+- `v0.14.1` — release tagging is automated (`.github/workflows/release.yml`):
+  pushing a version bump to `main` now creates and pushes the `vX.Y.Z`
+  tag on its own, then chains straight into `cd.yml`'s test-then-publish
+  jobs as a reusable workflow rather than depending on the tag push to
+  re-trigger it (GitHub suppresses new workflow runs triggered by the
+  default `GITHUB_TOKEN`). Added after a manual `git tag && git push`
+  from outside GitHub Actions hit a plain 403 — this repo's tag
+  protection allows tag creation from CI but not from that external
+  credential, even though the same credential could push ordinary
+  branch commits fine. See PRODUCT_ARCH.md §8. No change to the `flint`
+  CLI itself.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

@@ -7,6 +7,29 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.14.1 — 2026-08-13
+
+### Added
+
+- **`.github/workflows/release.yml`: tags releases automatically.** Fires
+  on any push to `main` that touches `pyproject.toml`; reads the version,
+  and — if `vX.Y.Z` doesn't already exist as a tag — creates and pushes
+  it using the workflow's own `GITHUB_TOKEN`. Exists because a plain
+  `git tag && git push` from outside GitHub Actions can hit a 403: this
+  repo's tag-protection rule only allows tag creation from a context
+  with the right permissions, which an external git credential may not
+  have even when it can push ordinary branch commits fine. Chains
+  straight into `cd.yml` as a reusable workflow (`workflow_call`, not a
+  second tag-push event) rather than relying on the tag push to
+  re-trigger `cd.yml` — GitHub explicitly suppresses new workflow runs
+  triggered by the default `GITHUB_TOKEN`, so a plain tag push from this
+  workflow would silently never fire the publish job. `cd.yml` gained a
+  `workflow_call` trigger and an optional `ref` input so both entry
+  points (a real tag push, and this workflow's direct call) share the
+  same test-then-publish logic. End state: merging a version-bump PR is
+  now the only manual step in a release — tagging and publishing happen
+  on their own. No change to the `flint` CLI itself.
+
 ## v0.14.0 — 2026-08-13
 
 ### Changed
