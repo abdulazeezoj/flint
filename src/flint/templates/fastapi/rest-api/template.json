@@ -78,6 +78,14 @@
     { "dir": "redis", "when": { "redis": [true] } }
   ],
   "skills": [
-    { "id": "fastapi" }
+    { "id": "fastapi" },
+    { "id": "pydantic-settings" },
+    { "id": "pytest" },
+    { "id": "sqlmodel", "when": { "orm": ["sqlmodel"] } },
+    { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "id": "alembic", "when": { "migrations": [true] } },
+    { "id": "taskiq", "when": { "worker": ["taskiq"] } },
+    { "id": "celery", "when": { "worker": ["celery"] } },
+    { "id": "redis", "when": { "redis": [true] } }
   ]
 }

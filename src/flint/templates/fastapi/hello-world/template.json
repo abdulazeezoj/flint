@@ -14,5 +14,10 @@
   "layers": [
     { "dir": "docker", "when": { "docker": [true] } },
     { "dir": "config", "when": { "config": [true] } }
+  ],
+  "skills": [
+    { "id": "fastapi" },
+    { "id": "pytest" },
+    { "id": "pydantic-settings", "when": { "config": [true] } }
   ]
 }

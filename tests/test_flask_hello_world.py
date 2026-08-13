@@ -102,11 +102,24 @@ def test_render_creates_expected_files(tmp_path: Path):
         Path("src/my_api/main.py"),
         Path("tests/test_main.py"),
     }
-    assert set(created) == expected
+    # Subset check, not exact equality — hello-world also always pulls
+    # in the flask/pytest skills (see test_render_includes_expected_skills).
+    assert expected <= set(created)
     for rel_path in expected:
         assert (target / rel_path).is_file()
 
     _assert_all_python_files_parse(target)
+
+
+def test_render_includes_expected_skills(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("flask", "hello-world", target, make_answers())
+
+    skill_paths = {p for p in created if p.parts[:2] == (".agents", "skills")}
+    skill_ids = {p.parts[2] for p in skill_paths if len(p.parts) > 3}
+    assert skill_ids == {"flask", "pytest"}
+    assert Path(".agents/skills/README.md") in skill_paths
+    assert not (target / ".agents/skills/pydantic-settings").exists()
     _assert_valid_toml(target / "pyproject.toml")
 
 

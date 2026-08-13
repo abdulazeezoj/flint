@@ -82,7 +82,11 @@ def _assert_valid_toml(path: Path) -> dict:
 
 
 def _paths(created: list[Path]) -> set[str]:
-    return {str(p) for p in created}
+    # Excludes .agents/skills/** — every combo below also always pulls in
+    # a resolved set of skills (see TestRestApiSkills), which would
+    # otherwise need repeating in each of these project-file-focused
+    # assertions.
+    return {str(p) for p in created if p.parts[:2] != (".agents", "skills")}
 
 
 class TestTemplateMetadata:
@@ -460,3 +464,58 @@ class TestRestApiRender:
             render("flask", "rest-api", target, answers)
             _assert_all_python_files_parse(target)
             _assert_valid_toml(target / "pyproject.toml")
+
+
+def _skill_ids(created: list[Path]) -> set[str]:
+    # .agents/skills/README.md is the generated index, not a skill id.
+    return {
+        p.parts[2]
+        for p in created
+        if p.parts[:2] == (".agents", "skills") and len(p.parts) > 3
+    }
+
+
+class TestRestApiSkills:
+    def test_flask_sqlalchemy_with_migrations_and_worker(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers()  # sqlite + flask-sqlalchemy + migrations=True
+        created = render("flask", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {
+            "flask",
+            "pydantic-settings",
+            "pytest",
+            "flask-sqlalchemy",
+            "flask-migrate",
+        }
+        assert Path(".agents/skills/README.md") in created
+
+    def test_manual_sqlalchemy_with_migrations(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(database="sqlite", orm="sqlalchemy", migrations=True)
+        created = render("flask", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {
+            "flask",
+            "pydantic-settings",
+            "pytest",
+            "sqlalchemy",
+            "alembic",
+        }
+
+    def test_no_database_no_worker_no_redis(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(database="none", orm="none", migrations=False)
+        created = render("flask", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {"flask", "pydantic-settings", "pytest"}
+
+    def test_celery_and_redis_add_their_skills(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(
+            database="none", orm="none", migrations=False,
+            worker="celery", broker="redis", redis=True,
+        )
+        created = render("flask", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {"flask", "pydantic-settings", "pytest", "celery", "redis"}

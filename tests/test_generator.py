@@ -119,6 +119,10 @@ def test_render_creates_expected_files(tmp_path: Path):
     target = tmp_path / "my-api"
     created = render("fastapi", "hello-world", target, make_answers())
 
+    # Project files proper — a subset check, not exact equality, since
+    # hello-world also always pulls in the fastapi/pytest skills (see
+    # TestSkillsMechanism and test_render_includes_expected_skills below
+    # for dedicated coverage of *that* file set).
     expected = {
         Path("pyproject.toml"),
         Path("README.md"),
@@ -128,9 +132,32 @@ def test_render_creates_expected_files(tmp_path: Path):
         Path("src/my_api/main.py"),
         Path("tests/test_main.py"),
     }
-    assert set(created) == expected
+    assert expected <= set(created)
     for rel_path in expected:
         assert (target / rel_path).is_file()
+
+
+def test_render_includes_expected_skills(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    skill_paths = {p for p in created if p.parts[:2] == (".agents", "skills")}
+    assert skill_paths == {
+        Path(".agents/skills/README.md"),
+        Path(".agents/skills/fastapi/SKILL.md"),
+        Path(".agents/skills/fastapi/guides/add-an-endpoint.md"),
+        Path(".agents/skills/fastapi/guides/testing.md"),
+        Path(".agents/skills/fastapi/references/gotchas.md"),
+        Path(".agents/skills/fastapi/references/routing-and-dependencies.md"),
+        Path(".agents/skills/pytest/SKILL.md"),
+        Path(".agents/skills/pytest/guides/parametrize.md"),
+        Path(".agents/skills/pytest/guides/writing-a-good-test.md"),
+        Path(".agents/skills/pytest/references/database-isolation.md"),
+        Path(".agents/skills/pytest/references/gotchas.md"),
+    }
+    # pydantic-settings is only pulled in when config=true (make_answers()
+    # defaults to no options at all, i.e. config unset/false).
+    assert not (target / ".agents/skills/pydantic-settings").exists()
 
 
 def test_render_with_docker_adds_dockerfile(tmp_path: Path):
@@ -215,7 +242,7 @@ def test_render_force_overwrites_nonempty_directory(tmp_path: Path):
 
     created = render("fastapi", "hello-world", target, make_answers(), force=True)
     assert (target / "pyproject.toml").is_file()
-    assert len(created) == 7
+    assert len(created) == 18  # 7 project files + 11 fastapi/pytest skill files
 
 
 def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
@@ -557,6 +584,70 @@ def test_rest_api_rabbitmq_broker_with_redis_caching_still_independent(tmp_path:
     env_file = (target / ".env").read_text()
     assert "RABBITMQ_URL=amqp://" in env_file
     assert "REDIS_URL=redis://" in env_file
+
+
+def _skill_ids(created: list[Path]) -> set[str]:
+    # .agents/skills/README.md is the generated index, not a skill id.
+    return {
+        p.parts[2]
+        for p in created
+        if p.parts[:2] == (".agents", "skills") and len(p.parts) > 3
+    }
+
+
+class TestFastapiRestApiSkills:
+    def test_sqlmodel_with_migrations(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers()  # sqlite + sqlmodel + migrations=True
+        created = render("fastapi", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {
+            "fastapi",
+            "pydantic-settings",
+            "pytest",
+            "sqlmodel",
+            "alembic",
+        }
+        assert Path(".agents/skills/README.md") in created
+
+    def test_sqlalchemy_no_migrations(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(database="postgres", orm="sqlalchemy", migrations=False)
+        created = render("fastapi", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest", "sqlalchemy"}
+
+    def test_no_database_no_worker_no_redis(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(database="none", orm="none", migrations=False)
+        created = render("fastapi", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest"}
+
+    def test_taskiq_worker_implies_redis_skill(self, tmp_path: Path):
+        # redis=True here simulates what prompts.prompt_template_options
+        # would already have resolved via skip_value (see
+        # test_rest_api_worker_taskiq_implies_redis above) — render() just
+        # applies whatever options dict it's given.
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(
+            database="none", orm="none", migrations=False, worker="taskiq", redis=True,
+        )
+        created = render("fastapi", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {
+            "fastapi", "pydantic-settings", "pytest", "taskiq", "redis",
+        }
+
+    def test_celery_worker_rabbitmq_broker_no_redis(self, tmp_path: Path):
+        target = tmp_path / "api"
+        answers = make_rest_api_answers(
+            database="none", orm="none", migrations=False,
+            worker="celery", broker="rabbitmq", redis=False,
+        )
+        created = render("fastapi", "rest-api", target, answers)
+
+        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest", "celery"}
 
 
 def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monkeypatch):

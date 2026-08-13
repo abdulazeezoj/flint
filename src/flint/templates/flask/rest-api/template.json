@@ -74,5 +74,16 @@
     { "dir": "migrations-sqlalchemy", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
     { "dir": "worker-celery", "when": { "worker": ["celery"] } },
     { "dir": "redis", "when": { "redis": [true] } }
+  ],
+  "skills": [
+    { "id": "flask" },
+    { "id": "pydantic-settings" },
+    { "id": "pytest" },
+    { "id": "flask-sqlalchemy", "when": { "orm": ["flask-sqlalchemy"] } },
+    { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "id": "flask-migrate", "when": { "orm": ["flask-sqlalchemy"], "migrations": [true] } },
+    { "id": "alembic", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
+    { "id": "celery", "when": { "worker": ["celery"] } },
+    { "id": "redis", "when": { "redis": [true] } }
   ]
 }
