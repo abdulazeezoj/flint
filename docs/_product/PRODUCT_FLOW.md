@@ -1,10 +1,10 @@
-# Flint — Product Flow
+# Conjure — Product Flow
 
 **Status:** Draft for v0
-**Last updated:** 2026-08-13 (v0.10: interactive `--force` confirmation, `flint list-templates`)
+**Last updated:** 2026-08-13 (v0.10: interactive `--force` confirmation, `conjure list-templates`)
 
 Companion to `PRODUCT_SPEC.md`. Describes exactly what happens when a user
-runs Flint, in both interactive and non-interactive modes. See
+runs Conjure, in both interactive and non-interactive modes. See
 `PRODUCT_SPEC.md` §3 for the framework/template/option distinction this
 flow depends on.
 
@@ -12,15 +12,15 @@ flow depends on.
 
 | Command | Behavior |
 |---|---|
-| `uvx flint` / `flint` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
-| `flint new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
-| `flint new NAME --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
-| `flint new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.flint/last.json` for this run (§6). |
-| `flint list-templates` | Prints a table of every framework/template pair (label, description, `--docker` support), including disabled/"coming soon" entries. Generates nothing — pure introspection. |
-| `flint --version` | Prints version, exits. |
-| `flint --help` / `flint new --help` | Prints usage, exits. |
+| `uvx conjure` / `conjure` | No args → full interactive wizard, generates into a new directory named after the answered project name, in the current working directory. |
+| `conjure new [NAME]` | Same wizard; `NAME` pre-fills the project-name prompt (or skips it if `--yes`). |
+| `conjure new NAME --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --docker --git --install --yes` | Fully non-interactive; no prompts, generates immediately. `--option`/`-o key=value` is repeatable, one per template-declared option. |
+| `conjure new NAME --no-remember ...` | Same as above, but neither reads nor writes `~/.conjure/last.json` for this run (§6). |
+| `conjure list-templates` | Prints a table of every framework/template pair (label, description, `--docker` support), including disabled/"coming soon" entries. Generates nothing — pure introspection. |
+| `conjure --version` | Prints version, exits. |
+| `conjure --help` / `conjure new --help` | Prints usage, exits. |
 
-`flint` with no subcommand is an alias for `flint new` (matches the
+`conjure` with no subcommand is an alias for `conjure new` (matches the
 `create-next-app` muscle memory of "just run the command").
 
 ## 2. Interactive wizard — step by step
@@ -30,7 +30,7 @@ brackets; pressing Enter accepts it. Arrow-key select lists are used for
 choices with more than 2 options; y/n confirms use inline `(Y/n)` prompts.
 
 Where noted below, a step's default isn't always the template's own
-hardcoded default — if `~/.flint/last.json` remembers a value for that
+hardcoded default — if `~/.conjure/last.json` remembers a value for that
 step (from a previous successful run) and it's still valid, that
 remembered value is preselected instead. See §6 for the full mechanism.
 This never changes what gets *asked*, only what's pre-highlighted/
@@ -80,7 +80,7 @@ falls back to.
      entry.
 
 5. Template options — declared by the chosen template, asked in the
-   order it declares them; entirely different per template (Flint's own
+   order it declares them; entirely different per template (Conjure's own
    code has no built-in knowledge of these — see PRODUCT_ARCH.md §4).
    Some options depend on an earlier one and are silently skipped
    (resolved to a documented value) rather than asked when their
@@ -113,7 +113,7 @@ falls back to.
      than out — most quick scaffolds don't need a container), unless
      this `<framework>/<template>` remembers a different value (§6). If
      yes, and the chosen framework/template doesn't have Docker support
-     yet, Flint warns and continues without one rather than failing.
+     yet, Conjure warns and continues without one rather than failing.
 
 8. Initialize a git repository?
    ? Initialize a git repository? (Y/n) ›
@@ -167,7 +167,7 @@ falls back to.
 
 ## 4. Non-interactive mode
 
-Triggered by either passing `--yes`, or by Flint detecting stdin is not a
+Triggered by either passing `--yes`, or by Conjure detecting stdin is not a
 TTY (e.g. running in CI). In that mode:
 
 - Every prompt above becomes: use the flag/`--option` if given, else use
@@ -180,7 +180,7 @@ TTY (e.g. running in CI). In that mode:
   each of these is superseded by a remembered value first, per the rule
   above.
 - If a required decision has no safe default and no flag was given (there
-  are none in v0 — every prompt has a default), Flint would exit `1` with
+  are none in v0 — every prompt has a default), Conjure would exit `1` with
   an actionable error rather than hang. This rule exists for future
   prompts that may not have a safe default.
 - Output is the same summary block, without spinners/animations (falls
@@ -203,10 +203,10 @@ TTY (e.g. running in CI). In that mode:
 | `git` not found, git-init requested | Warn, skip git step, still exit 0. |
 | Unexpected exception during generation | Roll back (delete partially-written target directory) and exit 2 with the error. Generation is all-or-nothing from the user's perspective. |
 
-## 6. Remembered preferences (`~/.flint/last.json`)
+## 6. Remembered preferences (`~/.conjure/last.json`)
 
 After a **successful** generation (files written; git/install steps can
-still fail independently without affecting this), Flint records:
+still fail independently without affecting this), Conjure records:
 
 - The chosen framework, as the new "last framework."
 - The chosen template, as the new "last template" *for that framework*
@@ -215,7 +215,7 @@ still fail independently without affecting this), Flint records:
 - For that exact `<framework>/<template>`: every resolved template
   option, plus whether `--docker`/`--git`/`--install` were used.
 
-This is stored in `~/.flint/last.json`. On the *next* run:
+This is stored in `~/.conjure/last.json`. On the *next* run:
 
 - The wizard preselects the remembered framework/template/options/docker/
   git/install wherever noted in §2 above, instead of the template's own
@@ -226,19 +226,19 @@ This is stored in `~/.flint/last.json`. On the *next* run:
   same as it always wins over a hardcoded default — remembering only
   changes what happens when nothing else specifies a value.
 - A remembered value that's no longer valid (e.g. a select option whose
-  choices changed, or a stale key from an older Flint version) is
+  choices changed, or a stale key from an older Conjure version) is
   silently ignored in favor of the template's own default — never an
   error, never a crash.
 
 `--remember/--no-remember` (default **on**) controls this per run: with
-`--no-remember`, Flint neither reads nor writes `~/.flint/last.json` for
+`--no-remember`, Conjure neither reads nor writes `~/.conjure/last.json` for
 that invocation, as if the file didn't exist.
 
 Reading and writing this file is entirely best-effort: if it's missing,
 unreadable, not valid JSON, or the directory can't be created/written to
-(e.g. a read-only home directory), Flint silently proceeds as if nothing
+(e.g. a read-only home directory), Conjure silently proceeds as if nothing
 were remembered — this never fails or warns during generation. There is
-no version/schema field; an entry from an older Flint that no longer
+no version/schema field; an entry from an older Conjure that no longer
 makes sense for the current template just falls through the same
 staleness handling as any other invalid remembered value.
 
@@ -269,7 +269,7 @@ how a template decides which skills to include.
 ## 8. Example transcript (interactive, rest-api with a real stack)
 
 ```
-$ uvx flint
+$ uvx conjure
 ? What is your project named? my-api
 ? Which framework? FastAPI
 ? Which template? REST API
@@ -329,7 +329,7 @@ Then open http://127.0.0.1:8000
 ## 9. Example transcript (non-interactive / CI, hello-world)
 
 ```
-$ flint new my-api --framework fastapi --template hello-world --git --install --yes
+$ conjure new my-api --framework fastapi --template hello-world --git --install --yes
 Options: config=False
 Creating my-api/ from fastapi/hello-world...
   ✔ AGENTS.md

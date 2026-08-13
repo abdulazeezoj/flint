@@ -29,5 +29,5 @@ jobs:
       - name: Run tests (fails under 100% coverage — see pyproject.toml)
         run: uv run pytest
 
-      - name: Verify flint runs
-        run: uv run flint --version
+      - name: Verify conjure runs
+        run: uv run conjure --version

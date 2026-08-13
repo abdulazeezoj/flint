@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/flint-cli/
+      url: https://pypi.org/project/conjure/
     permissions:
       id-token: write # required for PyPI trusted publishing (OIDC) — no API token secret needed
     steps:

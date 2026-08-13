@@ -1,13 +1,13 @@
 # FastAPI · Hello World
 
 ```bash
-flint new my-api --framework fastapi --template hello-world --yes
+conjure new my-api --framework fastapi --template hello-world --yes
 ```
 
 A minimal, `uv`-managed FastAPI app: one `GET /` route returning
 `{"message": "Hello, World!"}`, a passing `pytest` test, and everything
-else [every Flint project ships](../getting-started.md#what-you-get-every-time).
-This is the fastest path from `uvx flint` to a running app — reach for
+else [every Conjure project ships](../getting-started.md#what-you-get-every-time).
+This is the fastest path from `uvx conjure` to a running app — reach for
 [FastAPI · REST API](fastapi-rest-api.md) instead if you need a database,
 migrations, or a background worker from the start.
 
@@ -60,8 +60,9 @@ uv run pytest
 |---|---|---|---|
 | `-o config=<bool>` | `true` / `false` | `false` | Adds `pydantic-settings`-based configuration. |
 
-With `-o config=true`, a `core/config.py` module is added and `main.py` is
-replaced with a version that reads from it instead of hardcoding values:
+Turn on `-o config=true` and Conjure adds a `core/config.py` module, then
+swaps in a version of `main.py` that reads from it instead of hardcoding
+values:
 
 ```python
 from fastapi import FastAPI
@@ -115,11 +116,11 @@ lives.
 
 ## Docker
 
-Pass `--docker` to add a `Dockerfile` and `.dockerignore` — this template
-supports it:
+This template supports `--docker`: pass the flag and Conjure adds a
+`Dockerfile` and `.dockerignore`:
 
 ```bash
-flint new my-api --framework fastapi --template hello-world --docker --yes
+conjure new my-api --framework fastapi --template hello-world --docker --yes
 ```
 
 ```dockerfile
@@ -155,7 +156,7 @@ contains and how `AGENTS.md` points at them.
 ## Non-interactive example
 
 ```bash
-flint new my-api \
+conjure new my-api \
   --framework fastapi --template hello-world \
   -o config=true \
   --docker --git --install --yes

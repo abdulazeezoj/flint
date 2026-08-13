@@ -1,11 +1,11 @@
-# Flint — Architecture
+# Conjure — Architecture
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-12 (v0.7: RabbitMQ broker choice, .env.example, Django dropped)
+**Last updated:** 2026-08-13 (v0.12: project renamed to Conjure; docs-site grid-cards gotcha)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
-design for the `flint` CLI itself (not the projects it generates).
+design for the `conjure` CLI itself (not the projects it generates).
 
 ## 1. Tech stack
 
@@ -14,8 +14,8 @@ design for the `flint` CLI itself (not the projects it generates).
 | CLI framework | [Typer](https://typer.tiangolo.com/) | Type-hint-driven, generates `--help`, minimal boilerplate, built on Click (battle-tested arg parsing). |
 | Interactive prompts | [questionary](https://github.com/tmbo/questionary) | Arrow-key select lists and confirm prompts that read like `create-next-app`; degrades cleanly, easy to script around in tests. |
 | Terminal output | [rich](https://github.com/Textualize/rich) | Colored summaries, spinners for `uv sync` / `git init`, tables — Typer already depends on it. |
-| Templating | [Jinja2](https://jinja.palletsprojects.com/) | Renders both file contents and file/directory *names* (`{{package_name}}`), industry-standard, no need for a full scaffolding framework (cookiecutter/copier) when Flint owns its own bundled templates. |
-| Packaging / env | [uv](https://docs.astral.sh/uv/) | Both: (a) how Flint itself is built/packaged/tested, and (b) the package manager wired into every generated project. |
+| Templating | [Jinja2](https://jinja.palletsprojects.com/) | Renders both file contents and file/directory *names* (`{{package_name}}`), industry-standard, no need for a full scaffolding framework (cookiecutter/copier) when Conjure owns its own bundled templates. |
+| Packaging / env | [uv](https://docs.astral.sh/uv/) | Both: (a) how Conjure itself is built/packaged/tested, and (b) the package manager wired into every generated project. |
 | Testing | pytest + Typer's `CliRunner` | Standard, integrates with `uv run pytest`. |
 
 No cookiecutter/copier dependency: templates ship bundled in the package.
@@ -26,10 +26,10 @@ is a contained change, not a rewrite.
 
 ## 2. Distribution
 
-- PyPI distribution name: `flint-cli` (see PRODUCT_SPEC §10 for why).
-- Console script entry point: `flint`.
-- Primary usage is via `uvx flint` (ephemeral run, no install) or
-  `uv tool install flint-cli` (persistent `flint` on PATH) — mirrors how
+- PyPI distribution name: `conjure` (see PRODUCT_SPEC §10 for why).
+- Console script entry point: `conjure`.
+- Primary usage is via `uvx conjure` (ephemeral run, no install) or
+  `uv tool install conjure` (persistent `conjure` on PATH) — mirrors how
   `npx create-next-app` is normally invoked.
 - Build backend: `hatchling` via `uv`'s default `uv init --package`
   project shape (src layout).
@@ -37,7 +37,7 @@ is a contained change, not a rewrite.
 ## 3. Repository layout
 
 ```
-flint/
+conjure/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                  # tests, every push/PR to main
@@ -65,16 +65,16 @@ flint/
 │       ├── flask-hello-world.md
 │       └── flask-rest-api.md
 ├── src/
-│   └── flint/
+│   └── conjure/
 │       ├── __init__.py          # __version__
-│       ├── __main__.py          # `python -m flint`
+│       ├── __main__.py          # `python -m conjure`
 │       ├── cli.py               # Typer app, `new` command, flags incl. --option
 │       ├── prompts.py           # questionary wizard steps + option resolution
 │       ├── naming.py            # project name -> slug/package_name validation
 │       ├── generator.py         # template renderer: options, layers, Jinja2
 │       ├── postgen.py           # git init, uv sync, summary printing
-│       ├── prefs.py             # ~/.flint/last.json — best-effort read/write
-│       ├── errors.py            # FlintError and friends -> exit codes
+│       ├── prefs.py             # ~/.conjure/last.json — best-effort read/write
+│       ├── errors.py            # ConjureError and friends -> exit codes
 │       └── templates/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
@@ -292,7 +292,7 @@ class Answers(BaseModel):
 5. On any exception: remove everything written so far under `target_dir`
    before re-raising, unless `target_dir` already existed before this
    call (e.g. a `--force` run into a directory the user made) — never
-   delete something Flint didn't create. All-or-nothing generation, per
+   delete something Conjure didn't create. All-or-nothing generation, per
    PRODUCT_FLOW §5.
 6. Return the deduplicated, sorted list of created paths (used for the
    CLI summary; `postgen.print_summary` checks for `Path("Dockerfile")`
@@ -369,7 +369,7 @@ a given file makes templates harder to maintain:
   migrations/worker/redis all at once), `README.md`/`AGENTS.md` (one
   coherent narrative document), `.env`/`core/config.py` (all configured
   values in one place). Decomposing these into layers would need a
-  "merge multiple layers' contributions into one file" mechanism Flint
+  "merge multiple layers' contributions into one file" mechanism Conjure
   doesn't have (and isn't worth building for a handful of files) — a
   short, well-organized conditional block is the pragmatic choice here.
   `main.py` is a deliberate, documented exception: worker/database both
@@ -394,7 +394,7 @@ eye.
 
 ### 4.4 The generated *project's* layout is opinionated too — Next.js-style
 
-Everything above is about how flint's *own* code decides what to
+Everything above is about how conjure's *own* code decides what to
 render. This section is about the shape of what gets rendered — the
 layout a developer (or a coding agent extending the scaffold) actually
 sees inside `rest-api`'s `src/{{package_name}}/`.
@@ -406,7 +406,7 @@ convention, not enforcement.** Next doesn't mandate `lib/`/`components/`
 (`app/`/`pages/`) and nothing else competes for that kind of certainty.
 Applied here:
 
-- **Strictly opinionated** (flint always uses this exact name/location,
+- **Strictly opinionated** (conjure always uses this exact name/location,
   and every generated project agrees):
   - `main.py` — the FastAPI entrypoint. Never renamed, never moved.
   - `worker.py` — the worker entrypoint (present only when a worker is
@@ -421,14 +421,14 @@ Applied here:
     hypothetical future `schedules.py` (periodic job registration) would
     live here too — the folder's job is "cross-cutting plumbing," not
     "everything that isn't a route."
-- **A default, not a rule** — flint picks *something* reasonable so the
+- **A default, not a rule** — conjure picks *something* reasonable so the
   project isn't missing a home for these, but doesn't treat it as fixed
   the way the above is: `schemas.py` (Pydantic contracts) and
   `models.py` (ORM models, iff a database is chosen) stay single
   top-level files for now, because rest-api only ships one resource.
   Both are natural candidates to become `schemas/`/`models/` folders —
   mirroring `routes/`/`tasks/` — the moment a generated project grows a
-  second resource, but flint doesn't make that call for the user.
+  second resource, but conjure doesn't make that call for the user.
 
 Why `models.py` (and `db.py`'s session/engine setup) is **not** under
 `core/`, despite both starting life under `db/` before this design: the
@@ -443,7 +443,7 @@ the ambiguity this layout exists to avoid.
 `hello-world`'s optional `config` option follows the same convention for
 consistency (`core/config.py`, not top-level `config.py`) even though a
 one-endpoint template doesn't need the rest of the `core/`/`routes/`/
-`tasks/` structure — a developer who's used one flint template shouldn't
+`tasks/` structure — a developer who's used one conjure template shouldn't
 have to relearn where config lives in another.
 
 ### 4.5 `.agents/skills/` — a shared, opt-in skills catalog
@@ -467,7 +467,7 @@ duplicating that content across `fastapi/rest-api` and `flask/rest-api`
 (drifts the moment one copy gets a fix the other doesn't), or
 cross-linking between layer trees (fragile, nothing else in the
 template system does this). Instead, the catalog lives once, flat, at
-`src/flint/skills/<id>/` — outside `templates/` entirely — and each
+`src/conjure/skills/<id>/` — outside `templates/` entirely — and each
 template's `template.json` references catalog entries by `id`.
 
 **Schema**, `skills` inside a template's `template.json`:
@@ -486,7 +486,7 @@ same `when_matches(when, context)` predicate against the fully resolved
 answers — a skill with an empty/absent `when` is always included; one
 with a `when` is included only when it matches, exactly like a layer.
 
-**Catalog entry shape**, `src/flint/skills/<id>/`:
+**Catalog entry shape**, `src/conjure/skills/<id>/`:
 
 ```
 skill.json              # {id, label, description} — maintainer metadata,
@@ -539,13 +539,13 @@ connection bug for flask).
 Two audiences, two places, deliberately not merged:
 
 - **This document set** (`docs/_product/PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/
-  `PRODUCT_ARCH.md`) is for whoever is *building* flint — spec-numbered
+  `PRODUCT_ARCH.md`) is for whoever is *building* conjure — spec-numbered
   requirements, worked examples of the `when`/`skip_value` mechanism,
   incident write-ups. It guides development direction and is the
   source of truth this whole file is part of.
 - **The docs site** (`docs/*.md` outside `_product/`, built by
   `mkdocs.yml` with the Material theme, published to GitHub Pages) is
-  for whoever is *using* flint — install instructions, a CLI reference,
+  for whoever is *using* conjure — install instructions, a CLI reference,
   one page per template, `.agents/skills/` explained, remembered
   preferences, a contributing guide. Guide/reference tone, not spec
   tone; content is substantially *derived from* this document set and
@@ -580,14 +580,30 @@ target, or other structural issue (this is `--strict`'s job — content
 *quality* is still a human/review concern, `--strict` only catches
 structural breakage). See §8 for the deploy workflow itself.
 
+**Gotcha: Material's grid-cards recipe needs two extensions, and
+`--strict` won't catch a missing one.** `docs/index.md`'s "Where to go
+next" section uses `<div class="grid cards" markdown>` — Material's
+documented way to lay out linked cards. That recipe only renders if
+`markdown_extensions` includes both `attr_list` (lets the `markdown`
+attribute opt a raw HTML block into markdown processing) and
+`md_in_html` (the extension that actually processes markdown nested
+inside raw HTML — without it, Python-Markdown leaves the block's
+contents untouched). Missing either one isn't a build error: the page
+still builds and passes `--strict`, it just renders the card block as a
+literal run of `**[text](link.md)**` markdown syntax instead of cards —
+only caught by actually looking at the rendered page (found via a
+Playwright screenshot pass, not the build log). Worth remembering for
+any future page that reaches for a Material "recipe" requiring raw HTML
+with nested markdown.
+
 ## 5. Remembered preferences (`prefs.py`)
 
-`~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
+`~/.conjure/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
 thing that could work: one flat JSON file, no schema/migration
 machinery, best-effort I/O.
 
 ```python
-PREFS_DIR = Path.home() / ".flint"
+PREFS_DIR = Path.home() / ".conjure"
 PREFS_FILE = PREFS_DIR / "last.json"
 ```
 
@@ -626,7 +642,7 @@ construction rather than by caller-side checking:
   failure (missing file, unreadable, invalid JSON, valid JSON that isn't
   an object); `save_prefs` swallows any `OSError` (read-only home
   directory, out of disk, etc.). Neither ever raises — a broken prefs
-  file must never be the reason `flint new` fails.
+  file must never be the reason `conjure new` fails.
 - `get_last_framework(prefs)`, `get_last_template(prefs, framework_id)`,
   `get_template_prefs(prefs, full_id)` — read accessors that double as
   sanitizers: each validates the type of what it reads (e.g. a
@@ -661,7 +677,7 @@ for the template's own `default`:
   falls back to the existing hardcoded default (`False`/`True`/`True`
   respectively); any actual `bool` is used as-is.
 
-This means a template's schema can change across Flint versions — an
+This means a template's schema can change across Conjure versions — an
 option removed, a select's choices narrowed — and an old `last.json`
 entry just silently stops applying to the parts that no longer make
 sense, without any version field or migration step.
@@ -684,7 +700,7 @@ remembering).
 
 | PRODUCT_FLOW step | Module |
 |---|---|
-| Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `flint` invokes `new` via Typer's default-command pattern) |
+| Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `conjure` invokes `new` via Typer's default-command pattern) |
 | Interactive prompts | `prompts.py` — one function per step, each accepting a pre-supplied flag value and skipping its own prompt if set or if `--yes`/non-TTY. `prompt_framework`/`prompt_template` share a `_select_enabled` helper. |
 | Template option resolution | `prompts.prompt_template_options(template, provided, interactive, last)` — walks `template.options` in order, honoring an explicit `--option`/`-o key=value` override first (validated against the option's `type`/`choices`), else `when`-gating (§4), else a remembered value (§5) if still valid, else prompting or defaulting. `cli.py` parses the repeatable `--option` flag into a `dict[str, str]` via `prompts.parse_option_flags` and rejects unknown keys before resolution. |
 | Remembered preferences | `prefs.py` (§5) — `cli.py` loads once per run and passes slices into each `prompts.*` call; records once, after a successful render. |
@@ -693,7 +709,7 @@ remembering).
 | File generation | `generator.py` |
 | git init / uv sync | `postgen.py` — each step wrapped so a missing `git`/`uv` binary warns and continues rather than raising |
 | Summary / next steps | `postgen.py` (`print_summary`), using `rich`; prints a leading `Options: k=v, ...` line when the template declared any |
-| Exit codes | `errors.py` defines `FlintUserError` (→1) and lets anything else bubble to Typer's default handler (→2); the top-level command wraps generation in a `try/except FlintUserError` |
+| Exit codes | `errors.py` defines `ConjureUserError` (→1) and lets anything else bubble to Typer's default handler (→2); the top-level command wraps generation in a `try/except ConjureUserError` |
 
 TTY detection for non-interactive mode: `sys.stdin.isatty()`, overridable
 by explicit `--yes`.
@@ -705,7 +721,7 @@ downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
 matches what was actually generated.
 
-`flint list-templates` (since v0.10) is a separate, standalone `@app.
+`conjure list-templates` (since v0.10) is a separate, standalone `@app.
 command`, deliberately outside `_run_new`'s flow entirely — it's pure
 introspection (`generator.list_frameworks()` × `generator.
 list_templates()`, rendered as a `rich.table.Table`), generates
@@ -718,11 +734,11 @@ roadmap rather than just what's usable today.
 
 ## 7. Testing strategy
 
-`pytest` runs with `--cov=flint --cov-report=term-missing
+`pytest` runs with `--cov=conjure --cov-report=term-missing
 --cov-fail-under=100` by default (`[tool.pytest.ini_options]` in
 `pyproject.toml`), with branch coverage on
 (`[tool.coverage.run] branch = true`) — the suite fails the moment any
-line *or* branch in `src/flint/` goes uncovered, not just when a whole
+line *or* branch in `src/conjure/` goes uncovered, not just when a whole
 function is untested. `uv run pytest` is enough to check both tests and
 coverage locally; use `uv run pytest --no-cov` while iterating to skip
 the gate temporarily.
@@ -735,7 +751,7 @@ the gate temporarily.
   render with/without `docker`/`config`; the non-empty-directory guard,
   disabled-framework/-template rejection (synthesized via a
   `TEMPLATES_DIR` monkeypatch, since both real templates are enabled
-  now), rollback-on-failure (including that a `FlintError` mid-render
+  now), rollback-on-failure (including that a `ConjureError` mid-render
   still rolls back, and that a pre-existing `--force` directory is never
   deleted); the verbatim-copy path for non-`.jinja` files;
   `list_frameworks`/`list_templates` skipping entries without
@@ -784,15 +800,15 @@ the gate temporarily.
   `isolated_prefs_dir` autouse fixture monkeypatches `prefs.PREFS_DIR`/
   `prefs.PREFS_FILE` to a per-test `tmp_path` subdirectory — this is what
   keeps every test in the suite (not just `test_prefs.py`) from ever
-  touching the real `~/.flint`, and from leaking remembered state between
+  touching the real `~/.conjure`, and from leaking remembered state between
   tests. `test_cli.py` layers end-to-end coverage on top: a full
   remember → next-run-uses-it round trip through `CliRunner`,
   `--no-remember` skipping both the read and the write, an explicit flag
   still winning over a remembered value, and a stale remembered option
   value falling back to the template's own default.
-- `test_main.py` — covers the `python -m flint` / `python -m flint.cli`
+- `test_main.py` — covers the `python -m conjure` / `python -m conjure.cli`
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
-  plus a plain `import flint.__main__` to cover the guard's not-taken
+  plus a plain `import conjure.__main__` to cover the guard's not-taken
   branch.
 - `test_flask_hello_world.py` / `test_flask_rest_api.py` — Flask's
   mirror of the FastAPI hello-world/rest-api coverage above (rendered
@@ -911,7 +927,7 @@ surfaced by actually running the generated tooling:
 
 ## 8. Versioning & release mechanics
 
-- `src/flint/__init__.py` holds `__version__`, single source of truth;
+- `src/conjure/__init__.py` holds `__version__`, single source of truth;
   `pyproject.toml`'s `version` is kept in sync manually for v0 (a
   version-sync script/tool is a reasonable v0.x addition, not needed for
   one release).
@@ -922,8 +938,8 @@ surfaced by actually running the generated tooling:
   `main` and every PR — `uv sync --locked` (fails if `uv.lock` drifted
   from `pyproject.toml`), `uv run pytest` (the same 100%-coverage-gated
   suite documented in §7), and a smoke check that the installed console
-  script actually runs (`uv run flint --version`). Single Python
-  version (3.11, the floor in `requires-python`) — flint's own code has
+  script actually runs (`uv run conjure --version`). Single Python
+  version (3.11, the floor in `requires-python`) — conjure's own code has
   no version-specific branches, so a matrix would mostly re-run the
   same thing.
 - **CD** (`.github/workflows/cd.yml`, since v0.10.1): fires on pushing a
@@ -960,7 +976,7 @@ surfaced by actually running the generated tooling:
 
 Nothing is currently deferred — as of v0.10.0 every item previously
 tracked here is resolved (see PRODUCT_SPEC.md §12 and CHANGELOG.md):
-`--force` overwrite confirmation and `flint list-templates` shipped;
+`--force` overwrite confirmation and `conjure list-templates` shipped;
 package-manager choice and template distribution were closed as
 deliberate design decisions (uv-only, bundled-only) rather than left
 open. This section exists so a *new* non-goal has a documented home —

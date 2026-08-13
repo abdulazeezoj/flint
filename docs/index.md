@@ -1,4 +1,4 @@
-# Flint
+# Conjure
 
 `create-next-app`, for Python. One command, a short interactive wizard, and
 you have a running project — no hand-written boilerplate. Pick a richer
@@ -6,7 +6,7 @@ template and the same wizard wires up a real database, migrations, and a
 background worker too.
 
 ```bash
-uvx flint
+uvx conjure
 ```
 
 ```text
@@ -39,38 +39,38 @@ Next steps:
 Then open http://127.0.0.1:8000
 ```
 
-## Why Flint
+## Why Conjure
 
 Every new FastAPI or Flask project starts with the same repetitive setup —
 `pyproject.toml`, a `src/` layout, a first endpoint, a test, a `.gitignore`,
 a README nobody gets around to writing — and, past the toy stage, the same
 recurring decisions: which database, which ORM, whether to bother with
-migrations yet, whether background work needs a queue. Flint answers the
+migrations yet, whether background work needs a queue. Conjure answers the
 short list of decisions that actually matter and generates a project that's
 already wired for them, instead of a blank slate you have to wire yourself.
 
-- **Zero to running in under a minute.** `uvx flint` needs no install, no
-  config file, and produces a project you can `uv run` immediately.
+- **Zero to running in under a minute.** No install, no config file — run
+  `uvx conjure` and you have a project you can `uv run` immediately.
 - **Real head-start choices, not just a skeleton.** The `rest-api` template
   offers a database (SQLite/PostgreSQL), an ORM, Alembic migrations, a
   background worker (Taskiq/Celery), and Redis — pick what you need, skip
   what you don't.
 - **Fully scriptable.** Every interactive prompt has a matching flag, so
-  `flint new` works identically in CI with zero prompts.
+  `conjure new` works identically in CI with zero prompts.
 - **Two frameworks today, more later.** FastAPI and Flask ship with
   matching template shapes — same options, same conventions, same
   generated layout philosophy — so switching between them isn't a
   relearn.
 - **Agent-ready by default.** Every generated project ships an `AGENTS.md`
-  plus a `.agents/skills/` catalog of deeper, library-specific reference
-  material for exactly the stack it uses — see [Agent Skills](agent-skills.md).
+  plus a `.agents/skills/` catalog scoped to exactly the stack it generated
+  — see [Agent Skills](agent-skills.md).
 
 ## Where to go next
 
 <div class="grid cards" markdown>
 
 - **[Getting Started](getting-started.md)**
-  Install Flint and generate your first project, interactively or
+  Install Conjure and generate your first project, interactively or
   non-interactively.
 
 - **[CLI Reference](cli-reference.md)**
@@ -87,12 +87,11 @@ already wired for them, instead of a blank slate you have to wire yourself.
 ## Install
 
 ```bash
-uv tool install flint-cli   # persistent `flint` on PATH
+uv tool install conjure   # persistent `conjure` on PATH
 # or run it ephemerally, no install:
-uvx flint
+uvx conjure
 ```
 
-Flint is a CLI, not a library — installing `flint-cli` puts a `flint`
-command on your `PATH` (the PyPI distribution name differs from the command
-itself only because the plain `flint` name on PyPI belongs to an unrelated
-package).
+Conjure is a CLI, not a library: installing it puts a `conjure` command on
+your `PATH`, from a PyPI package of the same name — no `-cli` suffix, no
+alias to remember.

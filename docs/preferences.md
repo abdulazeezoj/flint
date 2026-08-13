@@ -1,14 +1,15 @@
 # Remembered Preferences
 
-Flint remembers what you picked last time and uses it as the new default —
-so a project you generate often (or a CI job you run repeatedly) tends to
-need fewer and fewer flags. This page covers the whole mechanism: what's
-saved, when, how it's used, and how to turn it off.
+Conjure remembers what you picked last time and uses it as the new default —
+so a project you generate often, or a CI job you run on repeat, needs fewer
+and fewer flags each time. The interesting part isn't the remembering; it's
+the forgetting — a stale value, a missing file, a corrupted one — none of it
+is allowed to interrupt a run.
 
 ## What gets remembered
 
-After a **successful** generation, Flint saves three things to
-`~/.flint/last.json`:
+After a **successful** generation, Conjure saves three things to
+`~/.conjure/last.json`:
 
 - **The last framework** you picked (e.g. `fastapi`).
 - **The last template you picked for that framework**, specifically.
@@ -30,7 +31,7 @@ into `fastapi/hello-world`'s options, even though they share a framework.
 Only after generation actually succeeds — the project's files have been
 written to disk. A failed or cancelled run (invalid input, an existing
 non-empty target directory you declined to overwrite, an unexpected
-error) never touches `~/.flint/last.json`; whatever was remembered before
+error) never touches `~/.conjure/last.json`; whatever was remembered before
 stays exactly as it was.
 
 The write happens *before* the optional git-init and dependency-install
@@ -57,15 +58,14 @@ interactive-only convenience.
 ## Precedence
 
 An explicit flag or `-o key=value` **always** wins over a remembered
-value — no exceptions, every time. Remembering only changes what happens
-when nothing else specifies a value; it never overrides something you
-actually typed.
+value — no exceptions. Remembering only changes what happens when nothing
+else specifies a value; it never overrides something you actually typed.
 
 ## Staleness — never an error
 
 If a remembered value no longer makes sense for the current template —
-say you upgraded Flint and a `select` option's choices changed, or an
-option was renamed or removed entirely — Flint doesn't error and doesn't
+say you upgraded Conjure and a `select` option's choices changed, or an
+option was renamed or removed entirely — Conjure doesn't error and doesn't
 warn. It silently falls back to the template's own current default for
 that one value, exactly as if nothing had been remembered for it. Every
 other still-valid remembered value is unaffected.
@@ -75,9 +75,9 @@ entries just stop applying to the parts that no longer fit, quietly.
 
 ## Resilience
 
-Reading and writing `~/.flint/last.json` is entirely best-effort. If the
+Reading and writing `~/.conjure/last.json` is entirely best-effort. If the
 file is missing, unreadable, not valid JSON, or isn't even a JSON object
-(e.g. hand-edited into something odd), Flint treats it as empty and
+(e.g. hand-edited into something odd), Conjure treats it as empty and
 proceeds with the template's normal defaults — this never crashes or
 warns during generation. The same applies in reverse: if the file can't
 be written (a read-only home directory, out of disk space, whatever),
@@ -87,7 +87,7 @@ unaffected.
 ## Opting out
 
 Pass `--no-remember` to skip both reading *and* writing
-`~/.flint/last.json` for that one invocation — Flint behaves as if the
+`~/.conjure/last.json` for that one invocation — Conjure behaves as if the
 file didn't exist, using template defaults on the way in and leaving the
 file untouched on the way out. It's a per-run flag, not a persistent
 setting: the next run without it goes back to reading and writing as
@@ -96,7 +96,7 @@ normal. See [CLI Reference](cli-reference.md) for the full
 
 ## Where the file lives
 
-`~/.flint/last.json` is a plain JSON file — nothing sensitive, nothing
+`~/.conjure/last.json` is a plain JSON file — nothing sensitive, nothing
 binary. Shape looks like this:
 
 ```json
@@ -116,7 +116,7 @@ binary. Shape looks like this:
 
 !!! tip "Resetting to defaults"
     Since it's just a plain file with no other purpose, deleting it is a
-    safe, complete reset: `rm ~/.flint/last.json`. Flint will recreate it
+    safe, complete reset: `rm ~/.conjure/last.json`. Conjure will recreate it
     on your next successful run, and until then every prompt goes back to
     the template's own hardcoded defaults.
 
@@ -125,17 +125,17 @@ binary. Shape looks like this:
 Generate a project with an explicit stack:
 
 ```bash
-flint new my-api \
+conjure new my-api \
   --framework fastapi --template rest-api \
   -o database=postgres --docker
 ```
 
-That run succeeds, so Flint remembers `fastapi`, `rest-api`, `database=postgres`,
+That run succeeds, so Conjure remembers `fastapi`, `rest-api`, `database=postgres`,
 and `docker=true` (along with whatever defaults applied to the rest of the
-`rest-api` options and to git/install). Run Flint again with no arguments:
+`rest-api` options and to git/install). Run Conjure again with no arguments:
 
 ```bash
-flint
+conjure
 ```
 
 ```text

@@ -1,11 +1,34 @@
 # Changelog
 
-All notable changes to Flint are documented here.
+All notable changes to Conjure are documented here.
 
 Versions follow `v{release}.{feature}.{fixes}` (see
 `docs/_product/PRODUCT_SPEC.md` §11): `release` is the major epoch
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
+
+## v0.12.0 — 2026-08-13
+
+### Changed
+
+- **Project name finalized as `conjure`.** Confirmed available and
+  unclaimed on PyPI, pronounceable, and free of collisions with
+  established tools — locked in before any release ever publishes under
+  it. The PyPI distribution name and the `conjure` console script are
+  the same string; no `-cli` suffix, no alias to remember.
+- **Two docs-site rendering bugs, fixed and verified visually.** The
+  homepage's "Where to go next" card grid was rendering as raw,
+  unprocessed markdown — `mkdocs.yml` was missing the `attr_list` and
+  `md_in_html` extensions Material's grid-cards recipe requires (see
+  PRODUCT_ARCH.md §4.6). Separately, `mkdocs.yml`'s `repo_name` pointed
+  at the wrong slug. Neither broke `mkdocs build --strict`, which checks
+  structure, not rendered output — both were only caught by an actual
+  Playwright visual pass across all 11 pages in both light and dark
+  themes, which is now how this site gets QA'd, not just build-checked.
+- **Editorial pass across all 11 docs pages** — tightened flat/listy
+  prose, fixed passive voice, and sharpened section openings for rhythm
+  and directness, without changing any code block, table, link, or
+  heading.
 
 ## v0.11.0 — 2026-08-13
 
@@ -53,7 +76,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   using Trusted Publishing (OIDC) — no API token stored as a repo
   secret. Publishing requires a one-time PyPI-side setup (see
   PRODUCT_ARCH.md §8 for exactly what to register). No change to the
-  `flint` CLI itself — this is release infrastructure only.
+  `conjure` CLI itself — this is release infrastructure only.
 
 ## v0.10.0 — 2026-08-13
 
@@ -61,13 +84,13 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Interactive `--force` overwrite confirmation.** Running into a
   non-empty target directory without `--force` used to hard-error
-  unconditionally. Now, in interactive mode, Flint asks "Directory 'x'
+  unconditionally. Now, in interactive mode, Conjure asks "Directory 'x'
   already exists and is not empty. Overwrite?" instead of failing
   outright — confirming proceeds exactly as `--force` would have,
   declining aborts cleanly with no files written. Non-interactive runs
   (`--yes`/piped stdin/CI) are unchanged: no prompt, same hard error
   unless `--force` was already passed.
-- **`flint list-templates`**: a new introspection command listing every
+- **`conjure list-templates`**: a new introspection command listing every
   framework/template pair — label, description, whether it supports
   `--docker` — including disabled/"coming soon" entries, so the roadmap
   stays visible outside the wizard too. Generates nothing.
@@ -76,7 +99,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Package manager and template distribution are formally closed, not
   left open.** Both were long-standing "Open Questions" in
-  PRODUCT_SPEC.md §12 with no code changes attached. Flint stays
+  PRODUCT_SPEC.md §12 with no code changes attached. Conjure stays
   `uv`-only (every template's `pyproject.toml`/README/`AGENTS.md`/skill
   already assumes it end to end — supporting pip/poetry would mean a
   second rendering of every template, not a small addition) and
@@ -101,7 +124,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `taskiq`, `celery`, `redis`, `pytest`. Selection is declarative — a
   new `skills` list in `template.json`, gated by the exact same `id`/
   `when` shape `layers` already use — and the catalog lives once, flat,
-  at `src/flint/skills/<id>/`, decoupled from any one framework/
+  at `src/conjure/skills/<id>/`, decoupled from any one framework/
   template so a skill used by both (e.g. `pytest`, `redis`) isn't
   duplicated. Rendered through the same Jinja mechanism as everything
   else, so skill content gets real `{{ package_name }}` substitution
@@ -204,7 +227,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `rest-api`, to match the hyphenated id style used elsewhere (e.g.
   `hello-world`) instead of being the odd one out. `--template restapi`
   is no longer recognized — use `--template rest-api`. Anything already
-  remembered in `~/.flint/last.json` under the old `fastapi/restapi` key
+  remembered in `~/.conjure/last.json` under the old `fastapi/restapi` key
   (§ v0.5.0) is simply never looked up again under the new id and falls
   back to the template's own defaults, same as any other stale entry —
   no manual migration needed.
@@ -213,8 +236,8 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 ### Added
 
-- **Remembered preferences** (`~/.flint/last.json`): after a successful
-  generation, Flint saves the last framework, the last template picked
+- **Remembered preferences** (`~/.conjure/last.json`): after a successful
+  generation, Conjure saves the last framework, the last template picked
   per framework, and — per `<framework>/<template>` — the resolved
   options plus `docker`/`git`/`install`. The next run uses these as the
   new default: the interactive wizard preselects them, and a flagless
@@ -224,12 +247,12 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   choice no longer valid for the current template) is silently ignored
   in favor of the template's own default rather than erroring.
 - `--remember/--no-remember` flag (default on) to opt a single run out
-  of both reading and writing `~/.flint/last.json` — for anyone who
+  of both reading and writing `~/.conjure/last.json` — for anyone who
   wants a fully stateless run.
 
 ### Changed
 
-- Reading/writing `~/.flint/last.json` is entirely best-effort: a
+- Reading/writing `~/.conjure/last.json` is entirely best-effort: a
   missing, corrupt, or unwritable prefs file never fails or warns during
   generation — it's silently treated as "nothing remembered yet."
 
@@ -338,7 +361,7 @@ full write-up of why each was invisible to lighter checks:
 ### Fixed
 
 - `generator.render` now rolls back a partially-written target directory
-  when a `FlintError` (not just any other exception) is raised mid-render
+  when a `ConjureError` (not just any other exception) is raised mid-render
   — previously that branch re-raised without cleaning up, breaking the
   documented all-or-nothing generation guarantee. Currently unreachable
   via any real input, but would have mattered the moment a future layer
@@ -348,8 +371,8 @@ full write-up of why each was invisible to lighter checks:
 
 - Test suite now enforces 100% statement + branch coverage
   (`--cov-fail-under=100` in `pyproject.toml`, branch coverage on) —
-  every module in `src/flint/` is fully covered, including the
-  `python -m flint` entry points, `git`/`uv` subprocess failure paths,
+  every module in `src/conjure/` is fully covered, including the
+  `python -m conjure` entry points, `git`/`uv` subprocess failure paths,
   and every prompt cancellation branch.
 
 ## v0.2.0 — 2026-08-12
@@ -380,12 +403,12 @@ full write-up of why each was invisible to lighter checks:
 
 ## v0.1.0 — 2026-08-12
 
-First release. `flint` scaffolds a runnable project from a short
+First release. `conjure` scaffolds a runnable project from a short
 interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 
 ### Added
 
-- `flint` / `flint new [NAME]` — interactive wizard: project name,
+- `conjure` / `conjure new [NAME]` — interactive wizard: project name,
   framework, git init, dependency install.
 - Fully non-interactive mode via `--framework`, `--git/--no-git`,
   `--install/--no-install`, `--yes`, and `--force`; auto-detected when
@@ -393,7 +416,7 @@ interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 - `fastapi-hello-world` template: a `uv`-managed, `src/`-layout FastAPI
   project with a passing `pytest` test, ready to run with
   `uv run fastapi dev src/<package>/main.py`.
-- `flint --version`.
+- `conjure --version`.
 - Project name validation: derives a filesystem-safe slug and a valid,
   importable Python package name; rejects empty/keyword/stdlib-shadowing
   names instead of silently mutating them.

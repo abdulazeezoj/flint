@@ -1,15 +1,15 @@
 # Flask · Hello World
 
 ```bash
-flint new my-api --framework flask --template hello-world --yes
+conjure new my-api --framework flask --template hello-world --yes
 ```
 
 A minimal, `uv`-managed Flask app: one `GET /` route returning
 `{"message": "Hello, World!"}`, a passing `pytest` test, and everything
-else [every Flint project ships](../getting-started.md#what-you-get-every-time).
+else [every Conjure project ships](../getting-started.md#what-you-get-every-time).
 It's the Flask mirror of [FastAPI · Hello World](fastapi-hello-world.md) —
 same shape, same options, same layer structure — so switching between
-Flint's two frameworks isn't a relearn. Reach for
+Conjure's two frameworks isn't a relearn. Reach for
 [Flask · REST API](flask-rest-api.md) instead if you need a database,
 migrations, or a background worker from the start.
 
@@ -64,7 +64,7 @@ uv run pytest
 
 !!! note
     The entrypoint is `main.py`, not Flask's more common `app.py`/`wsgi.py`
-    — Flint uses `main.py` for every framework's entrypoint so the landmark
+    — Conjure uses `main.py` for every framework's entrypoint so the landmark
     file is identical whichever one you picked.
 
 ## Options
@@ -75,10 +75,10 @@ uv run pytest
 |---|---|---|---|
 | `-o config=<bool>` | `true` / `false` | `false` | Adds `pydantic-settings`-based configuration. |
 
-With `-o config=true`, a `core/config.py` module is added and `main.py` is
-replaced with a version that reads from it instead of hardcoding values.
-Flask's constructor takes an *import name*, not a display name, so the
-configured values are stored on `app.config` instead of passed to
+Turn on `-o config=true` and Conjure adds a `core/config.py` module, then
+swaps in a version of `main.py` that reads from it instead of hardcoding
+values. Flask's constructor takes an *import name*, not a display name, so
+the configured values land on `app.config` rather than getting passed to
 `Flask(...)`:
 
 ```python
@@ -130,11 +130,11 @@ my-api/
 
 ## Docker
 
-Pass `--docker` to add a `Dockerfile` and `.dockerignore` — this template
-supports it:
+This template supports `--docker`: pass the flag and Conjure adds a
+`Dockerfile` and `.dockerignore`:
 
 ```bash
-flint new my-api --framework flask --template hello-world --docker --yes
+conjure new my-api --framework flask --template hello-world --docker --yes
 ```
 
 Flask's own dev server isn't meant for production, so the container runs
@@ -156,7 +156,7 @@ docker run -p 8000:8000 my-api
 `gunicorn` is only added to `dependencies` when `--docker` is passed — no
 production WSGI server pulled in for projects that never asked for a
 container. No Docker Compose is generated either, here or anywhere in
-Flint — one `Dockerfile` is the entire Docker story.
+Conjure — one `Dockerfile` is the entire Docker story.
 
 ## Agent skills
 
@@ -174,7 +174,7 @@ contains and how `AGENTS.md` points at them.
 ## Non-interactive example
 
 ```bash
-flint new my-api \
+conjure new my-api \
   --framework flask --template hello-world \
   -o config=true \
   --docker --git --install --yes

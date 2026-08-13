@@ -1,6 +1,6 @@
 [project]
-name = "flint-cli"
-version = "0.11.0"
+name = "conjure"
+version = "0.12.0"
 description = "Interactive project scaffolding for Python frameworks — create-next-app, for FastAPI, Flask, and friends."
 readme = "README.md"
 license = "MIT"
@@ -26,14 +26,14 @@ classifiers = [
 Repository = "https://github.com/abdulazeezoj/flint"
 
 [project.scripts]
-flint = "flint.cli:main"
+conjure = "conjure.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.8.17,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "flint"
+module-name = "conjure"
 
 [dependency-groups]
 dev = [
@@ -46,8 +46,8 @@ docs = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=flint --cov-report=term-missing --cov-fail-under=100"
+addopts = "--cov=conjure --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 branch = true
-source = ["flint"]
+source = ["conjure"]
