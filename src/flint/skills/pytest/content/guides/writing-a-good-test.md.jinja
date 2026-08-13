@@ -1,0 +1,85 @@
+# Guide: writing a good test for a new endpoint
+
+This is the testing half of adding a new resource. For the
+routing/schema{% if database is defined and database != "none" %}/model{% endif %} half — the code under test — see the
+{% if framework == "fastapi" %}`fastapi` skill's `guides/add-an-endpoint.md`{% else %}`flask` skill's `guides/add-a-resource.md`{% endif %}.
+For how `client` itself talks to the app in-process, see the
+{% if framework == "fastapi" %}`fastapi` skill's `guides/testing.md`{% else %}`flask` skill's `guides/testing.md`{% endif %}.
+This guide only covers what makes a test *good* once you already have
+a working `client`.
+
+## One test per behavior
+
+Split behaviors into separate test functions rather than one function
+that asserts an entire flow end-to-end: `test_create_widget`,
+`test_list_widgets`, `test_get_widget`,
+`test_get_widget_missing_returns_404`, `test_delete_widget`. The
+starter `test_item_crud` in `tests/test_main.py` chains
+create → list → get → delete → get-again-expecting-404 into one
+function to keep the initial scaffold short — read it as a compact
+example of the behaviors worth covering, not as the shape to keep
+copying as a resource grows. Once a resource has more going on than the
+basic CRUD set, one test per behavior means a failing test's *name*
+tells you what broke (`test_get_widget_missing_returns_404` failing is
+unambiguous; a failure partway through one long combined test isn't).
+
+## Assert the status code *and* the response body's shape
+
+`assert response.status_code == 201` alone doesn't prove the response
+body is right. Always also assert on
+{% if framework == "fastapi" %}`response.json()`{% else %}`response.get_json()`{% endif %},
+checking the fields that matter — not necessarily every field (an `id`
+that's merely "some int" is often enough to check for presence), but
+any field the caller sent should come back unchanged:
+
+```python
+{% if framework == "fastapi" %}
+async def test_create_widget(client: AsyncClient) -> None:
+    response = await client.post(
+        "/widgets/", json={"name": "Widget", "description": "A thing"}
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "Widget"
+    assert body["description"] == "A thing"
+    assert "id" in body
+
+
+async def test_get_widget_missing_returns_404(client: AsyncClient) -> None:
+    response = await client.get("/widgets/999")
+    assert response.status_code == 404
+{% else %}
+def test_create_widget(client) -> None:
+    response = client.post(
+        "/widgets/", json={"name": "Widget", "description": "A thing"}
+    )
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["name"] == "Widget"
+    assert body["description"] == "A thing"
+    assert "id" in body
+
+
+def test_get_widget_missing_returns_404(client) -> None:
+    response = client.get("/widgets/999")
+    assert response.status_code == 404
+{% endif %}
+```
+
+## The minimum behaviors worth a test
+
+For any CRUD resource: create (2xx, body echoes the input), list (2xx,
+the new item is present), get-by-id (2xx, the right item comes back),
+get-by-id when missing (404), delete (2xx/204), and get-by-id again
+after delete (404). `tests/test_main.py`'s `test_item_crud` covers
+exactly this set for `items` in one combined function; give a new
+resource the same coverage, split per the section above once there's
+more than the basics worth testing.
+
+## When the same behavior needs several inputs
+
+If you find yourself about to write several near-identical test
+functions that only differ in the input payload and the expected
+outcome (several invalid payloads that should all 422, say), that's a
+sign to reach for `@pytest.mark.parametrize` instead — see
+`guides/parametrize.md`.
