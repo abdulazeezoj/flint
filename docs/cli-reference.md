@@ -34,7 +34,7 @@ it interactively, or it falls back to `my-app` in non-interactive mode.
 |---|---|---|
 | `--framework TEXT` | *(prompted / first enabled)* | Framework to use, e.g. `fastapi`. |
 | `--template TEXT` | *(prompted / first enabled)* | Template variant within the framework, e.g. `hello-world`. |
-| `--option`, `-o KEY=VALUE` | *(repeatable)* | Set a template-specific option as `key=value`, e.g. `-o database=postgres -o orm=sqlmodel`. See [`--option` / `-o`](#--option--o-key-value) below. |
+| `--option`, `-o KEY=VALUE` | *(repeatable)* | Set a template-specific option as `key=value`, e.g. `-o database=postgres -o orm=sqlmodel`. See [`--option` / `-o`](#-option-o-keyvalue) below. |
 | `--docker` / `--no-docker` | `--no-docker` | Add a `Dockerfile` (and `.dockerignore`). |
 | `--git` / `--no-git` | `--git` | Initialize a git repository. |
 | `--install` / `--no-install` | `--install` | Install dependencies with `uv`. |
