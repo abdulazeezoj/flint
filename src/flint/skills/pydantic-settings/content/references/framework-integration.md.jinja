@@ -1,0 +1,104 @@
+{% if framework == "fastapi" %}
+# How FastAPI code reaches for `settings`
+{% else %}
+# How Flask code reaches for `settings`
+{% endif %}
+
+Every consumer imports the same module-level singleton:
+
+```python
+from {{ package_name }}.core.config import settings
+```
+
+{% if framework == "fastapi" %}
+## FastAPI: `settings` is used directly, everywhere
+
+FastAPI never wraps `settings` in anything — every consumer just
+imports the object and reads attributes off it:
+
+- `main.py` builds the app from it directly:
+  `app = FastAPI(title=settings.app_name, debug=settings.debug{% if template == "rest-api" %}, lifespan=lifespan{% endif %})`.
+{% if template == "rest-api" %}
+- `core/db.py` builds the engine from it:
+  `engine = create_async_engine(settings.database_url, echo=settings.debug)`.
+{% if redis %}
+- `core/redis.py` builds the client from it:
+  `redis_client = Redis.from_url(settings.redis_url, decode_responses=True)`.
+{% endif %}
+{% if worker in ("taskiq", "celery") %}
+- `worker.py` builds the broker from it (`settings.{% if broker == "rabbitmq" %}rabbitmq_url{% else %}redis_url{% endif %}`).
+{% endif %}
+{% if migrations %}
+- `alembic/env.py` reads `settings.database_url` too, so migrations
+  always target the same database the app itself would connect to —
+  never a second, hand-copied connection string.
+{% endif %}
+{% endif %}
+
+There's no framework-level indirection to work around: if you need a
+config value in a new module, import `settings` the same way and read
+the attribute. Nothing here is request-scoped or needs `Depends()` —
+see the `fastapi` skill's notes on why `Depends()` is for per-request
+values, not app-lifetime singletons like this one.
+{% else %}
+## Flask: app-level values get copied onto `app.config`, everything else imports `settings` directly
+
+Flask can't take a `Settings` instance as `Flask(__name__)`'s first
+argument, so{% if template == "rest-api" %} `main.py`'s `create_app()` factory{% else %} `main.py`{% endif %} copies the handful of
+values Flask itself{% if template == "rest-api" %} (or Flask-SQLAlchemy){% endif %} needs onto the app's own `config` mapping:
+
+```python
+{% if template == "rest-api" %}
+def create_app(*, database_url: str | None = None, testing: bool = False) -> Flask:
+    app = Flask(__name__)
+    app.config["APP_NAME"] = settings.app_name
+    app.config["DEBUG"] = settings.debug
+    app.config["TESTING"] = testing
+{% if database != "none" %}
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url or settings.database_url
+{% endif %}
+    ...
+{% else %}
+app = Flask(__name__)
+app.config["APP_NAME"] = settings.app_name
+app.config["DEBUG"] = settings.debug
+{% endif %}
+```
+
+This is a one-time copy at app-construction time, not a live view —
+the app never holds a reference to `settings` itself, it holds copies
+of the values it needed. That's *only* different from FastAPI's
+"keep the object" style because `Flask.__init__`/`app.config` is a
+plain dict-like mapping with no constructor hook for an arbitrary
+settings object; it isn't a sign that Flask's config is more dynamic
+or re-read per request — `settings` itself is still built once, just
+like in FastAPI.
+{% if template == "rest-api" %}
+Notice `create_app(*, database_url: str | None = None, ...)` accepts an
+**override** for the database URL, defaulting to `settings.database_url`
+only when the caller doesn't pass one. `tests/conftest.py` uses exactly
+this to force an isolated in-memory SQLite database
+(`create_app(database_url="sqlite:///:memory:", testing=True)`) without
+touching `.env` or monkeypatching `settings` at all — prefer this same
+explicit-override shape for any other test that needs a different
+config value than what `.env` provides, rather than mutating the
+shared `settings` singleton.
+
+Everything that *isn't* Flask/Flask-SQLAlchemy itself skips
+`app.config` entirely and imports `settings` directly, exactly like
+FastAPI does:
+{% if redis %}
+- `core/redis.py`: `redis_client = Redis.from_url(settings.redis_url, decode_responses=True)`.
+{% endif %}
+{% if worker == "celery" %}
+- `worker.py`: `celery_app = Celery(..., broker=settings.{% if broker == "rabbitmq" %}rabbitmq_url{% else %}redis_url{% endif %}, ...)`.
+{% endif %}
+{% if migrations %}
+- `alembic/env.py`: `config.set_main_option("sqlalchemy.url", settings.database_url)`.
+{% endif %}
+So the rule of thumb: **inside the app factory**, app/Flask-specific
+values go on `app.config`; **everywhere else** (workers, migrations,
+standalone clients), import `settings` directly — don't invent a third
+way to thread a config value into a new module.
+{% endif %}
+{% endif %}

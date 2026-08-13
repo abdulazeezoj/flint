@@ -1,0 +1,84 @@
+---
+name: sqlmodel
+description: Model definition, async session/query patterns, and Pydantic-vs-table-model conventions for this project's SQLModel data layer. Use when defining or changing a table model, writing a query against the database, or touching session/engine setup.
+---
+
+# SQLModel
+
+This project's ORM is [SQLModel](https://sqlmodel.tiangolo.com/) — a thin
+layer over SQLAlchemy and Pydantic, from the same author as FastAPI. This
+skill covers how *this project* uses it, not the whole library surface, so
+you can add code that matches the existing conventions instead of
+introducing a second style.
+
+SQLModel is the default ORM for `fastapi`/`rest-api` (the other choice is
+plain SQLAlchemy — see the `sqlalchemy` skill if that's what this project
+uses instead; check `src/{{ package_name }}/models.py` for `SQLModel` vs.
+`declarative_base()` if you're unsure which applies). It is async-only in
+this project — Flask's sync data layer uses plain SQLAlchemy or
+flask-sqlalchemy instead.
+
+## When to reach for this
+
+- Defining a new table model, or adding/changing a field on an existing one.
+- Writing a query (`select`, filtering, ordering) against the database.
+- Touching `src/{{ package_name }}/core/db.py` — engine, session factory,
+  `init_db()`.
+- Debugging a query that returns a coroutine instead of data, or an
+  `AttributeError` that mentions `.execute()`.
+
+## Quick reference
+
+- **Models**: `src/{{ package_name }}/models.py`. One class per table,
+  inheriting `SQLModel` with `table=True` — this single class *is* both
+  the Pydantic model and the SQLAlchemy table declaration:
+
+  ```python
+  from sqlmodel import Field, SQLModel
+
+  class Item(SQLModel, table=True):
+      id: int | None = Field(default=None, primary_key=True)
+      name: str
+      description: str | None = None
+  ```
+
+- **Engine & sessions**: `src/{{ package_name }}/core/db.py` builds an
+  async engine (`create_async_engine`) and an `async_sessionmaker` bound to
+  SQLModel's own `AsyncSession`
+  (`from sqlmodel.ext.asyncio.session import AsyncSession` — not
+  SQLAlchemy's). `get_session()` is the `Depends()`-able generator every
+  route uses to get one session per request (see the `fastapi` skill's
+  `references/routing-and-dependencies.md` for the dependency-injection
+  side of this).
+- **Querying**: `select(Model)` from `sqlmodel`, run with
+  `await session.exec(...)` — **`.exec()`, not `.execute()`** (see
+  `references/gotchas.md`). `session.get(Model, id)` for a primary-key
+  lookup, `session.add()` / `await session.commit()` /
+  `await session.refresh()` for writes.
+- **Every session call that touches the database is awaited.** There is no
+  sync fallback in this project's data layer — a call missing `await`
+  doesn't error immediately, it hands back a coroutine object (see
+  `references/gotchas.md`).
+- **Table model vs. API schema**: the SQLModel class in `models.py` is the
+  *table* model. `src/{{ package_name }}/schemas.py` holds separate plain
+  Pydantic models (`ItemCreate`, `ItemRead`) for what crosses the HTTP
+  boundary — see `references/models-and-sessions.md` for why these aren't
+  collapsed into one type even though SQLModel supports `table=False`
+  models for exactly that.
+{% if migrations %}
+- **Migrations**: this project has `migrations=true` — Alembic's
+  `env.py` points `target_metadata` at `SQLModel.metadata` and imports
+  `models.py` so Alembic can see the tables when autogenerating. The
+  `alembic` skill covers the migration workflow itself; this skill only
+  covers the model-definition side that autogenerate reads from.
+{% endif %}
+
+## Go deeper
+
+- `references/models-and-sessions.md` — field syntax, the async session
+  lifecycle, and why table models and API schemas stay separate types.
+- `references/gotchas.md` — the missing-`await` trap and the
+  `.exec()`/`.execute()` naming mismatch, both real mistakes this
+  project's own templates hit while being built.
+- `guides/add-a-model.md` — defining a new table model end-to-end, with a
+  pointer to the `fastapi` skill for wiring it into a router.

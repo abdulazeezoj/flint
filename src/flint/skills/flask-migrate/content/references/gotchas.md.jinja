@@ -1,0 +1,66 @@
+# Gotchas
+
+## `db.create_all()` and real migrations must never coexist
+
+`core/db.py`'s `init_db()` only calls `db.create_all()` when
+`testing=True`:
+
+```python
+def init_db(app: Flask, *, testing: bool = False) -> None:
+    ...
+    db.init_app(app)
+    migrate.init_app(app, db)
+    if testing:
+        # Tests run against an isolated in-memory database with no
+        # migration history to replay, so the schema is created directly
+        # from the models here instead. Real usage must NOT do this: it
+        # would leave `flask db migrate` permanently unable to detect a
+        # schema change, since the tables would already match the models
+        # before any migration ever ran. Real schema comes from `flask
+        # db upgrade` — see README.md's "Migrations" section.
+        with app.app_context():
+            db.create_all()
+```
+
+That `if testing:` guard is load-bearing, not incidental. If
+`db.create_all()` ran unconditionally — e.g. moved outside the guard "to
+make sure the tables exist" — real usage would create every table
+directly from the current models, outside migration history entirely.
+The tables would then already exist and already match the models
+exactly, so the next `flask db migrate` has nothing to diff: it
+permanently reports **"No changes in schema detected"**, even for a
+real model change, because as far as Alembic's autogenerate can tell,
+the live database already matches. There's no clean way to recover from
+this except dropping the tables (losing data) or hand-writing the
+migration Alembic refused to generate.
+
+The `testing=True` path is safe specifically because it targets the
+isolated in-memory SQLite database (`tests/conftest.py`'s
+`sqlite:///:memory:`), which has no migration history and is thrown
+away after the test run — never the real, `.env`-configured database.
+Real usage establishes schema exclusively through `flask db upgrade`
+(see `guides/first-migration.md`). If you're ever tempted to add a
+`db.create_all()` call to `main.py`'s startup path "to make first-run
+easier," don't — that's precisely the mistake this guard exists to
+prevent.
+
+## `flask db migrate` needs a live app, not just an import
+
+Unlike bare Alembic (where `env.py` typically imports a `Base`/engine
+directly), this project's `migrations/env.py` pulls both the engine and
+the model metadata off `current_app.extensions['migrate'].db` at
+runtime — the actual object `migrate.init_app(app, db)` registered. That
+means every `flask db` command needs `--app src/{{ package_name }}/main.py`
+so Flask can build a real `create_app()` instance first; running
+`alembic` directly (skipping the `flask` CLI) in this project won't
+work, because there's no app context for `env.py` to pull `current_app`
+from.
+
+## Running `flask db init` here fails, and isn't needed
+
+The `flask/rest-api` template ships `migrations/` fully pre-generated —
+`env.py`, `alembic.ini`, `script.py.mako`, and an empty `versions/`
+directory are already in the generated project. Running `flask db init`
+against it fails (Flask-Migrate refuses to overwrite an existing
+`migrations/` directory), and it isn't part of this project's workflow
+regardless — go straight to `flask db migrate`.

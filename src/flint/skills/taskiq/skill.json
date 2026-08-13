@@ -1,0 +1,5 @@
+{
+  "id": "taskiq",
+  "label": "Taskiq",
+  "description": "Async task queue conventions for this project's Taskiq worker: broker setup, task discovery, and the .kiq() enqueue pattern."
+}

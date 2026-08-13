@@ -1,0 +1,5 @@
+{
+  "id": "alembic",
+  "label": "Alembic",
+  "description": "Autogenerating, reviewing, and applying database migrations for this project's SQLModel/SQLAlchemy models, and the src-layout + create_all gotchas that break it silently."
+}

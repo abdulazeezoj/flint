@@ -1,0 +1,5 @@
+{
+  "id": "flask-sqlalchemy",
+  "label": "Flask-SQLAlchemy",
+  "description": "The db = SQLAlchemy() extension object, init_app wiring, db.Model definitions, and app-context-bound sessions for this project's Flask data layer."
+}

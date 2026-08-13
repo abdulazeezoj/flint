@@ -1,0 +1,100 @@
+# Gotchas
+
+Two real, project-specific ways Alembic breaks here — not hypothetical,
+the second one was an actual bug in this project's own templates before
+it was fixed. Both are invisible to `uv sync && uv run pytest`, which
+never touches Alembic at all, so they stay hidden until someone actually
+runs a migration command.
+
+## `prepend_sys_path` must be `src`, not `.`
+
+This project uses a `src/` layout
+(`src/{{ package_name }}/...`), and `alembic.ini` reflects that:
+
+```ini
+[alembic]
+script_location = alembic
+prepend_sys_path = src
+```
+
+`env.py` does `from {{ package_name }}.core.config import settings` and
+`from {{ package_name }}.models import ...` — those imports only resolve
+because `prepend_sys_path = src` puts `src/` on `sys.path` before `env.py`
+runs. If this ever gets "cleaned up" to `prepend_sys_path = .` (Alembic's
+own default template, written for a flat layout) or removed entirely,
+one of two things happens, and neither is subtle once you're looking for
+it but both are confusing the first time:
+
+- Most commonly, `alembic revision --autogenerate` fails outright with
+  `ModuleNotFoundError: No module named '{{ package_name }}'` — loud,
+  easy to trace back to this line.
+- Less obviously, if `{{ package_name }}` happens to *also* be importable
+  some other way (e.g. installed in the active environment from a
+  previous `uv sync`/editable install), the import silently succeeds
+  against a **stale installed copy** instead of the checked-out source —
+  autogenerate then diffs against the wrong models and can produce an
+  empty migration, or one missing your latest change, with no error at
+  all.
+
+If `alembic revision --autogenerate` can't find your models, or produces
+an empty migration when you know you changed one, check this line first.
+
+## Migrations are decorative if anything else also creates tables
+
+This is the single most important rule once Alembic is in the picture:
+**application code must never create tables outside migration history.**
+Concretely — nothing in `src/{{ package_name }}/` may call
+{{ "`SQLModel.metadata.create_all(...)`" if orm == "sqlmodel" else "`Base.metadata.create_all(...)`" }}
+(or `conn.run_sync(...create_all)`) at app startup once `migrations=true`.
+
+This was a real bug in this exact project, not a theoretical one: the
+app's own startup code called `create_all()` unconditionally, regardless
+of whether Alembic was enabled. The failure mode is quiet and easy to
+mistake for "everything's fine":
+
+1. The app boots, `create_all()` runs, the tables now exist — but
+   `alembic_version` (the table Alembic uses to track which migrations
+   have actually been applied) was never stamped, because no migration
+   ever ran.
+2. Someone runs `alembic revision --autogenerate -m "..."` expecting it
+   to capture the initial schema. It compares the models against the
+   *live database* — which, thanks to step 1, already matches the models
+   exactly — and reports **"No changes in schema detected."** No
+   migration file is written. The project now looks like it has
+   migrations (the directory, the config, the workflow) but doesn't: no
+   revision has ever actually run.
+3. On a genuinely fresh database where `create_all()` hasn't run yet,
+   `alembic upgrade head` would eventually try to create tables that
+   already exist by the time anyone gets around to writing that first
+   migration — a `DuplicateTable`-style failure, or worse, a mismatch
+   between what the migration thinks it's creating and what's actually
+   there.
+
+**The fix in this project**: when `migrations=true`,
+{% if framework == "fastapi" %}
+`src/{{ package_name }}/main.py` deliberately does **not** import or
+call `init_db()` at all — not "call it conditionally," genuinely not
+imported, so there's no code path left that could accidentally invoke
+it. Schema comes solely from `uv run alembic upgrade head`. See
+`main.py`'s imports: `init_db` only appears there when `not migrations`.
+{% else %}
+`src/{{ package_name }}/core/db.py`'s `init_db()` only calls
+`Base.metadata.create_all(engine)` when `testing=True` (the in-memory
+database the test suite uses, which has no migration history to replay
+and is thrown away after the run) — real usage never takes that branch.
+Schema for a real database comes solely from
+`uv run alembic upgrade head`.
+{% endif %}
+If you're adding new startup code near the database, follow the same
+rule: check `migrations` before doing anything that could create or
+alter schema, or better, don't gate it at all and just never call
+`create_all()` once migrations exist for real (non-test) code paths.
+
+**If you inherit a project where this already happened** (autogenerate
+keeps saying "No changes detected" and you know that's wrong): the
+database has schema with no migration history behind it. The way out is
+to either drop and recreate the database, then run
+`guides/first-migration.md`'s two commands against it, or hand-write a
+migration that matches the current live schema and
+`alembic stamp head` it — don't try to "fix" this by adding a
+`create_all()` call back into application code.

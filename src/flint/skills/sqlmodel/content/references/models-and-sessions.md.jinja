@@ -1,0 +1,142 @@
+# Models & sessions
+
+## A table model is one class, playing two roles
+
+`SQLModel` subclasses do double duty: with `table=True`, the class is
+*simultaneously* a Pydantic model (validation, `.model_dump()`, etc.) and
+a SQLAlchemy-mapped table. `src/{{ package_name }}/models.py`:
+
+```python
+from sqlmodel import Field, SQLModel
+
+class Item(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    description: str | None = None
+```
+
+- Plain type-annotated attributes (`name: str`) become both the Pydantic
+  field and the table column — no separate `Column(...)` declarations for
+  the common case.
+- `Field(...)` is where you reach for anything SQLAlchemy needs that a
+  bare annotation can't express: `primary_key=True`, `default=None` (a
+  `None` default here means "let the database assign it" for an
+  autoincrementing PK — the Python-side default and the DB-side behavior
+  are two different things, don't confuse `Field(default=None)` with the
+  column being nullable), `foreign_key="other.id"`, `index=True`, etc.
+- `id: int | None` (optional at the Python level, `None` before insert)
+  vs. the actual non-null integer column the database enforces — this is
+  normal and matches every SQLModel example you'll find upstream, not a
+  bug in this project's templates.
+
+Adding a field is: add the annotation (+ `Field(...)` if it needs
+anything beyond a plain column), then see the `migrations` note below —
+a model change alone does not change the live schema.
+
+## The async session lifecycle
+
+`src/{{ package_name }}/core/db.py` sets up the engine and session
+factory once, at import time:
+
+```python
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from {{ package_name }}.core.config import settings
+
+engine = create_async_engine(settings.database_url, echo=settings.debug)
+async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+```
+
+Note the import: `AsyncSession` comes from `sqlmodel.ext.asyncio.session`,
+*not* `sqlalchemy.ext.asyncio` — SQLModel's `AsyncSession` is the one with
+`.exec()` on it (see `gotchas.md`). Mixing the two up is an easy paste
+error if you're copying a snippet from plain SQLAlchemy docs.
+
+`expire_on_commit=False` matters here: without it, every attribute on an
+object you just committed would be lazily re-fetched from the database the
+next time you touch it — and a lazy re-fetch on an *async* session outside
+an active `await` context raises, rather than transparently blocking the
+way sync SQLAlchemy would. Keep this flag as-is; don't remove it while
+"simplifying" `db.py`.
+
+`get_session()` yields exactly one session per request:
+
+```python
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+```
+
+Every route depends on this via `Depends(get_session)` — see the
+`fastapi` skill for the dependency-injection side. Never create a session
+outside this pattern (e.g. a module-level session shared across requests)
+— sessions are not thread/task-safe to share.
+
+### The query/write cycle, from `routes/items.py`
+
+```python
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+# read many
+result = await session.exec(select(Item))
+items = list(result.all())
+
+# read one by primary key
+item = await session.get(Item, item_id)
+
+# create
+db_item = Item(**item_in.model_dump())
+session.add(db_item)
+await session.commit()
+await session.refresh(db_item)   # populate db-assigned fields (id, defaults)
+
+# delete
+await session.delete(item)
+await session.commit()
+```
+
+- `session.add()` is the one call in this list that is *not* awaited — it
+  only stages the object in the session's identity map, no I/O happens
+  yet. Everything that actually talks to the database (`exec`, `get`,
+  `commit`, `refresh`, `delete`) is awaited.
+- `await session.refresh(db_item)` after `commit()` is what makes the
+  database-assigned `id` (and any other server-side default) available on
+  the Python object you're about to return — skip it and you'll return an
+  object with `id=None` even though the row now has a real id.
+- Filtering/ordering compose onto `select()` the same way as plain
+  SQLAlchemy Core: `select(Item).where(Item.name == name).order_by(Item.id)`
+  — SQLModel's `select()` is SQLAlchemy's, re-exported.
+
+## Why table models and API schemas stay separate types
+
+`src/{{ package_name }}/schemas.py` defines `ItemCreate`/`ItemRead` as
+*plain* `pydantic.BaseModel` subclasses, deliberately not SQLModel
+`table=False` models and deliberately not the same class as `Item` in
+`models.py`, even though SQLModel is explicitly designed to let a single
+model wear all three hats. This project keeps them separate on purpose:
+
+- **What a client is allowed to send** and **what the database stores**
+  usually diverge. `ItemCreate` has no `id` field — a client doesn't get
+  to choose a primary key. As soon as a model grows a server-assigned or
+  computed field (`created_at`, `owner_id` from the auth context, a
+  hashed password vs. the plaintext one an endpoint accepts), a single
+  shared type stops working and you're refactoring under pressure instead
+  of from the start.
+- **What a response exposes** and **what the table stores** also diverge
+  once you add anything sensitive (a password hash, an internal flag) —
+  `ItemRead` is an explicit allowlist of what leaves the process; the ORM
+  model is not.
+- Route handlers convert explicitly at the boundary —
+  `Item(**item_in.model_dump())` on the way in,
+  `response_model=ItemRead` against the ORM instance on the way out (see
+  the `fastapi` skill's `references/routing-and-dependencies.md`) — so
+  the divergence is a one-line conversion, not a design constraint you
+  have to work around later.
+
+If a resource is genuinely simple enough that request/response/table
+really are identical today, it's still worth keeping the three types
+distinct from the start — the cost of three small classes is much lower
+than the cost of unwinding one shared class later.

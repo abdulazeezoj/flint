@@ -1,0 +1,70 @@
+---
+name: flask-migrate
+description: The `flask db ...` CLI, the `Migrate`/`db` object wiring in core/db.py, and the create_all()-vs-migrations gotcha for this project's Flask-SQLAlchemy app. Use when generating, applying, or rolling back a migration, or debugging why `flask db migrate` sees "No changes in schema detected".
+---
+
+# Flask-Migrate
+
+This project's database schema is version-controlled with Flask-Migrate
+— the `flask db ...` command group. Flask-Migrate is a thin Flask-CLI
+wrapper *around* Alembic: under the hood every `flask db` command is
+doing exactly what the `alembic` skill describes (diffing your models
+against the last-applied revision, writing a versioned migration
+script), it's just invoked through Flask instead of the bare `alembic`
+CLI, and it's wired to a Flask-SQLAlchemy `db` object rather than a
+hand-rolled SQLAlchemy engine. This skill covers that Flask-specific
+wrapper layer; see the `alembic` skill for what's happening underneath
+(autogenerate diffing, migration file anatomy).
+
+## When to reach for this
+
+- Generating a migration after adding or changing a model in
+  `src/{{ package_name }}/models.py`.
+- Applying or rolling back migrations, in dev or before deploying.
+- Debugging `flask db migrate` reporting "No changes in schema
+  detected" when you know the models changed.
+- Touching `core/db.py`'s `migrate = Migrate()` / `migrate.init_app(...)`
+  wiring, or anything under `migrations/`.
+
+## Quick reference
+
+- **Generate a migration**: `uv run flask --app src/{{ package_name }}/main.py db migrate -m "describe your change"`
+  — diffs the models against the last-applied revision and writes a new
+  file under `migrations/versions/`. Always review the generated file
+  before applying it; autogenerate is a diffing heuristic, not a
+  guarantee (see the `alembic` skill).
+- **Apply migrations**: `uv run flask --app src/{{ package_name }}/main.py db upgrade`
+  — runs every unapplied revision, in order, up to the latest.
+- **Roll back one**: `uv run flask --app src/{{ package_name }}/main.py db downgrade`
+  — reverts the single most recently applied revision.
+- **No `flask db init` needed here**: most Flask-Migrate tutorials start
+  with `flask db init` to scaffold the `migrations/` directory. This
+  project's `flask/rest-api` template already ships that directory
+  pre-generated (`migrations/env.py`, `alembic.ini`, `script.py.mako`,
+  `versions/`) — running `db init` again would fail (the directory
+  already exists) and isn't part of this project's workflow. `flask db
+  migrate` works immediately, no setup step first.
+- **The `--app` flag is load-bearing**: every command above passes
+  `--app src/{{ package_name }}/main.py` so Flask can discover
+  `create_app()` and build a real app/db before Flask-Migrate can do
+  anything — there is no module-level `app = create_app()` for the CLI
+  to fall back to (see the `flask` skill's `references/gotchas.md`).
+- **Why Flask-SQLAlchemy specifically**: Flask-Migrate's `Migrate` object
+  is constructed against a Flask-SQLAlchemy `db = SQLAlchemy()` instance
+  (`migrate.init_app(app, db)` in `core/db.py`) — it reads the model
+  metadata and engine off that object. This is exactly why Flask's
+  `orm=sqlalchemy` (manual SQLAlchemy, no `db` object) uses bare Alembic
+  via a separate `migrations-sqlalchemy` layer instead of Flask-Migrate;
+  the two ORM choices in this project are not interchangeable here.
+
+## Go deeper
+
+- `references/cli-and-wiring.md` — the `Migrate`/`db` object wiring in
+  `core/db.py`, what each `flask db` command does, and what
+  `migrations/env.py`/`alembic.ini` actually configure versus what this
+  project customized.
+- `references/gotchas.md` — the `create_all()`-vs-migrations trap this
+  project's own template hit while being built.
+- `guides/first-migration.md` — the exact sequence to run before
+  starting the app for the first time, and what to repeat on every model
+  change.

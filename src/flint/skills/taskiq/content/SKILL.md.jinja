@@ -1,0 +1,72 @@
+---
+name: taskiq
+description: Async task queue conventions for this project's Taskiq worker — broker setup, task discovery, and the .kiq() enqueue pattern. Use when adding a background task, wiring a new tasks/ module, or debugging a task the worker doesn't seem to know about.
+---
+
+# Taskiq
+
+This project offloads background work to [Taskiq](https://taskiq-python.github.io/),
+an async-first task queue that matches FastAPI's async model (the sync
+counterpart, Celery, is the other `worker` choice for projects that want
+it — see the `celery` skill instead, if that's what this project has).
+This skill covers how *this project* wires Taskiq — not the whole
+library surface — so a new task lands the same way the existing one
+does.
+
+## When to reach for this
+
+- Adding a new background task (a new function under
+  `src/{{ package_name }}/tasks/`).
+- Enqueuing a task from a route handler (`.kiq(...)`) instead of running
+  it inline.
+- Touching `src/{{ package_name }}/worker.py` — broker construction, or
+  the task-module imports at the bottom of the file.
+- Debugging "task not found" / an empty task list when the worker
+  process starts — see `references/gotchas.md` first, this is almost
+  always the cause.
+
+## Quick reference
+
+- **Broker**: `src/{{ package_name }}/worker.py` builds one module-level
+  `broker` object.{% if broker == "rabbitmq" %} This project uses RabbitMQ
+  (`AioPikaBroker`, from `taskiq-aio-pika`), pointed at
+  `settings.rabbitmq_url`.{% else %} This project uses Redis
+  (`ListQueueBroker`, from `taskiq-redis`), pointed at
+  `settings.redis_url`.{% endif %} The URL comes from `core/config.py`
+  (env-overridable via `.env`) — the broker itself doesn't need any
+  further backend-specific tuning to get started.
+- **Tasks**: one (or more) plain `async def` functions per file under
+  `src/{{ package_name }}/tasks/`, each decorated `@broker.task`. See
+  `tasks/example.py` for the shape.
+- **Two ways to call a `@broker.task` function**: `await add(1, 2)` runs
+  it inline, in whichever process called it, like any other function.
+  `await add.kiq(1, 2)` *enqueues* it on the broker instead — it returns
+  immediately with a `TaskiqTask` (not the result), and a separate
+  worker process picks the task up and actually runs it. `main.py`'s
+  `/tasks/add` endpoint uses `.kiq(...)`, which is the point of having a
+  worker at all: the request returns instantly instead of blocking on
+  the task's own runtime.
+- **Two independent processes**: the API process (`fastapi dev`/`fastapi
+  run`) only ever enqueues — it never runs a task's body itself. The
+  worker process, started separately with
+  `uv run taskiq worker {{ package_name }}.worker:broker --app-dir src`,
+  is what actually executes tasks. Nothing in the API process blocks
+  waiting for a task to finish unless you explicitly await the
+  `TaskiqTask`'s result.
+- **Startup/shutdown**: `main.py`'s `lifespan` hook calls
+  `broker.startup()`/`broker.shutdown()`, guarded by `if not
+  broker.is_worker_process`. The same `broker` object is imported by
+  both processes — the worker process manages its own startup/shutdown
+  internally, so the API process must skip it or the two would race
+  each other on the same connection setup.
+
+## Go deeper
+
+- `references/broker-and-tasks.md` — the broker construction per
+  `broker` choice, the `@broker.task`/`.kiq()` distinction in more
+  depth, and how tests should (and shouldn't) touch any of this.
+- `references/gotchas.md` — the task-discovery trap this project's own
+  worker template was built to avoid, and why the fix looks the way it
+  does.
+- `guides/add-a-task.md` — the concrete steps to add a new background
+  task end-to-end (task function, wiring, enqueue endpoint).

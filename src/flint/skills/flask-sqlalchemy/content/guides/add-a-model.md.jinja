@@ -1,0 +1,90 @@
+# Guide: add a new `db.Model`
+
+Walks through adding a `Widget` model alongside the existing `Item`
+model — follow this shape rather than inventing a new one. This covers
+only the model + query half; for the full resource (schema, Blueprint,
+route registration, test) see the `flask` skill's
+`guides/add-a-resource.md`, which points back here for this step.
+
+## 1. Define the model
+
+In `src/{{ package_name }}/models.py`, add the class next to `Item`:
+
+```python
+from sqlalchemy.orm import Mapped, mapped_column
+
+from {{ package_name }}.core.db import db
+
+
+class Item(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str | None] = mapped_column(default=None)
+
+
+class Widget(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    description: Mapped[str | None] = mapped_column(default=None)
+```
+
+Always import `db` from `{{ package_name }}.core.db` — a model defined
+against any other `SQLAlchemy()` instance won't show up in
+`db.create_all()`{% if migrations %} or in `flask db migrate`'s autogenerate diff{% endif %},
+and produces confusing "table not found" errors instead of an obvious
+import error. Add columns with `Mapped[...]` + `mapped_column(...)`
+(SQLAlchemy 2.0 declarative style, matching `Item`); a foreign key to
+another model uses `db.relationship(...)` the same way plain
+SQLAlchemy does — see the `sqlalchemy` skill for that syntax, it isn't
+special here.
+
+{% if migrations %}
+## 2. Generate and apply a migration
+
+This project has `migrations=true` — the table does **not** get
+created by `db.create_all()` outside of tests (see
+`references/gotchas.md`). Run:
+
+```
+uv run flask --app src/{{ package_name }}/main.py db migrate -m "add widgets table"
+uv run flask --app src/{{ package_name }}/main.py db upgrade
+```
+
+Check the generated migration file before applying it — autogenerate
+is a diff, not a guarantee, and it's worth confirming it actually
+describes "add a `widgets` table" and nothing else. The `flask-migrate`
+skill covers this workflow in depth if the generated migration looks
+wrong or empty.
+
+## 3. Query it
+{% else %}
+## 2. Query it
+{% endif %}
+
+From inside a route handler (or anywhere else with an active app
+context — see `references/gotchas.md` if you're writing a script
+instead), follow `routes/items.py`'s style:
+
+```python
+from {{ package_name }}.core.db import db
+from {{ package_name }}.models import Widget
+
+# read
+widgets = db.session.execute(db.select(Widget)).scalars().all()
+widget = db.session.get(Widget, widget_id)
+
+# write
+widget = Widget(name="example")
+db.session.add(widget)
+db.session.commit()
+
+# delete
+db.session.delete(widget)
+db.session.commit()
+```
+
+Same `db.session.execute(db.select(...))` / `db.session.get(...)` shape
+as `Item`'s routes — don't mix in the legacy `Model.query` shorthand,
+this codebase is consistent about the explicit form. For anything past
+this (filtering, joins, ordering), see the `sqlalchemy` skill — the
+query API is identical to plain SQLAlchemy once you're past `db.select`.

@@ -1,0 +1,155 @@
+# Routing{% if template == "rest-api" %} & Blueprints{% endif %}
+
+{% if template == "rest-api" %}
+## Blueprint structure
+
+Every resource gets its own file under `src/{{ package_name }}/routes/`,
+exporting a single `bp = Blueprint("items", __name__,
+url_prefix="/items")` (swap `items`/`"/items"` for the resource name).
+`create_app()` registers it once:
+
+```python
+from {{ package_name }}.routes.items import bp as items_bp
+app.register_blueprint(items_bp)
+```
+
+Route handlers are plain functions decorated with `@bp.get(...)`,
+`@bp.post(...)`, `@bp.delete(...)`, etc. — mirror `routes/items.py` for
+a new resource rather than inventing a new shape. Don't register routes
+directly on `app` outside `main.py`'s own `/` health-check route; every
+resource, even a one-endpoint one, gets its own Blueprint file.
+
+## Handlers are sync — no `await`
+
+Flask here is WSGI. Every handler is `def`, never `async def`; there's
+no event loop to hand control back to. See `references/gotchas.md` for
+what this means for anything slow (a query, an outbound HTTP call).
+
+## Request validation — manual, because Flask doesn't do it for you
+
+Unlike FastAPI, Flask has no automatic request-body-to-model wiring.
+Every handler that accepts a body validates it explicitly:
+
+```python
+from pydantic import ValidationError
+from {{ package_name }}.schemas import ItemCreate, ItemRead
+
+@bp.post("/")
+def create_item():
+    try:
+        payload = ItemCreate.model_validate(request.get_json(force=True, silent=True) or {})
+    except ValidationError as exc:
+        return jsonify({"detail": exc.errors()}), 422
+    ...
+```
+
+`request.get_json(force=True, silent=True) or {}` is deliberate:
+`force=True` parses the body as JSON even if the client didn't send a
+`Content-Type: application/json` header, `silent=True` makes a
+malformed body return `None` instead of raising, and `or {}` turns that
+`None` into an empty dict — so a bad/missing body becomes a normal
+Pydantic `ValidationError` (→ a `422` with field-level detail) instead
+of Flask's generic `400 Bad Request` for unparseable JSON. Copy this
+exact shape for any new endpoint that accepts a body; don't call
+`request.json` directly (raises on a bad body with a much less useful
+error) or skip validation and pass `request.get_json()` straight to
+your{% if database != "none" %} model/{% endif %} database layer.
+
+## Response shape
+
+Return `jsonify(model.model_dump())` for a single resource,
+`jsonify([m.model_dump() for m in items])` for a list — never a bare
+Pydantic model or ORM instance (`jsonify` doesn't know how to serialize
+either). For non-`200` responses, return a `(body, status_code)` tuple:
+`return jsonify(created.model_dump()), 201`, `return "", 204`,
+`return jsonify({"detail": "Item not found"}), 404`. Mirror
+`routes/items.py`'s status codes for new resources: `201` on create,
+`204` on delete (empty body), `404` via the tuple form when not found,
+`422` for a validation failure.
+
+{% if database != "none" %}
+## Reading/writing the database inside a handler
+
+{% if orm == "flask-sqlalchemy" %}
+Use `db.session` (imported from `core.db`) — Flask-SQLAlchemy's scoped
+session, already bound to the current app/request context:
+
+```python
+from {{ package_name }}.core.db import db
+from {{ package_name }}.models import Item
+
+items = db.session.execute(db.select(Item)).scalars().all()
+```
+
+Don't build a new engine or session anywhere else — `db` is the one
+instance, initialized once in `create_app()` via `db.init_app(app)`.
+{% else %}
+Call `get_session()` (imported from `core.db`) — it returns a session
+bound to the current app context via a `scoped_session`, torn down
+automatically at the end of the request (see
+`core/db.py`'s `app.teardown_appcontext(...)`):
+
+```python
+from sqlalchemy import select
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Item
+
+session = get_session()
+items = session.execute(select(Item)).scalars().all()
+```
+
+Don't create engines/sessions ad hoc in a route — `get_session()` is
+the one entry point.
+{% endif %}
+{% endif %}
+
+{% if worker == "celery" %}
+## Enqueuing background work from a handler
+
+A handler stays fast by handing slow work to the Celery worker instead
+of doing it inline — `main.py`'s `/tasks/add` route is the template:
+
+```python
+from {{ package_name }}.tasks.example import add
+
+@app.post("/tasks/add")
+def enqueue_add():
+    task = add.delay(a, b)
+    return jsonify({"task_id": task.id})
+```
+
+`.delay(...)` returns immediately with a task id; the actual work runs
+in the separate `celery worker` process (see `worker.py`), not inline
+in this request. Never call a `@celery_app.task`-decorated function
+directly (`add(a, b)`) from a route expecting it to run in the
+background — that just runs it synchronously, in-process, defeating the
+point.
+{% endif %}
+{% else %}
+## Route structure
+
+Routes are decorated directly on the module-level `app` in `main.py`
+(`@app.get("/")`), since this template has only the one route. If you
+add more than a couple of routes, or anything that needs its own file,
+switch to the `rest-api` template's shape instead of growing `main.py`
+indefinitely: one `Blueprint` per resource under a new `routes/`
+package, registered via `app.register_blueprint(...)` — generate a
+throwaway `rest-api` project (or read its `routes/items.py`) for the
+concrete shape.
+
+## Handlers are sync — no `await`
+
+Flask here is WSGI, not ASGI. Handlers are plain `def`; there is no
+`await` and no benefit to writing `async def` — see
+`references/gotchas.md`.
+
+## Response shape
+
+This template's one route returns a plain `dict`
+(`{"message": "Hello, World!"}`) — Flask auto-serializes a `dict`
+returned from a `2xx` route to JSON. That shortcut is fine for a route
+this simple; once you're validating input or returning anything with a
+real shape (an id, nested fields), reach for explicit Pydantic
+models + `jsonify(...)`, the way the `rest-api` template's
+`schemas.py`/routes do, rather than passing dicts around by hand.
+{% endif %}

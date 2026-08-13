@@ -1,0 +1,80 @@
+# Gotchas
+
+Real mistakes this project's own SQLModel templates hit while being built
+and live-verified — not hypothetical, each one broke something concrete
+before it was fixed. Worth knowing before you hit the same wall.
+
+## A missing `await` doesn't error — it hands back a coroutine
+
+Every session call that touches the database (`session.exec(...)`,
+`session.get(...)`, `session.commit()`, `session.refresh(...)`,
+`session.delete(...)`) is a coroutine function. Forget the `await` and
+Python does not raise on that line:
+
+```python
+result = session.exec(select(Item))   # BUG: missing `await`
+items = result.all()                  # AttributeError: 'coroutine' object has no attribute 'all'
+```
+
+`result` is silently a coroutine object, not a `ScalarResult`. The
+failure surfaces one line later, on whatever you tried to do with the
+"result" — and the error message (`'coroutine' object has no attribute
+...`) doesn't mention `await` at all, so it reads like a completely
+unrelated bug if you don't already know to check for a missing `await`.
+Python also emits a `RuntimeWarning: coroutine '...' was never awaited`
+at garbage-collection time, easy to miss in test output — if you ever see
+that warning, it means a real database call in your change silently never
+ran. When a query "returns nothing" or a write "doesn't seem to persist,"
+check for a missing `await` on that call before assuming the query logic
+is wrong.
+
+## `.exec()`, not `.execute()`
+
+Plain SQLAlchemy's `AsyncSession.execute(select(...))` returns a `Result`
+you then call `.scalars()` on to get model instances back. SQLModel's
+`AsyncSession` (`sqlmodel.ext.asyncio.session.AsyncSession` — see
+`references/models-and-sessions.md` for the import) adds `.exec()`,
+which does that unwrapping for you and returns model instances directly:
+
+```python
+# This project's pattern (SQLModel):
+result = await session.exec(select(Item))
+items = list(result.all())            # Item instances
+
+# Plain SQLAlchemy's pattern — do NOT copy this here:
+result = await session.execute(select(Item))
+items = list(result.scalars().all())  # extra .scalars() step
+```
+
+`.execute()` still exists on SQLModel's session (it's inherited from
+SQLAlchemy) and will *not* raise an error — it just returns rows wrapped
+the SQLAlchemy way instead of the SQLModel way, which then breaks
+`response_model=` validation or attribute access downstream in a way
+that's confusing to trace back to "used the wrong method name." This trips
+people up specifically because plain SQLAlchemy's own docs, Stack
+Overflow answers, and LLM training data overwhelmingly show `.execute()`
+— when you're working in this project's SQLModel layer, reach for
+`.exec()` instead every time.
+{% if migrations %}
+
+## Alembic needs the models actually imported
+
+This project has `migrations=true`. Alembic's `env.py` sets
+`target_metadata = SQLModel.metadata`, but that metadata object only
+knows about tables whose model class has been imported *somewhere* in the
+process — `env.py` imports `models.py` explicitly for exactly this
+reason:
+
+```python
+from {{ package_name }}.models import Item  # noqa: F401 - registers metadata
+```
+
+If you add a new model in a different module and it never gets imported
+(directly or transitively) before `alembic revision --autogenerate` runs,
+autogenerate won't see it and won't generate a migration for it — not an
+error, just a quietly incomplete migration. Keep new models importable
+from `models.py` (or make sure `env.py`'s import list picks up wherever
+you put them). The migration workflow itself (generating, reviewing, and
+running revisions) is covered in the `alembic` skill — this is only the
+model-visibility half of that story.
+{% endif %}

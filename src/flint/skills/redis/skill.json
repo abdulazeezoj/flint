@@ -1,0 +1,5 @@
+{
+  "id": "redis",
+  "label": "Redis",
+  "description": "Module-level Redis client setup and basic get/set/delete caching conventions for this project's Redis add-on."
+}

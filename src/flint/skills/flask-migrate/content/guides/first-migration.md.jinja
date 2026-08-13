@@ -1,0 +1,63 @@
+# Guide: the first migration
+
+Run this once before starting the app for the first time — it generates
+the initial migration from the models in `src/{{ package_name }}/models.py`
+and applies it, creating the schema:
+
+```
+uv run flask --app src/{{ package_name }}/main.py db migrate -m "describe your change"
+uv run flask --app src/{{ package_name }}/main.py db upgrade
+```
+
+No `flask db init` step first — `migrations/` (`env.py`, `alembic.ini`,
+`script.py.mako`, `versions/`) is already part of the generated project,
+unlike most Flask-Migrate walkthroughs that start from an empty project.
+Running `db init` against it would fail, and it isn't needed here — see
+`references/gotchas.md`.
+
+## What each command actually does
+
+1. `db migrate -m "..."` diffs your models against the (currently
+   empty) migration history and writes a new file under
+   `migrations/versions/`. This step only writes a file — the database
+   itself is untouched until the next command.
+2. `db upgrade` applies that file (and any other unapplied revisions) to
+   the real database configured by `SQLALCHEMY_DATABASE_URI` — this is
+   the step that actually creates the tables.
+
+Until both commands have run, the database has no tables and the app
+will fail on the first query that touches one.
+
+## Review before applying
+
+Open the file `db migrate` just wrote under `migrations/versions/`
+before running `db upgrade` — autogenerate is a diffing heuristic (see
+the `alembic` skill), not a guarantee it captured exactly what you
+intended. This matters even more on the very first migration, since it
+typically creates every table in one file — a good moment to check
+column types, nullability, and defaults all came out the way the models
+say they should.
+
+## Repeat both commands on every model change
+
+Whenever you add, remove, or change a field on a model in
+`src/{{ package_name }}/models.py`:
+
+```
+uv run flask --app src/{{ package_name }}/main.py db migrate -m "describe your change"
+uv run flask --app src/{{ package_name }}/main.py db upgrade
+```
+
+Same two commands, same order, every time — there's no separate "first
+migration" mechanism versus "later migration" mechanism, only the first
+one happens to run against an empty history. If `db migrate` reports
+"No changes in schema detected" and you know you changed a model, see
+`references/gotchas.md` for the most likely cause.
+
+## Rolling back
+
+`uv run flask --app src/{{ package_name }}/main.py db downgrade` reverts
+the single most recently applied revision. Run it again to step back
+further. This runs the migration file's `downgrade()` function, so it's
+only as safe as that function is — for a destructive change (e.g. a
+dropped column), downgrading doesn't bring the data back.

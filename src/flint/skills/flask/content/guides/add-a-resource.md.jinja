@@ -1,0 +1,139 @@
+{% if template == "rest-api" %}
+# Guide: add a new resource
+
+Walks through adding a `widgets` resource end-to-end, following the
+same shape as the existing `items` resource — copy that shape for any
+new resource rather than inventing a new one.
+
+## 1. Define the schemas
+
+In `src/{{ package_name }}/schemas.py`, add the request/response models:
+
+```python
+class WidgetCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class WidgetRead(BaseModel):
+{% if database != "none" %}
+    model_config = ConfigDict(from_attributes=True)
+
+{% endif %}
+    id: int
+    name: str
+    description: str | None = None
+```
+
+{% if database != "none" %}
+## 2. Define the model
+
+In `src/{{ package_name }}/models.py`, add the {{ orm }} model (mirror the
+existing `Item` model's shape — same primary-key/column conventions).
+
+## 3. Write the Blueprint
+{% else %}
+## 2. Write the Blueprint
+{% endif %}
+
+Create `src/{{ package_name }}/routes/widgets.py`:
+
+```python
+from flask import Blueprint, jsonify, request
+from pydantic import ValidationError
+{% if orm == "sqlalchemy" %}
+from sqlalchemy import select
+{% endif %}
+
+{% if database != "none" %}
+from {{ package_name }}.core.db import {% if orm == "flask-sqlalchemy" %}db{% else %}get_session{% endif %}
+from {{ package_name }}.models import Widget
+{% endif %}
+from {{ package_name }}.schemas import WidgetCreate, WidgetRead
+
+bp = Blueprint("widgets", __name__, url_prefix="/widgets")
+
+
+@bp.get("/")
+def list_widgets():
+{% if orm == "flask-sqlalchemy" %}
+    widgets = db.session.execute(db.select(Widget)).scalars().all()
+{% elif orm == "sqlalchemy" %}
+    session = get_session()
+    widgets = session.execute(select(Widget)).scalars().all()
+{% else %}
+    ...  # same in-memory-store shape as routes/items.py
+{% endif %}
+    return jsonify([WidgetRead.model_validate(w).model_dump() for w in widgets])
+```
+
+Follow `routes/items.py` for the rest of the CRUD handlers (`POST`,
+`GET /<int:widget_id>`, `DELETE /<int:widget_id>`) — same
+`ItemCreate.model_validate(request.get_json(force=True, silent=True) or
+{})` / `422` shape for validation errors (see
+`references/routing-and-blueprints.md`), same status codes (`201` on
+create, `204` on delete, `404` via `jsonify({"detail": ...}), 404` when
+not found).
+
+{% if database != "none" %}
+## 4. Register the Blueprint
+{% else %}
+## 3. Register the Blueprint
+{% endif %}
+
+In `src/{{ package_name }}/main.py`, inside `create_app()`:
+
+```python
+from {{ package_name }}.routes.widgets import bp as widgets_bp
+...
+app.register_blueprint(widgets_bp)
+```
+
+{% if database != "none" %}
+## 5. Test it
+{% else %}
+## 4. Test it
+{% endif %}
+
+Add `tests/test_widgets.py`, mirroring `tests/test_main.py`'s `client`
+fixture usage (see `guides/testing.md`) — every new resource gets its
+own CRUD-cycle test (create, list, get, delete, and the 404 case), not
+just a smoke test of one happy path.
+
+{% else %}
+# Guide: add a new route
+
+This template has one route (`/`, in `main.py`) and no `schemas.py` or
+`routes/` package — for anything past a route or two, generate (or
+compare against) the `rest-api` template instead of growing `main.py`
+by hand; it already has the resource/Blueprint/schema shape this guide
+would otherwise have you build from scratch.
+
+## Adding a second simple route
+
+For one more small, unvalidated route, follow the existing one's shape
+directly in `main.py`:
+
+```python
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+```
+
+## Add a test
+
+In `tests/test_main.py` (or a new `tests/test_<name>.py`), mirror the
+existing test: build a client from the module-level `app` and assert on
+the JSON response.
+
+```python
+from {{ package_name }}.main import app
+
+
+def test_health() -> None:
+    client = app.test_client()
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json == {"status": "ok"}
+```
+{% endif %}

@@ -1,0 +1,110 @@
+{% if template == "rest-api" %}
+# The `create_app()` factory & config
+
+## Shape
+
+```python
+def create_app(*, database_url: str | None = None, testing: bool = False) -> Flask:
+    app = Flask(__name__)
+    app.config["APP_NAME"] = settings.app_name
+    app.config["DEBUG"] = settings.debug
+    app.config["TESTING"] = testing
+{% if database != "none" %}
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url or settings.database_url
+    init_db(app, testing=testing)
+{% endif %}
+
+    app.register_blueprint(items_bp)
+
+    @app.get("/")
+    def read_root() -> dict[str, str]:
+        return jsonify({"message": "Hello, World!"})
+
+    return app
+```
+
+Why it's shaped this way, in order:
+
+1. **`app = Flask(__name__)` first, always** — everything after builds
+   on this instance; nothing before it.
+2. **Config comes from the module-level `settings` object**
+   (`core/config.py`'s `Settings()`, `pydantic-settings` reading
+   `.env`), copied into `app.config` — not read from `os.environ`
+   directly in `create_app()`. Add a new setting to `Settings`, then
+   read it off `settings.<field>` here; don't reach for
+   `os.environ.get(...)` inline.
+{% if database != "none" %}
+3. **`database_url` is a parameter, not always `settings.database_url`**
+   — this is what lets `tests/conftest.py` point the app at
+   `sqlite:///:memory:` without touching `.env` or the real database at
+   all. Any new "which external resource does this app talk to" needs
+   the same shape: a keyword parameter on `create_app()` that defaults
+   to reading from `settings`, so tests can override it.
+4. **`init_db(app, testing=testing)` — extension init happens inside
+   the factory, never at module scope.** {% if orm == "flask-sqlalchemy" %}This is where
+   `db.init_app(app)`{% if migrations %} and `migrate.init_app(app, db)`{% endif %} get called — the global
+   `db`{% if migrations %}/`migrate`{% endif %} object(s) declared in `core/db.py` are singletons
+   *bound to this specific `app` instance* here, not constructed fresh.
+   {% else %}This is where the SQLAlchemy engine gets created and
+   `SessionLocal` (the `scoped_session` in `core/db.py`) gets bound to
+   it — the engine isn't created at import time, only when
+   `create_app()` runs.
+   {% endif %}See `references/gotchas.md` for why none of this can happen
+   at module scope.
+{% endif %}
+5. **Blueprints are registered inside the factory**, after config/db
+   setup and before the function returns — so every Blueprint's routes
+   see a fully-configured `app`.
+6. **`return app` is the last line.** Nothing after `create_app()`
+   returns constructs anything further; `flask run`/gunicorn/tests each
+   call it exactly once per app instance they need.
+
+## Extending it
+
+- New config value → add a field to `Settings` in `core/config.py`,
+  then copy it into `app.config` (or read `settings.<field>` directly
+  wherever you need it — `app.config` is only necessary for values
+  Flask/an extension itself expects to find there, like
+  `SQLALCHEMY_DATABASE_URI`).
+- New extension (a cache client, a mail sender, ...) → initialize it
+  inside `create_app()`, the same place `init_db()` is called, never at
+  module scope in `main.py` or `core/`.
+- New Blueprint → `app.register_blueprint(...)` alongside the existing
+  `items_bp` line (see `guides/add-a-resource.md`).
+
+{% else %}
+# Config
+
+This template's `main.py` builds `app = Flask(__name__)` directly at
+module scope — there's no `create_app()` factory (see
+`references/gotchas.md` for when that pattern becomes necessary; this
+template doesn't need it yet).
+
+{% if config %}
+This project has `config=true`: `core/config.py` defines a
+`pydantic-settings` `Settings` class, instantiated once as a
+module-level `settings = Settings()` (reading `.env`), and `main.py`
+copies the fields it needs into `app.config`:
+
+```python
+from {{ package_name }}.core.config import settings
+
+app = Flask(__name__)
+app.config["APP_NAME"] = settings.app_name
+app.config["DEBUG"] = settings.debug
+```
+
+Add new settings as fields on `Settings`, not as scattered
+`os.environ` reads — `settings` is instantiated once at import time,
+which is safe here specifically because reading `.env` has no side
+effects worth protecting against (unlike opening a database
+connection, which is why the `rest-api` template needs a factory and
+this one doesn't).
+{% else %}
+This project has `config=false` — no `Settings`/`.env` layer, just the
+bare `Flask(__name__)` app. If you need configuration later, regenerate
+with the "Add configuration (pydantic-settings)?" option enabled (or
+add a `core/config.py` module mirroring the `rest-api` template's, if
+you outgrow this by hand).
+{% endif %}
+{% endif %}

@@ -1,0 +1,5 @@
+{
+  "id": "pydantic-settings",
+  "label": "pydantic-settings",
+  "description": "Typed, validated environment-variable configuration via BaseSettings — how this project defines, loads, extends, and consumes its Settings class."
+}

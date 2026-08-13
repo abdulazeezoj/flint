@@ -1,0 +1,76 @@
+---
+name: redis
+description: Module-level Redis client setup and get/set/delete caching conventions for this project's Redis add-on ({% if framework == "fastapi" %}async, via redis.asyncio{% else %}sync, via redis{% endif %}). Use when caching a response, invalidating a cache key, or touching core/redis.py.
+---
+
+# Redis
+
+This project's Redis add-on (`redis=true`) gives you a ready-to-use
+client for **caching** — a module-level `redis_client` you `get`/`set`/
+`delete` against, nothing more. This skill covers how *this project*
+uses `redis-py` for that, not the whole library surface.
+
+## Caching Redis is independent of broker Redis
+
+If a background worker was also chosen, it may *also* talk to Redis —
+but as a message broker (`broker=redis`), wired up separately inside
+the {% if framework == "fastapi" %}`taskiq`{% else %}`celery`{% endif %}
+skill. That's a different client, a different connection, a different
+concern, and this skill doesn't cover it. The two choices are
+deliberately decoupled: picking `broker=redis` for the worker does
+**not** by itself give you this caching client wired into your routes
+(`redis=true` is its own prompt) — and picking `broker=rabbitmq` (or
+having no worker at all) still leaves the caching-Redis question open,
+it's just asked independently. If you see `redis_client` imported
+anywhere, it's this skill's client, for caching; if you see a
+broker/worker object talking to Redis, that's the other one.
+
+## When to reach for this
+
+- Caching an expensive or frequently-requested response.
+- Invalidating a cached value after a create/update/delete.
+- Debugging stale data being served after a write.
+- Touching `src/{{ package_name }}/core/redis.py`.
+
+## Quick reference
+
+- **Location**: `src/{{ package_name }}/core/redis.py` — one
+  module-level client, `redis_client`, built once at import time and
+  imported wherever it's needed. Same reasoning as
+  `core/config.py`'s module-level `settings` (see the
+  `pydantic-settings` skill): constructing a client from a URL does no
+  I/O by itself, so importing this module is always safe — the actual
+  network connection is opened lazily, on the first real command.
+{% if framework == "fastapi" %}
+- **Client**: `redis.asyncio.Redis`, built via
+  `Redis.from_url(settings.redis_url, decode_responses=True)` — async,
+  to match this project's async FastAPI handlers. Every call needs
+  `await` (`await redis_client.get(...)`).
+{% else %}
+- **Client**: plain `redis.Redis` (the sync client), built via
+  `Redis.from_url(settings.redis_url, decode_responses=True)` — Flask's
+  handlers are sync, so the client is sync too. No `await` anywhere.
+{% endif %}
+- **`decode_responses=True`**: values come back as `str`, not `bytes` —
+  don't add your own `.decode()` calls, and remember to
+  `json.dumps`/`json.loads` yourself for anything structured (the
+  client doesn't serialize for you).
+- **`redis_url` setting**: `src/{{ package_name }}/core/config.py`'s
+  `Settings.redis_url`, defaulting to `redis://localhost:6379/0`,
+  overridable via `REDIS_URL` in `.env` — see the `pydantic-settings`
+  skill for the loading mechanism.
+- **Dependency**: plain `redis>=5.2.0` in `pyproject.toml` — no
+  `hiredis` extra. `redis.asyncio` ships in the same package as the
+  sync client; nothing extra to install for FastAPI's async usage.
+- **Run it**: point `REDIS_URL` at a running Redis (`docker run -p
+  6379:6379 redis` is the fastest local option) — there's no
+  auto-provisioning here, unlike the SQLite database.
+
+## Go deeper
+
+- `references/redis-operations.md` — the `get`/`set`/`setex`/`delete`
+  calls this project actually reaches for, with real signatures.
+- `references/gotchas.md` — the sync/async client mismatch and the one
+  thing caching always gets wrong (invalidation).
+- `guides/add-caching-to-an-endpoint.md` — caching the `items` list
+  response end-to-end, invalidation included.

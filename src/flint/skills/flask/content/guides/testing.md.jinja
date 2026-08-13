@@ -1,0 +1,110 @@
+# Guide: how this project's tests talk to the app
+
+```
+uv run pytest
+```
+
+## No running server, no real network
+
+{% if template == "rest-api" %}
+Tests use Flask's own `app.test_client()` (see `tests/conftest.py`'s
+`client` fixture) — requests go directly into the Flask app in-process,
+no socket, no `flask run` running in the background. This is faster and
+more deterministic than hitting a real port.
+
+## The app under test is built by calling the factory directly
+
+```python
+# tests/conftest.py
+import pytest
+from {{ package_name }}.main import create_app
+
+
+@pytest.fixture
+def client():
+    app = create_app(database_url="sqlite:///:memory:", testing=True)
+    return app.test_client()
+```
+
+This is *why* `create_app()` takes a `database_url` parameter at all
+(see `references/gotchas.md` and
+`references/app-factory-and-config.md`): the fixture calls the factory
+directly with an isolated in-memory SQLite URL, so every test run uses
+a fresh, disposable database — never whatever `DATABASE_URL` is
+configured in `.env`, and never a database shared across test runs.
+`testing=True` sets `app.config["TESTING"]`, which Flask itself uses to
+change error-handling behavior (propagating exceptions instead of
+turning them into 500 responses), separate from — but passed alongside
+— the database override.
+
+{% if database != "none" %}
+{% if migrations %}
+Because migrations are on, schema creation is special-cased for
+`testing=True`{% if orm == "sqlalchemy" %} in `core/db.py`{% endif %}: the test database's tables are
+created directly from the models
+(`{% if orm == "flask-sqlalchemy" %}db.create_all(){% else %}Base.metadata.create_all(engine){% endif %}`), not
+by replaying `{% if orm == "flask-sqlalchemy" %}flask db upgrade{% else %}alembic upgrade head{% endif %}` — there's no
+migration history to replay against a database that's recreated from
+scratch on every test run. This is a **testing-only** shortcut; real
+schema still comes from the migration command (see `README.md`).
+{% else %}
+Since `migrations=false`, the same
+`{% if orm == "flask-sqlalchemy" %}db.create_all(){% else %}Base.metadata.create_all(engine){% endif %}`
+call that runs on every real boot also runs for the test database —
+nothing test-specific needed here beyond the isolated URL.
+{% endif %}
+{% endif %}
+
+## Adding a test for a new endpoint
+
+Mirror `tests/test_main.py`: a `def test_...(client)` function using
+the `client` fixture, asserting on `response.status_code` and
+`response.get_json()`. One test per behavior (create, list, get-by-id,
+404-when-missing, delete) rather than one large test asserting
+everything — a failure then points at exactly what broke.
+
+```python
+def test_item_crud(client) -> None:
+    create_response = client.post("/items/", json={"name": "Widget"})
+    assert create_response.status_code == 201
+    item = create_response.get_json()
+
+    get_response = client.get(f"/items/{item['id']}")
+    assert get_response.status_code == 200
+
+    delete_response = client.delete(f"/items/{item['id']}")
+    assert delete_response.status_code == 204
+```
+
+{% else %}
+Tests use Flask's own `app.test_client()`, built directly from the
+module-level `app` in `main.py` — requests go directly into the app
+in-process, no socket, no `flask run` running in the background:
+
+```python
+# tests/test_main.py
+from {{ package_name }}.main import app
+
+
+def test_read_root() -> None:
+    client = app.test_client()
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json == {"message": "Hello, World!"}
+```
+
+There's no fixture here because there's no per-test setup needed (no
+database, no config to override) — `client = app.test_client()` at the
+top of each test is enough. If you add anything a test needs to
+isolate (config, a database), that's the point at which to introduce a
+`tests/conftest.py` fixture and, likely, switch `main.py` to the
+`rest-api` template's `create_app()` factory shape (see
+`references/gotchas.md`) so tests can build an isolated app instead of
+importing the one real one.
+
+## Adding a test for a new route
+
+Mirror `tests/test_main.py`: a `def test_...()` function that builds
+its own `client = app.test_client()` and asserts on
+`response.status_code`/`response.json`.
+{% endif %}

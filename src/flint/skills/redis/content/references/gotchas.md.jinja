@@ -1,0 +1,54 @@
+# Gotchas
+
+{% if framework == "fastapi" %}
+## Don't reach for the sync `redis` client by mistake
+
+`core/redis.py` imports from `redis.asyncio`, not plain `redis` — every
+call on `redis_client` returns a coroutine and needs `await`. If you
+ever import `redis.Redis` (the sync client) directly and call it from
+inside an `async def` handler, it blocks the whole event loop for the
+duration of that call — every other in-flight request stalls, not just
+the one that made it. Same failure shape as a sync database driver
+inside an async handler; see the `fastapi` skill's gotchas for the full
+explanation, since the mechanism is identical. Low local traffic hides
+this completely, so it's easy to ship without noticing until real
+concurrent load hits it.
+{% else %}
+## The client here is sync, on purpose — don't swap it for `redis.asyncio`
+
+`core/redis.py` imports plain `redis.Redis`, matching Flask's sync
+request handling. Reaching for `redis.asyncio.Redis` instead wouldn't
+integrate with anything here — Flask's default handlers aren't
+`async def`, so there's no event loop for it to cooperate with, and
+mixing async I/O into a sync view generally requires infrastructure
+this project doesn't set up (an async-capable server, `async` view
+support). If a handler ever becomes I/O-heavy enough that this matters,
+that's a bigger change than swapping the Redis client — treat it as its
+own decision, not something to reach for casually here.
+{% endif %}
+
+## Invalidation is the hard part, and this project doesn't do it for you
+
+`core/redis.py` gives you a client and nothing else — no automatic
+cache invalidation on writes. If you cache the `items` list response
+(`GET /items/`) and then `create_item`/`delete_item` modifies the
+underlying data, the cached response is now stale, and it stays stale
+until its TTL expires — the app will silently keep serving the old list
+until then. This project's own example (see
+`guides/add-caching-to-an-endpoint.md`) handles it the simplest way
+that's actually correct: every write handler that touches `items`
+explicitly deletes the `"items:all"` cache key before returning, so the
+next read is a real miss and repopulates the cache. There's no cleverer
+default here (no cache-aside library, no write-through layer) — if you
+add caching to a new resource, you're responsible for adding the
+matching invalidation calls to every handler that writes to it. A TTL
+is a safety net for when you forget, not a substitute for invalidating
+correctly.
+
+## A cache miss on Redis being down looks like a real bug
+
+`redis_client` doesn't validate a connection at import time — the first
+sign Redis isn't running is an exception on the first real `get`/`set`
+call, not at startup. If caching-related errors show up only in some
+environments, check that `REDIS_URL` actually points at a reachable
+Redis before assuming the caching logic itself is wrong.

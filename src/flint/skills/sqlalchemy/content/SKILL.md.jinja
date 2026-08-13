@@ -1,0 +1,101 @@
+---
+name: sqlalchemy
+description: Declarative models, session lifecycle, and query conventions for this project's SQLAlchemy data layer ({% if framework == "fastapi" %}async, via sqlalchemy.ext.asyncio{% else %}sync, via scoped_session{% endif %}). Use when adding or changing a model, writing a query, or touching session/engine setup.
+---
+
+# SQLAlchemy
+
+{% if framework == "fastapi" %}
+This project's data layer is SQLAlchemy 2.0 in **async** mode
+(`sqlalchemy.ext.asyncio`) — every query and session operation is
+awaited. This skill covers how *this project* uses it, not the whole
+library surface, so new code matches the existing conventions instead
+of introducing a second style (in particular: don't add a sync
+engine/session anywhere in this codebase — see `references/gotchas.md`
+for why that's worse than it sounds).
+{% else %}
+This project's data layer is SQLAlchemy 2.0 in **sync** mode (plain
+`sqlalchemy`, no `asyncio` extension) — Flask's request handling is
+sync, so there's no `await` anywhere in the data layer. This skill
+covers how *this project* uses it, not the whole library surface, so
+new code matches the existing conventions instead of introducing a
+second style.
+{% endif %}
+
+## When to reach for this
+
+- Adding, changing, or removing a model in `src/{{ package_name }}/models.py`.
+- Writing a new query in a route handler.
+- Touching `src/{{ package_name }}/core/db.py` — engine, session
+  {% if framework == "fastapi" %}factory, or the `get_session` dependency{% else %}factory, or `get_session()`{% endif %}.
+{% if framework == "fastapi" %}
+- Debugging a "greenlet" error, an unawaited coroutine warning, or a
+  handler that looks async but hangs.
+{% else %}
+- Debugging a session that has stale data, a `DetachedInstanceError`,
+  or a session that appears to leak across requests.
+{% endif %}
+
+## Quick reference
+
+- **Models**: `src/{{ package_name }}/models.py`. SQLAlchemy 2.0
+  declarative style — `class Base(DeclarativeBase): pass`, then each
+  model declares columns with `Mapped[...]` type annotations and
+  `mapped_column(...)`, not the legacy `Column(...)` + `declarative_base()`
+  style:
+
+  ```python
+  class Item(Base):
+      __tablename__ = "items"
+
+      id: Mapped[int] = mapped_column(primary_key=True)
+      name: Mapped[str]
+      description: Mapped[str | None] = mapped_column(default=None)
+  ```
+
+  `Mapped[str]` alone (no `mapped_column()`) is a plain required
+  column; `Mapped[str | None]` makes it nullable. Reach for
+  `mapped_column(...)` only when you need to say more (`primary_key`,
+  a default, a `ForeignKey`, an explicit column name).
+
+{% if framework == "fastapi" %}
+- **Engine & sessions**: `src/{{ package_name }}/core/db.py`.
+  `create_async_engine(settings.database_url, ...)` built once at
+  module scope; `async_session_maker = async_sessionmaker(engine,
+  class_=AsyncSession, expire_on_commit=False)`. Every request gets its
+  own session via the `get_session()` FastAPI dependency — never a
+  session held longer than one request, never a session shared across
+  requests.
+- **Queries**: always `await` — `await session.execute(select(Item))`
+  then `.scalars().all()` for a list, `await session.get(Item, id)` for
+  a primary-key lookup, `session.add(obj)` (not awaited — it's
+  synchronous bookkeeping) then `await session.commit()`.
+- **Run it**: `uv run fastapi dev src/{{ package_name }}/main.py` — see
+  the `fastapi` skill for the app layer these sessions plug into via
+  `Depends(get_session)`.
+{% else %}
+- **Engine & sessions**: `src/{{ package_name }}/core/db.py`.
+  `SessionLocal = scoped_session(sessionmaker())` at module scope
+  (unconfigured — no engine yet); `init_db(app)` binds the real engine
+  with `SessionLocal.configure(bind=engine)` once the app factory knows
+  the database URL, and registers `app.teardown_appcontext(lambda
+  exc=None: SessionLocal.remove())` so every request's session is torn
+  down automatically. `get_session()` just returns `SessionLocal()` —
+  there's no Flask equivalent of FastAPI's `Depends()`, so this is
+  called directly inside each route handler, not injected.
+- **Queries**: no `await` anywhere — `session.execute(select(Item)).scalars().all()`
+  for a list, `session.get(Item, id)` for a primary-key lookup,
+  `session.add(obj)` then `session.commit()`.
+- **Run it**: `uv run flask --app src/{{ package_name }}/main.py run`
+  — see the `flask` skill for the app-factory layer `get_session()`
+  plugs into.
+{% endif %}
+
+## Go deeper
+
+- `references/sessions-and-queries.md` — the session lifecycle in
+  detail and the query patterns this project's routes use.
+- `references/gotchas.md` — real mistakes this project's own templates
+  are built to avoid, and why the fix looks the way it does.
+- `guides/add-a-model.md` — the concrete steps to add a new model and
+  wire a query for it, following the `Item` model's shape.
