@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-13 (v0.14.1: automated release tagging via `release.yml` — see §8)
+**Last updated:** 2026-08-13 (v0.14.2: fixed release automation's PyPI Trusted Publishing verification — see §8)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -981,16 +981,32 @@ surfaced by actually running the generated tooling:
   that tag using the workflow's own `GITHUB_TOKEN` — needed because an
   external git credential pushing branches fine can still get a plain
   403 trying to push a tag if the repo has a tag-protection rule
-  scoped tighter than branch push access. Rather than let that tag
-  push try to re-trigger `cd.yml` (GitHub suppresses new workflow runs
-  triggered by the default `GITHUB_TOKEN`, so it wouldn't fire),
-  `release.yml`'s `publish` job calls `cd.yml` directly as a reusable
-  workflow (`workflow_call`, `ref: vX.Y.Z`) in the same run. `cd.yml`
-  keeps its original `push: tags: v*` trigger too, so a manually
-  pushed tag (e.g. from a contributor's own machine) still works
-  exactly as before — `workflow_call`'s optional `ref` input just lets
-  both entry points share one test-then-publish implementation instead
-  of forking it.
+  scoped tighter than branch push access.
+- **Chaining `release.yml` into `cd.yml`** (since v0.14.2 — v0.14.1's
+  first attempt is a documented incident, not just history): a tag push
+  from the default `GITHUB_TOKEN` doesn't retrigger other workflows
+  (GitHub explicitly suppresses that, as a loop guard), so `release.yml`
+  can't just push the tag and rely on `cd.yml`'s `push: tags: v*`
+  trigger to fire. The first fix — `release.yml` calling `cd.yml`
+  directly via `workflow_call` — ran, tested, and built correctly, then
+  failed at the actual PyPI upload: PyPI's Trusted Publishing OIDC
+  verification checks the certificate's Build Config URI, which names
+  the *top-level* workflow that ran (`release.yml`), not any reusable
+  workflow it calls — so it never matches a Trusted Publisher
+  registered for `cd.yml`, no matter what `cd.yml` itself declares.
+  Fixed by giving `cd.yml` a `workflow_run` trigger
+  (`workflows: ["Release"]`, gated on `github.event.workflow_run.conclusion
+  == 'success'`) instead — `cd.yml` then runs as its own genuinely
+  top-level workflow, matching what's registered on PyPI. Since a
+  `workflow_run`-triggered job has no `workflow_call` `ref` input to
+  read the intended tag from, the "does this commit's tag match
+  `pyproject.toml`" safety check now does `git describe --tags
+  --exact-match HEAD` (checkout uses `fetch-depth: 0` so the tag is
+  actually present locally) instead of parsing `github.ref_name` — this
+  works the same whether `cd.yml` was triggered by a real tag push or
+  by `release.yml` finishing. `cd.yml`'s original `push: tags: v*`
+  trigger is unchanged, so a tag pushed by a human from their own
+  machine still works exactly as before.
 
 ## 9. Explicitly deferred (tracked, not forgotten)
 
