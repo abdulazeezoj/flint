@@ -1,0 +1,5 @@
+{
+  "id": "celery",
+  "label": "Celery",
+  "description": "Task definition, enqueuing, and result-checking conventions for this project's Celery background worker."
+}

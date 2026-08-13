@@ -1,0 +1,88 @@
+# Gotchas
+
+Real mechanics of how this project's Celery setup is wired — not a
+general Celery tutorial — worth knowing before you hit the same wall.
+
+## A new `tasks/` module doesn't run itself — `worker.py` has to import it
+
+Pointing `celery -A {{ package_name }}.worker.celery_app worker` at
+`worker.py` only gets the worker process the `celery_app` instance.
+Celery doesn't scan `tasks/` on its own; a task only gets *registered*
+when the module defining it is *imported* somewhere in the process,
+because `@celery_app.task` does its registration as a side effect of
+that module executing. `tasks/example.py` only becomes visible to the
+worker because `worker.py` ends with:
+
+```python
+from {{ package_name }}.tasks import example  # noqa: E402,F401
+```
+
+That import can't move to the top of `worker.py`, and it's not there by
+accident. `tasks/example.py` does `from {{ package_name }}.worker import
+celery_app` — it needs the `celery_app` instance to decorate `add` with
+`@celery_app.task`. So `worker.py` can't import `tasks/example` before
+`celery_app` is defined without hitting a circular import (`worker.py`
+importing `tasks/example.py` importing `worker.py`, which isn't
+finished defining `celery_app` yet). Building `celery_app` first, then
+importing the task modules that depend on it, is the only way to break
+that cycle — which is why the import sits at the *bottom* of the file,
+after a `# noqa: E402,F401` (import-not-at-top and unused-import,
+both intentional here).
+
+**The consequence for you**: every new module you add under `tasks/`
+needs its own import line added to the bottom of `worker.py`, right
+next to the `tasks.example` one. Skip it and the task function still
+imports and runs fine anywhere else in your code — `add.delay(...)`
+even successfully publishes a message to the broker — but the worker
+process never registers it, so the message just sits unconsumed and the
+task silently never executes. There's no error; it looks like a hang.
+
+{% if framework == "fastapi" %}
+## `.delay()`/`.apply_async()` are sync calls — don't `await` them
+
+Celery's client API (`.delay()`, `.apply_async()`, `AsyncResult(...)`)
+is synchronous by design — under the hood it's a blocking publish to
+{{ broker }}, not a coroutine. `main.py`'s `enqueue_add` is a plain
+`def`, not `async def`, even though the rest of this FastAPI app favors
+`async def` handlers the moment they do I/O (see the `fastapi` skill).
+Don't "fix" this by making it `async def` and `await add.delay(a, b)` —
+`.delay()` doesn't return an awaitable, so that's a `TypeError` at
+request time, not a style improvement. If you need to call it from code
+that's already inside an `async def`, call it as-is (unawaited); Celery
+has no async client.
+{% endif %}
+
+## Forgetting `PYTHONPATH=src` breaks the worker, not the API
+
+The API process finds `{{ package_name }}` because it's installed
+editable into the project's virtualenv. The `celery` CLI's `-A` flag
+does a plain module import (`{{ package_name }}.worker`) from whatever's
+on `PYTHONPATH`, and this project's source lives under `src/` rather
+than the repo root — so running
+`uv run celery -A {{ package_name }}.worker.celery_app worker` without
+`PYTHONPATH=src` fails with `ModuleNotFoundError:
+No module named '{{ package_name }}'` even though the API starts fine.
+Always use the full command from the README:
+
+```
+PYTHONPATH=src uv run celery -A {{ package_name }}.worker.celery_app worker --loglevel=info
+```
+
+{% if broker == "rabbitmq" %}
+## The `rpc://` result backend only delivers to the process that enqueued the task
+
+This project configures `backend="rpc://"` when the broker is
+RabbitMQ (see `worker.py`) instead of pointing the backend at Redis.
+`rpc://` implements results as an AMQP reply sent back to the exact
+connection that called `.delay()`/`.apply_async()` — it is not a shared
+store any process can poll later. Enqueuing in one process (e.g. a
+request handler) and then trying to fetch
+`AsyncResult(task_id, app=celery_app).result` from a *different*,
+unrelated process (a separate script, a different API worker) is not a
+supported pattern with `rpc://` — you'll get a result that never
+arrives rather than a clear error. If you need results that any process
+can read back later (a status-polling endpoint hit by a different
+request than the one that enqueued the task, for example), point the
+result backend at Redis instead, the way the `broker == "redis"` branch
+of `worker.py` already does for both broker and backend.
+{% endif %}

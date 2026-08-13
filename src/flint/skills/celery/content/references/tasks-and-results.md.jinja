@@ -1,0 +1,93 @@
+# Tasks, enqueuing, and results
+
+## Defining a task
+
+A task is any function decorated with `@celery_app.task`, living under
+`src/{{ package_name }}/tasks/`. `tasks/example.py` is the template:
+
+```python
+from {{ package_name }}.worker import celery_app
+
+
+@celery_app.task
+def add(a: int, b: int) -> int:
+    return a + b
+```
+
+Nothing special about the function body — it's plain Python, run inside
+the worker process. Arguments and the return value get serialized to
+cross the {{ broker }} broker, so keep them to plain JSON-friendly types
+(numbers, strings, lists, dicts) rather than passing ORM instances,
+open file handles, or other non-serializable objects.
+
+Registering a new task always means the same two edits:
+
+1. Write the function in a module under `tasks/` (a new file, or add to
+   an existing one).
+2. Add an import for that module to the bottom of `worker.py`, next to
+   the existing `tasks.example` import — see `references/gotchas.md`
+   for why it has to be there and not at the top.
+
+## Enqueuing: `.delay()` vs `.apply_async()`
+
+```python
+task = add.delay(a, b)                    # shorthand this project's own endpoint uses
+task = add.apply_async(args=(a, b))       # equivalent, spelled out
+```
+
+`.delay(*args, **kwargs)` is shorthand for the common case — call it
+exactly like you'd call the function directly, and it enqueues instead
+of running inline. `.apply_async()` is the same operation with room for
+options `.delay()` doesn't expose:
+
+```python
+add.apply_async(
+    args=(a, b),
+    countdown=30,          # run at least 30s from now, not immediately
+    retry=True,
+    retry_policy={"max_retries": 3, "interval_start": 1},
+)
+```
+
+Reach for `.apply_async()` the moment you need a delay, a specific
+queue/routing key, or a retry policy — otherwise `.delay()` (what
+`/tasks/add` uses) is the right default; there's no other difference
+between them.
+
+Both return an `AsyncResult` immediately, *before* the task has run —
+enqueuing never blocks on execution. `task.id` is the only thing you
+get back synchronously; everything else about the task's outcome has to
+be looked up separately, after the worker has had a chance to run it.
+
+## Reading a result back
+
+```python
+from celery.result import AsyncResult
+
+from {{ package_name }}.worker import celery_app
+
+result = AsyncResult(task_id, app=celery_app)
+result.status   # "PENDING" | "STARTED" | "SUCCESS" | "FAILURE" | ...
+result.result   # the return value once status is "SUCCESS" (or the
+                 # exception, if status is "FAILURE")
+```
+
+You don't need to hold on to the original `task` object returned by
+`.delay()` — `task_id` (a plain string) is everything `AsyncResult`
+needs, so it's safe to persist just the id (e.g. return it from an
+endpoint, as `/tasks/add` does) and reconstruct the `AsyncResult` later
+from wherever you need to check on it.
+
+{% if broker == "rabbitmq" %}
+This project's result backend is `rpc://` (RabbitMQ broker, see
+`worker.py`) — reading `.status`/`.result` only works from the same
+process that called `.delay()`/`.apply_async()` in the first place. See
+`references/gotchas.md` for what that means in practice and when to
+switch to a Redis-backed result backend instead.
+{% else %}
+This project's result backend is the same Redis instance as the broker
+(`settings.redis_url`, see `worker.py`) — results are shared state any
+process can read, not tied to whichever process enqueued the task, so a
+status-polling endpoint hit by a different request than the one that
+called `.delay()` works as you'd expect.
+{% endif %}
