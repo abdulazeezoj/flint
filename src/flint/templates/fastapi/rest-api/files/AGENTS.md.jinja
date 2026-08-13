@@ -87,3 +87,38 @@ Next.js only enforces structure for routing, nothing else):
 - New endpoints that touch the database take `session` via
   `Depends(get_session)` — don't create engines/sessions ad hoc.
 {% endif %}
+
+## Agent skills
+
+Deeper, library-specific reference material lives in `.agents/skills/`
+— start with `.agents/skills/README.md` for the full index. This
+project ships:
+
+- `.agents/skills/fastapi/SKILL.md` — routing, dependency injection,
+  request/response models, lifespan, testing conventions.
+- `.agents/skills/pydantic-settings/SKILL.md` — configuration via
+  `Settings`.
+- `.agents/skills/pytest/SKILL.md` — this project's testing
+  conventions (isolated database, async fixtures).
+{% if orm == "sqlmodel" %}
+- `.agents/skills/sqlmodel/SKILL.md` — model definition, async
+  sessions, query patterns.
+{% elif orm == "sqlalchemy" %}
+- `.agents/skills/sqlalchemy/SKILL.md` — declarative models, async
+  sessions, query patterns.
+{% endif %}
+{% if migrations %}
+- `.agents/skills/alembic/SKILL.md` — the migration workflow, and why
+  the database is deliberately **not** auto-created on startup.
+{% endif %}
+{% if worker == "taskiq" %}
+- `.agents/skills/taskiq/SKILL.md` — task definitions, the two-process
+  model, and the task-discovery gotcha (read this before adding a task).
+{% elif worker == "celery" %}
+- `.agents/skills/celery/SKILL.md` — task definitions, the two-process
+  model, and the task-discovery gotcha (read this before adding a task).
+{% endif %}
+{% if redis %}
+- `.agents/skills/redis/SKILL.md` — caching client usage, and why
+  cache invalidation on writes isn't automatic here.
+{% endif %}

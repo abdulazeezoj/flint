@@ -42,3 +42,17 @@ uv run pytest
   `uv.lock`; run `uv add <package>` / `uv remove <package>` instead.
 - Keep route handlers typed; return plain dicts or Pydantic models, not
   raw strings.
+
+## Agent skills
+
+Deeper, library-specific reference material lives in `.agents/skills/`
+— start with `.agents/skills/README.md` for the full index. This
+project ships:
+
+- `.agents/skills/fastapi/SKILL.md` — routing, dependency injection,
+  request/response models, lifespan, testing conventions.
+- `.agents/skills/pytest/SKILL.md` — this project's testing conventions.
+{% if config %}
+- `.agents/skills/pydantic-settings/SKILL.md` — configuration via
+  `Settings`.
+{% endif %}
