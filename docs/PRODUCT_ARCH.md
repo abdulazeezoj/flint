@@ -850,9 +850,29 @@ surfaced by actually running the generated tooling:
 - `CHANGELOG.md` follows the `v{release}.{feature}.{fixes}` scheme
   defined in the product spec; every entry links the version to the
   behavior change, newest first.
-- No CI/publish automation in v0 (non-goal); the release step is a
-  manual `uv build` + tag, documented in the CHANGELOG's Unreleased →
-  version-heading workflow.
+- **CI** (`.github/workflows/ci.yml`, since v0.10.1): on every push to
+  `main` and every PR — `uv sync --locked` (fails if `uv.lock` drifted
+  from `pyproject.toml`), `uv run pytest` (the same 100%-coverage-gated
+  suite documented in §7), and a smoke check that the installed console
+  script actually runs (`uv run flint --version`). Single Python
+  version (3.11, the floor in `requires-python`) — flint's own code has
+  no version-specific branches, so a matrix would mostly re-run the
+  same thing.
+- **CD** (`.github/workflows/cd.yml`, since v0.10.1): fires on pushing a
+  `v*` tag (the same tag the manual release step already produced pre-
+  automation — bump `__version__`/`pyproject.toml`, update
+  `CHANGELOG.md`, commit, tag, push). Two jobs: `test` (identical gate
+  to CI — a tag with a red test suite never reaches `publish`), then
+  `publish`, which verifies the pushed tag's version matches
+  `pyproject.toml`'s (refuses to publish on a mismatch — a manually
+  mistagged commit must not ship under the wrong version), runs `uv
+  build`, and publishes via `pypa/gh-action-pypi-publish` using PyPI's
+  **Trusted Publishing** (OIDC) — no long-lived API token stored as a
+  GitHub secret; the `publish` job's `id-token: write` permission and
+  its `pypi` environment are what PyPI's trusted-publisher config keys
+  off of (repo, workflow filename, and environment name all have to
+  match what's registered on PyPI's side for the token exchange to
+  succeed).
 
 ## 9. Explicitly deferred (tracked, not forgotten)
 

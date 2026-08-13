@@ -1,5 +1,8 @@
 # flint
 
+[![CI](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/flint-cli)](https://pypi.org/project/flint-cli/)
+
 `create-next-app`, for Python. One command, a short interactive wizard,
 and you have a running project — no hand-written boilerplate. Pick a
 richer template and the same wizard wires up a real database,
@@ -145,3 +148,23 @@ Adding a skill to the `.agents/skills/` catalog is the same kind of
 change — see `src/flint/skills/fastapi/` for the reference shape, then
 add `{"id": "your-skill", "when": {...}}` to whichever templates'
 `skills` list should include it.
+
+## Releasing
+
+CI (`.github/workflows/ci.yml`) runs the test suite on every push/PR.
+To ship a release: bump `__version__` in `src/flint/__init__.py` and
+`version` in `pyproject.toml` (kept in sync manually), add a
+`CHANGELOG.md` entry, commit, then tag and push:
+
+```
+git tag v0.10.1
+git push origin v0.10.1
+```
+
+`.github/workflows/cd.yml` picks up the tag, re-runs the test suite,
+verifies the tag matches `pyproject.toml`'s version, and publishes to
+PyPI via Trusted Publishing (OIDC) — no API token stored as a repo
+secret. One-time setup on PyPI's side: register a trusted publisher
+(Account → Publishing, or the project's own Settings → Publishing once
+it exists) with owner `abdulazeezoj`, repo `flint`, workflow
+`cd.yml`, and environment `pypi`.

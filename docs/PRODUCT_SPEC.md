@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.10.0: interactive `--force` confirmation, `flint list-templates`; package manager and template distribution closed as uv-only/bundled-only)
+**Last updated:** 2026-08-13 (v0.10.1: CI/CD via GitHub Actions, PyPI publishing on tag push)
 
 ## 1. Vision
 
@@ -250,6 +250,11 @@ hold for every project shape a generated app might end up living in
   directory (FR2), a new `flint list-templates` introspection command
   (FR12), and the package-manager/template-distribution open questions
   are formally closed (uv-only, bundled-only) rather than left open.
+- `v0.10.1` — CI/CD via GitHub Actions: `.github/workflows/ci.yml` runs
+  the test suite on every push/PR; `.github/workflows/cd.yml` publishes
+  to PyPI on a `v*` tag push, via Trusted Publishing (OIDC, no stored
+  API token). No change to the `flint` CLI itself — release
+  infrastructure only. See PRODUCT_ARCH.md §8.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

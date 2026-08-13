@@ -7,6 +7,22 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.10.1 — 2026-08-13
+
+### Added
+
+- **CI/CD via GitHub Actions.** `.github/workflows/ci.yml` runs on every
+  push to `main` and every PR: `uv sync --locked`, the full test suite
+  (`uv run pytest`, same 100%-coverage gate as local development), and
+  a smoke check that the installed console script runs. `.github/
+  workflows/cd.yml` fires on pushing a `v*` tag: re-runs the same test
+  gate, verifies the tag's version matches `pyproject.toml` (refuses to
+  publish on a mismatch), builds via `uv build`, and publishes to PyPI
+  using Trusted Publishing (OIDC) — no API token stored as a repo
+  secret. Publishing requires a one-time PyPI-side setup (see
+  PRODUCT_ARCH.md §8 for exactly what to register). No change to the
+  `flint` CLI itself — this is release infrastructure only.
+
 ## v0.10.0 — 2026-08-13
 
 ### Added
