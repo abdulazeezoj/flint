@@ -31,7 +31,7 @@ def root(
         bool, typer.Option("--version", help="Show the version and exit.")
     ] = False,
 ) -> None:
-    """Flint — interactive project scaffolding for Python frameworks."""
+    """Flint — strike a spark, get a running Python project."""
     if version:
         console.print(f"flint {__version__}")
         raise typer.Exit()

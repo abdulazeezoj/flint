@@ -7,6 +7,17 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.14.3 — 2026-08-13
+
+### Changed
+
+- **The flint → spark → fire metaphor now runs through the project's
+  descriptions.** `pyproject.toml`'s `description` (shown on the PyPI
+  listing), `mkdocs.yml`'s `site_description`, `README.md`'s opening
+  line, and the `flint --help` header all now lead with "strike a
+  spark" / "throws a spark" framing, echoing `docs/index.md`'s "Why
+  Flint" section. Copy only — no behavior change.
+
 ## v0.14.2 — 2026-08-13
 
 ### Fixed
