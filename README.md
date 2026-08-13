@@ -1,8 +1,8 @@
-# spindle
+# flint
 
 [![CI](https://github.com/abdulazeezoj/spindle/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/spindle/actions/workflows/ci.yml)
 [![Docs](https://github.com/abdulazeezoj/spindle/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/spindle/)
-[![PyPI](https://img.shields.io/pypi/v/spindle)](https://pypi.org/project/spindle/)
+[![PyPI](https://img.shields.io/pypi/v/flint-kit)](https://pypi.org/project/flint-kit/)
 
 `create-next-app`, for Python. One command, a short interactive wizard,
 and you have a running project — no hand-written boilerplate. Pick a
@@ -10,7 +10,7 @@ richer template and the same wizard wires up a real database,
 migrations, and a background worker too.
 
 ```
-uvx spindle
+uvx --from flint-kit flint
 ```
 
 ```
@@ -49,32 +49,32 @@ remembered preferences, and how to contribute.
 ## Install
 
 ```
-uv tool install spindle   # persistent `spindle` on PATH
+uv tool install flint-kit   # persistent `flint` on PATH
 # or run it ephemerally, no install:
-uvx spindle
+uvx --from flint-kit flint
 ```
 
 ## Usage
 
 ```
-spindle                                     # interactive wizard
-spindle new my-api                           # interactive, name pre-filled
-spindle new my-api \
+flint                                     # interactive wizard
+flint new my-api                           # interactive, name pre-filled
+flint new my-api \
   --framework fastapi --template rest-api \
   -o database=sqlite -o orm=sqlmodel \
   --docker --git --install --yes            # fully non-interactive, for scripts/CI
-spindle list-templates                       # what's available, without generating anything
-spindle --version
-spindle --help
+flint list-templates                       # what's available, without generating anything
+flint --version
+flint --help
 ```
 
-Every prompt has a matching flag, and Spindle remembers your last
-choices in `~/.spindle/last.json` as the new default next time. See the
+Every prompt has a matching flag, and Flint remembers your last
+choices in `~/.flint/last.json` as the new default next time. See the
 [CLI Reference](https://abdulazeezoj.github.io/spindle/cli-reference/)
 and [Remembered Preferences](https://abdulazeezoj.github.io/spindle/preferences/)
 docs for the full details.
 
-## What spindle ships
+## What flint ships
 
 A project is always generated from a `<framework>/<template>` pair —
 **FastAPI** and **Flask**, each with a **Hello World** and a fuller
@@ -91,7 +91,7 @@ docs for what each one actually generates.
 ```
 uv sync
 uv run pytest       # also runs coverage — the suite fails under 100%
-uv run spindle --help
+uv run flint --help
 ```
 
 Adding a framework, template, or skill is a content-only change — no

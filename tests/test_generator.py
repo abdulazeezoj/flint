@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-import spindle.generator as generator_module
-from spindle.errors import SpindleError, SpindleUserError
-from spindle.generator import (
+import flint.generator as generator_module
+from flint.errors import FlintError, FlintUserError
+from flint.generator import (
     Answers,
     get_framework,
     get_skill,
@@ -69,7 +69,7 @@ def test_list_frameworks_includes_fastapi():
 
 
 def test_get_framework_unknown_raises():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         get_framework("does-not-exist")
 
 
@@ -80,7 +80,7 @@ def test_list_templates_includes_hello_world_and_rest_api():
 
 
 def test_get_template_unknown_raises():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         get_template("fastapi", "does-not-exist")
 
 
@@ -231,7 +231,7 @@ def test_render_refuses_nonempty_directory_without_force(tmp_path: Path):
     target.mkdir()
     (target / "existing.txt").write_text("hello")
 
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         render("fastapi", "hello-world", target, make_answers())
 
 
@@ -250,7 +250,7 @@ def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
     _write_meta(tmp_path / "widget", "widget")
     _write_meta(tmp_path / "widget" / "basic", "basic", enabled=False)
 
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         render(
             "widget",
             "basic",
@@ -264,7 +264,7 @@ def test_render_disabled_framework_raises(tmp_path: Path, monkeypatch):
     _write_meta(tmp_path / "widget", "widget", enabled=False)
     _write_meta(tmp_path / "widget" / "basic", "basic")
 
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         render(
             "widget",
             "basic",
@@ -287,21 +287,21 @@ def test_render_rolls_back_on_failure(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(generator_module, "_render_content", flaky_render_content)
 
-    with pytest.raises(SpindleError):
+    with pytest.raises(FlintError):
         render("fastapi", "hello-world", target, make_answers())
 
     assert not target.exists()
 
 
 def test_render_unknown_template_raises(tmp_path: Path):
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         render("fastapi", "does-not-exist", tmp_path / "x", make_answers())
 
 
-def test_render_propagates_spindle_error_without_wrapping_but_still_rolls_back(
+def test_render_propagates_flint_error_without_wrapping_but_still_rolls_back(
     tmp_path: Path, monkeypatch
 ):
-    # A SpindleError raised mid-render (e.g. surfaced from a future layer
+    # A FlintError raised mid-render (e.g. surfaced from a future layer
     # hook) should pass through unchanged rather than being wrapped in
     # the generic "Failed to generate project" message — but generation
     # is still all-or-nothing, so the partial directory must be rolled
@@ -309,11 +309,11 @@ def test_render_propagates_spindle_error_without_wrapping_but_still_rolls_back(
     target = tmp_path / "my-api"
 
     def raise_user_error(layer_root, target_dir, context):
-        raise SpindleUserError("deliberate")
+        raise FlintUserError("deliberate")
 
     monkeypatch.setattr(generator_module, "_render_layer", raise_user_error)
 
-    with pytest.raises(SpindleUserError, match="deliberate"):
+    with pytest.raises(FlintUserError, match="deliberate"):
         render("fastapi", "hello-world", target, make_answers())
 
     assert not target.exists()
@@ -357,17 +357,17 @@ def test_list_templates_skips_subdirs_without_template_json(tmp_path: Path, monk
 def test_render_does_not_delete_preexisting_directory_on_failure(tmp_path: Path, monkeypatch):
     # created_before=True (the target dir existed before this render call,
     # e.g. a --force run) must never be cleaned up on failure — only
-    # directories spindle itself created get rolled back.
+    # directories flint itself created get rolled back.
     target = tmp_path / "my-api"
     target.mkdir()
     (target / "keepme.txt").write_text("do not delete")
 
     def raise_error(layer_root, target_dir, context):
-        raise SpindleUserError("deliberate")
+        raise FlintUserError("deliberate")
 
     monkeypatch.setattr(generator_module, "_render_layer", raise_error)
 
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         render("fastapi", "hello-world", target, make_answers(), force=True)
 
     assert target.exists()
@@ -709,10 +709,10 @@ class TestSkillsMechanism:
         assert skill.description == "About widget."
         assert skill.path == tmp_path / "widget"
 
-    def test_get_skill_unknown_raises_spindle_error(self, tmp_path: Path, monkeypatch):
+    def test_get_skill_unknown_raises_flint_error(self, tmp_path: Path, monkeypatch):
         monkeypatch.setattr(generator_module, "SKILLS_DIR", tmp_path)
 
-        with pytest.raises(SpindleError, match="Unknown skill 'ghost'"):
+        with pytest.raises(FlintError, match="Unknown skill 'ghost'"):
             get_skill("ghost")
 
     def test_template_json_skills_key_parses_into_skill_refs(self, tmp_path: Path, monkeypatch):
@@ -871,7 +871,7 @@ class TestSkillsMechanism:
             )
         )
 
-        with pytest.raises(SpindleError, match="Unknown skill 'ghost'"):
+        with pytest.raises(FlintError, match="Unknown skill 'ghost'"):
             render(
                 "acme",
                 "basic",

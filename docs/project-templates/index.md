@@ -1,6 +1,6 @@
 # Templates
 
-Every project Spindle generates comes from exactly one `<framework>/<template>`
+Every project Flint generates comes from exactly one `<framework>/<template>`
 pair, plus whatever options that template offers. Three distinct concepts,
 picked in this order:
 
@@ -10,25 +10,25 @@ picked in this order:
   `hello-world` or `rest-api`. Selected second, scoped to the framework you
   just picked.
 - **Option** — a further, template-specific choice, declared by the template
-  itself — not hardcoded in Spindle. `hello-world` asks only whether to add
+  itself — not hardcoded in Flint. `hello-world` asks only whether to add
   `pydantic-settings` config; `rest-api` asks for a database, an ORM,
   whether to add migrations, a background worker, a message broker, and
-  Redis. Spindle's wizard has no built-in notion of "database" or "worker" —
+  Redis. Flint's wizard has no built-in notion of "database" or "worker" —
   it just renders whatever the chosen template's `template.json` declares.
 
 ```text
-spindle new my-api --framework fastapi --template rest-api -o database=postgres
+flint new my-api --framework fastapi --template rest-api -o database=postgres
 #                 ^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^
 #                 framework           template             template option
 ```
 
-This is what lets Spindle grow in three independent directions — more
+This is what lets Flint grow in three independent directions — more
 frameworks, more templates per framework, richer options per template —
 without any one axis blocking the others.
 
 ## How a template is put together
 
-You don't need to know this to use Spindle, but it explains why the pages
+You don't need to know this to use Flint, but it explains why the pages
 below look the way they do. Each template directory bundles:
 
 - **`files/`** — always rendered, no conditions attached: the base project
@@ -68,13 +68,13 @@ between FastAPI and Flask isn't a relearn.
 
 !!! tip
     Not sure what's available or which options a template accepts? Run
-    `spindle list-templates` — it prints every framework/template pair,
+    `flint list-templates` — it prints every framework/template pair,
     including anything still "coming soon," with no project generated. See
     [CLI Reference](../cli-reference.md).
 
 ## Next
 
-- [Getting Started](../getting-started.md) — install Spindle and generate
+- [Getting Started](../getting-started.md) — install Flint and generate
   your first project
 - [Agent Skills](../agent-skills.md) — how `.agents/skills/` is selected
   and what's in it

@@ -8,9 +8,9 @@ PRODUCT_ARCH.md §6.
 import questionary
 import pytest
 
-from spindle import prompts
-from spindle.errors import SpindleUserError
-from spindle.generator import FrameworkMeta, TemplateLayer, TemplateMeta, TemplateOption
+from flint import prompts
+from flint.errors import FlintUserError
+from flint.generator import FrameworkMeta, TemplateLayer, TemplateMeta, TemplateOption
 
 FASTAPI = FrameworkMeta(id="fastapi", label="FastAPI", description="", enabled=True, path=None)
 FLASK_SOON = FrameworkMeta(id="flask", label="Flask", description="", enabled=False, path=None)
@@ -73,12 +73,12 @@ def test_prompt_framework_interactive_select(monkeypatch):
 
 
 def test_prompt_framework_flag_disabled_rejected():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_framework("flask", [FASTAPI, FLASK_SOON], interactive=True)
 
 
 def test_prompt_framework_flag_unknown_rejected():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_framework("does-not-exist", [FASTAPI, FLASK_SOON], interactive=True)
 
 
@@ -96,7 +96,7 @@ def test_prompt_template_interactive_select(monkeypatch):
 
 
 def test_prompt_template_flag_disabled_rejected():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_template("rest-api", [HELLO_WORLD, SOON_TEMPLATE], interactive=True)
 
 
@@ -219,7 +219,7 @@ def test_prompt_install_remembered_default_used_non_interactive():
 
 def test_prompt_cancelled_raises(monkeypatch):
     monkeypatch.setattr(questionary, "text", lambda *a, **k: type("Q", (), {"ask": lambda self: None})())
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_project_name(None, interactive=True)
 
 
@@ -227,7 +227,7 @@ def test_prompt_framework_select_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_framework(None, [FASTAPI, FLASK_SOON], interactive=True)
 
 
@@ -235,7 +235,7 @@ def test_prompt_docker_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_docker(None, interactive=True)
 
 
@@ -243,7 +243,7 @@ def test_prompt_git_init_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_git_init(None, interactive=True)
 
 
@@ -285,7 +285,7 @@ def test_prompt_force_overwrite_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_force_overwrite("my-api", force=False, interactive=True)
 
 
@@ -293,7 +293,7 @@ def test_prompt_install_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "confirm", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_install(None, interactive=True)
 
 
@@ -312,7 +312,7 @@ def test_parse_option_flags_empty_list():
 
 
 def test_parse_option_flags_rejects_missing_equals():
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.parse_option_flags(["database"])
 
 
@@ -364,7 +364,7 @@ WIDGET_TEMPLATE = TemplateMeta(
 
 
 def test_prompt_template_options_unknown_key_rejected():
-    with pytest.raises(SpindleUserError, match="Unknown option"):
+    with pytest.raises(FlintUserError, match="Unknown option"):
         prompts.prompt_template_options(WIDGET_TEMPLATE, {"bogus": "x"}, interactive=False)
 
 
@@ -376,7 +376,7 @@ def test_prompt_template_options_provided_select_value_used():
 
 
 def test_prompt_template_options_provided_invalid_select_value_rejected():
-    with pytest.raises(SpindleUserError, match="not a valid value"):
+    with pytest.raises(FlintUserError, match="not a valid value"):
         prompts.prompt_template_options(
             WIDGET_TEMPLATE, {"database": "mysql"}, interactive=False
         )
@@ -394,7 +394,7 @@ def test_prompt_template_options_provided_confirm_value_parsed(raw, expected):
 
 
 def test_prompt_template_options_provided_invalid_confirm_value_rejected():
-    with pytest.raises(SpindleUserError, match="not a valid boolean"):
+    with pytest.raises(FlintUserError, match="not a valid boolean"):
         prompts.prompt_template_options(
             WIDGET_TEMPLATE,
             {"database": "sqlite", "orm": "sqlmodel", "migrations": "maybe"},
@@ -442,7 +442,7 @@ def test_prompt_template_options_cancelled_raises(monkeypatch):
     monkeypatch.setattr(
         questionary, "select", lambda *a, **k: type("Q", (), {"ask": lambda self: None})()
     )
-    with pytest.raises(SpindleUserError):
+    with pytest.raises(FlintUserError):
         prompts.prompt_template_options(WIDGET_TEMPLATE, {}, interactive=True)
 
 
@@ -498,7 +498,7 @@ def test_prompt_template_options_explicit_flag_wins_over_remembered():
 
 
 def test_prompt_template_options_real_rest_api_template_default_flow():
-    from spindle.generator import get_template
+    from flint.generator import get_template
 
     rest_api = get_template("fastapi", "rest-api")
     resolved = prompts.prompt_template_options(rest_api, {}, interactive=False)
@@ -513,7 +513,7 @@ def test_prompt_template_options_real_rest_api_template_default_flow():
 
 
 def test_prompt_template_options_real_rest_api_worker_implies_redis_broker():
-    from spindle.generator import get_template
+    from flint.generator import get_template
 
     rest_api = get_template("fastapi", "rest-api")
     resolved = prompts.prompt_template_options(
@@ -524,7 +524,7 @@ def test_prompt_template_options_real_rest_api_worker_implies_redis_broker():
 
 
 def test_prompt_template_options_real_rest_api_rabbitmq_broker_decouples_redis():
-    from spindle.generator import get_template
+    from flint.generator import get_template
 
     rest_api = get_template("fastapi", "rest-api")
     resolved = prompts.prompt_template_options(

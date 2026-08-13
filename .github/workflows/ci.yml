@@ -29,5 +29,5 @@ jobs:
       - name: Run tests (fails under 100% coverage — see pyproject.toml)
         run: uv run pytest
 
-      - name: Verify spindle runs
-        run: uv run spindle --version
+      - name: Verify flint runs
+        run: uv run flint --version

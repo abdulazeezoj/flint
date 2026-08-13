@@ -1,6 +1,6 @@
 # FastAPI · REST API
 
-The richest template Spindle ships. Where `hello-world` gets you a single
+The richest template Flint ships. Where `hello-world` gets you a single
 endpoint, `rest-api` gets you a layered FastAPI project with a real
 database, an ORM, Alembic migrations, a background worker, and Redis —
 each independently optional, wired together correctly when combined, and
@@ -79,7 +79,7 @@ convention, applied literally rather than loosely: **only routing is
 strictly located; everything else is a sensible default, not an
 enforced rule.**
 
-- **Strictly opinionated** — Spindle always uses this exact name and
+- **Strictly opinionated** — Flint always uses this exact name and
   location, and every generated project agrees: `main.py` (never
   renamed, never moved), `worker.py` (same, when present), `routes/`
   (one module per resource — routers are individually imported and
@@ -90,7 +90,7 @@ enforced rule.**
 - **A default, not a rule** — `schemas.py` and `models.py` stay
   single top-level files for now, because this template only ships one
   resource. They're natural candidates to become `schemas/`/`models/`
-  folders the moment your project grows a second resource — Spindle just
+  folders the moment your project grows a second resource — Flint just
   doesn't make that call for you.
 
 Notice `models.py` and the engine/session setup in `db.py` live outside
@@ -103,7 +103,7 @@ to stay small and stable.
 ## A full example
 
 ```bash
-spindle new my-api \
+flint new my-api \
   --framework fastapi --template rest-api \
   -o database=postgres -o orm=sqlmodel -o migrations=true \
   -o worker=taskiq -o broker=rabbitmq -o redis=true \
@@ -139,7 +139,7 @@ exported from `core/redis.py`) needs Redis reachable at `REDIS_URL`.
 
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework fastapi --template rest-api`, has an interactive
-equivalent if you just run `spindle new my-api` and answer the prompts
+equivalent if you just run `flint new my-api` and answer the prompts
 instead.
 
 ## Gotchas worth knowing before you edit the generated code
@@ -260,7 +260,7 @@ three; the full example above pulls in `fastapi`, `pydantic-settings`,
 
 ## Docker
 
-Pass `--docker` and Spindle adds a `Dockerfile` (plus a matching
+Pass `--docker` and Flint adds a `Dockerfile` (plus a matching
 `.dockerignore`) to the project root, alongside a `Docker` section in the
 generated `README.md` with the exact build/run commands:
 

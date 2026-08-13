@@ -9,7 +9,7 @@ to keep this hermetic — no real git/uv/network involved.
 import subprocess
 from pathlib import Path
 
-from spindle import postgen
+from flint import postgen
 
 
 def _summary_kwargs(**overrides):

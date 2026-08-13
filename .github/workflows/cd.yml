@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/spindle/
+      url: https://pypi.org/project/flint-kit/
     permissions:
       id-token: write # required for PyPI trusted publishing (OIDC) — no API token secret needed
     steps:

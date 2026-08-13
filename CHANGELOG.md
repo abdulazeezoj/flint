@@ -1,11 +1,46 @@
 # Changelog
 
-All notable changes to Spindle are documented here.
+All notable changes to Flint are documented here.
 
 Versions follow `v{release}.{feature}.{fixes}` (see
 `docs/_product/PRODUCT_SPEC.md` §11): `release` is the major epoch
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
+
+## v0.14.0 — 2026-08-13
+
+### Changed
+
+- **Project renamed a third time — back to `flint`, this time with a
+  split brand/distribution name.** `spindle` (see `v0.13.0`) turned out
+  to already be a published, unrelated PyPI package (a classical-magnetism
+  library) — a real collision the plain-availability check couldn't have
+  caught any earlier, since it's a straightforward already-taken name,
+  not a similarity/squat-guard block. A ~300-candidate sweep across a
+  dozen semantic domains (craft/tool words, birds, mythology, whimsical
+  animals, food, invented syllables, 2–3 letter abbreviations) turned up
+  essentially nothing both short and clean: PyPI's namespace for
+  short, pronounceable English words is almost entirely pre-claimed.
+  Rather than keep hunting for an available bare word, this settles the
+  question with the pattern real projects actually use when the bare
+  name isn't available — e.g. GitHub's own `spec-kit` ships on PyPI as
+  `specify-cli` while the command is `specify`; the web framework Sillo
+  ships as `sillo-framework` while the brand and command are `sillo`.
+  Same here: **brand and command are `flint`** (reverting the
+  `spindle`→`flint` half of `v0.13.0`'s rename — package, CLI,
+  `~/.spindle/last.json` → `~/.flint/last.json`, generated-project
+  attribution, all docs), while **the PyPI distribution name is
+  `flint-kit`**, since plain `flint` is a real, unrelated, already-
+  published package (a Fortran analysis tool) and `flint-cli` also
+  turned out to be taken (an unrelated data-connector CLI). Because the
+  distribution and command names now differ, `uvx flint` alone won't
+  resolve correctly — the ephemeral-run form is `uvx --from flint-kit
+  flint`, same shape as `uvx --from httpie http`. `uv tool install
+  flint-kit` needs no such adjustment; it installs the `flint` console
+  script under its own name regardless of the distribution name. The
+  GitHub repository itself stays at `abdulazeezoj/spindle` for now (not
+  renamed back to `flint` in this pass) — a separate decision from the
+  package identity.
 
 ## v0.13.0 — 2026-08-13
 
@@ -24,7 +59,10 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `conjure` rename: package, CLI, `~/.conjure/last.json` →
   `~/.spindle/last.json`, generated-project attribution, all docs, and
   this time the GitHub repository itself too
-  (`abdulazeezoj/flint` → `abdulazeezoj/spindle`).
+  (`abdulazeezoj/flint` → `abdulazeezoj/spindle`). (Superseded one
+  release later — see `v0.14.0`: `spindle` turned out to already be a
+  real, unrelated published package, a plain collision the earlier
+  check should have — and, in hindsight, easily could have — caught.)
 
 ## v0.12.0 — 2026-08-13
 
@@ -96,7 +134,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   using Trusted Publishing (OIDC) — no API token stored as a repo
   secret. Publishing requires a one-time PyPI-side setup (see
   PRODUCT_ARCH.md §8 for exactly what to register). No change to the
-  `spindle` CLI itself — this is release infrastructure only.
+  `flint` CLI itself — this is release infrastructure only.
 
 ## v0.10.0 — 2026-08-13
 
@@ -104,13 +142,13 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Interactive `--force` overwrite confirmation.** Running into a
   non-empty target directory without `--force` used to hard-error
-  unconditionally. Now, in interactive mode, Spindle asks "Directory 'x'
+  unconditionally. Now, in interactive mode, Flint asks "Directory 'x'
   already exists and is not empty. Overwrite?" instead of failing
   outright — confirming proceeds exactly as `--force` would have,
   declining aborts cleanly with no files written. Non-interactive runs
   (`--yes`/piped stdin/CI) are unchanged: no prompt, same hard error
   unless `--force` was already passed.
-- **`spindle list-templates`**: a new introspection command listing every
+- **`flint list-templates`**: a new introspection command listing every
   framework/template pair — label, description, whether it supports
   `--docker` — including disabled/"coming soon" entries, so the roadmap
   stays visible outside the wizard too. Generates nothing.
@@ -119,7 +157,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 - **Package manager and template distribution are formally closed, not
   left open.** Both were long-standing "Open Questions" in
-  PRODUCT_SPEC.md §12 with no code changes attached. Spindle stays
+  PRODUCT_SPEC.md §12 with no code changes attached. Flint stays
   `uv`-only (every template's `pyproject.toml`/README/`AGENTS.md`/skill
   already assumes it end to end — supporting pip/poetry would mean a
   second rendering of every template, not a small addition) and
@@ -144,7 +182,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `taskiq`, `celery`, `redis`, `pytest`. Selection is declarative — a
   new `skills` list in `template.json`, gated by the exact same `id`/
   `when` shape `layers` already use — and the catalog lives once, flat,
-  at `src/spindle/skills/<id>/`, decoupled from any one framework/
+  at `src/flint/skills/<id>/`, decoupled from any one framework/
   template so a skill used by both (e.g. `pytest`, `redis`) isn't
   duplicated. Rendered through the same Jinja mechanism as everything
   else, so skill content gets real `{{ package_name }}` substitution
@@ -247,7 +285,7 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   `rest-api`, to match the hyphenated id style used elsewhere (e.g.
   `hello-world`) instead of being the odd one out. `--template restapi`
   is no longer recognized — use `--template rest-api`. Anything already
-  remembered in `~/.spindle/last.json` under the old `fastapi/restapi` key
+  remembered in `~/.flint/last.json` under the old `fastapi/restapi` key
   (§ v0.5.0) is simply never looked up again under the new id and falls
   back to the template's own defaults, same as any other stale entry —
   no manual migration needed.
@@ -256,8 +294,8 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 
 ### Added
 
-- **Remembered preferences** (`~/.spindle/last.json`): after a successful
-  generation, Spindle saves the last framework, the last template picked
+- **Remembered preferences** (`~/.flint/last.json`): after a successful
+  generation, Flint saves the last framework, the last template picked
   per framework, and — per `<framework>/<template>` — the resolved
   options plus `docker`/`git`/`install`. The next run uses these as the
   new default: the interactive wizard preselects them, and a flagless
@@ -267,12 +305,12 @@ Versions follow `v{release}.{feature}.{fixes}` (see
   choice no longer valid for the current template) is silently ignored
   in favor of the template's own default rather than erroring.
 - `--remember/--no-remember` flag (default on) to opt a single run out
-  of both reading and writing `~/.spindle/last.json` — for anyone who
+  of both reading and writing `~/.flint/last.json` — for anyone who
   wants a fully stateless run.
 
 ### Changed
 
-- Reading/writing `~/.spindle/last.json` is entirely best-effort: a
+- Reading/writing `~/.flint/last.json` is entirely best-effort: a
   missing, corrupt, or unwritable prefs file never fails or warns during
   generation — it's silently treated as "nothing remembered yet."
 
@@ -381,7 +419,7 @@ full write-up of why each was invisible to lighter checks:
 ### Fixed
 
 - `generator.render` now rolls back a partially-written target directory
-  when a `SpindleError` (not just any other exception) is raised mid-render
+  when a `FlintError` (not just any other exception) is raised mid-render
   — previously that branch re-raised without cleaning up, breaking the
   documented all-or-nothing generation guarantee. Currently unreachable
   via any real input, but would have mattered the moment a future layer
@@ -391,8 +429,8 @@ full write-up of why each was invisible to lighter checks:
 
 - Test suite now enforces 100% statement + branch coverage
   (`--cov-fail-under=100` in `pyproject.toml`, branch coverage on) —
-  every module in `src/spindle/` is fully covered, including the
-  `python -m spindle` entry points, `git`/`uv` subprocess failure paths,
+  every module in `src/flint/` is fully covered, including the
+  `python -m flint` entry points, `git`/`uv` subprocess failure paths,
   and every prompt cancellation branch.
 
 ## v0.2.0 — 2026-08-12
@@ -423,12 +461,12 @@ full write-up of why each was invisible to lighter checks:
 
 ## v0.1.0 — 2026-08-12
 
-First release. `spindle` scaffolds a runnable project from a short
+First release. `flint` scaffolds a runnable project from a short
 interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 
 ### Added
 
-- `spindle` / `spindle new [NAME]` — interactive wizard: project name,
+- `flint` / `flint new [NAME]` — interactive wizard: project name,
   framework, git init, dependency install.
 - Fully non-interactive mode via `--framework`, `--git/--no-git`,
   `--install/--no-install`, `--yes`, and `--force`; auto-detected when
@@ -436,7 +474,7 @@ interactive wizard, in the spirit of `create-react-app`/`create-next-app`.
 - `fastapi-hello-world` template: a `uv`-managed, `src/`-layout FastAPI
   project with a passing `pytest` test, ready to run with
   `uv run fastapi dev src/<package>/main.py`.
-- `spindle --version`.
+- `flint --version`.
 - Project name validation: derives a filesystem-safe slug and a valid,
   importable Python package name; rejects empty/keyword/stdlib-shadowing
   names instead of silently mutating them.
