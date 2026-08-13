@@ -4,10 +4,11 @@
 [![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
 [![PyPI](https://img.shields.io/pypi/v/flint-kit)](https://pypi.org/project/flint-kit/)
 
-`create-next-app`, for Python. One command, a short interactive wizard,
-and you have a running project — no hand-written boilerplate. Pick a
-richer template and the same wizard wires up a real database,
-migrations, and a background worker too.
+`create-next-app`, for Python — strike it and it throws a spark. One
+command, a short interactive wizard, and you have a running project —
+no hand-written boilerplate. Pick a richer template and the same
+wizard wires up a real database, migrations, and a background worker
+too.
 
 ```
 uvx --from flint-kit flint
