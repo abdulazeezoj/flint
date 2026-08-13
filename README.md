@@ -121,15 +121,15 @@ library-specific reference material (`SKILL.md` + `references/` +
 themselves for a bare hello-world, up to a dozen for a fully-loaded
 rest-api), plus a generated `.agents/skills/README.md` index and an
 `AGENTS.md` section pointing at whichever apply. See
-`docs/PRODUCT_ARCH.md` §4.5.
+`docs/_product/PRODUCT_ARCH.md` §4.5.
 
-See `docs/PRODUCT_SPEC.md` for full v0 scope and non-goals.
+See `docs/_product/PRODUCT_SPEC.md` for full v0 scope and non-goals.
 
 ## Docs
 
-- [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — vision, scope, requirements
-- [`docs/PRODUCT_FLOW.md`](docs/PRODUCT_FLOW.md) — exact wizard/CLI behavior
-- [`docs/PRODUCT_ARCH.md`](docs/PRODUCT_ARCH.md) — technical design
+- [`docs/_product/PRODUCT_SPEC.md`](docs/_product/PRODUCT_SPEC.md) — vision, scope, requirements
+- [`docs/_product/PRODUCT_FLOW.md`](docs/_product/PRODUCT_FLOW.md) — exact wizard/CLI behavior
+- [`docs/_product/PRODUCT_ARCH.md`](docs/_product/PRODUCT_ARCH.md) — technical design
 - [`CHANGELOG.md`](CHANGELOG.md) — release history
 
 ## Development

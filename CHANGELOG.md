@@ -2,10 +2,10 @@
 
 All notable changes to Flint are documented here.
 
-Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
-§11): `release` is the major epoch (starting at `0`), `feature` bumps for
-new user-facing capability, `fixes` bumps for patches with no new
-capability.
+Versions follow `v{release}.{feature}.{fixes}` (see
+`docs/_product/PRODUCT_SPEC.md` §11): `release` is the major epoch
+(starting at `0`), `feature` bumps for new user-facing capability,
+`fixes` bumps for patches with no new capability.
 
 ## v0.10.1 — 2026-08-13
 
