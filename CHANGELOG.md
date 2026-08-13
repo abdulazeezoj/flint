@@ -7,6 +7,38 @@ Versions follow `v{release}.{feature}.{fixes}` (see `docs/PRODUCT_SPEC.md`
 new user-facing capability, `fixes` bumps for patches with no new
 capability.
 
+## v0.9.0 — 2026-08-13
+
+### Added
+
+- **`.agents/skills/<id>/` — a shared, opt-in catalog of deeper agent
+  reference material.** Beyond the always-on, lightweight `AGENTS.md`,
+  every generated project now also gets `.agents/skills/<id>/` for
+  each library it actually uses — a `SKILL.md`, `references/*.md`, and
+  `guides/*.md` per library, plus a generated `.agents/skills/README.md`
+  index and an `AGENTS.md` section pointing at whichever skills apply.
+  Eleven skills ship: `fastapi`, `flask`, `pydantic-settings`,
+  `sqlmodel`, `sqlalchemy` (covers both FastAPI's async and Flask's
+  sync usage), `flask-sqlalchemy`, `alembic`, `flask-migrate`,
+  `taskiq`, `celery`, `redis`, `pytest`. Selection is declarative — a
+  new `skills` list in `template.json`, gated by the exact same `id`/
+  `when` shape `layers` already use — and the catalog lives once, flat,
+  at `src/flint/skills/<id>/`, decoupled from any one framework/
+  template so a skill used by both (e.g. `pytest`, `redis`) isn't
+  duplicated. Rendered through the same Jinja mechanism as everything
+  else, so skill content gets real `{{ package_name }}` substitution
+  and can branch on resolved options (e.g. the shared `sqlalchemy`
+  skill reads async-first for a FastAPI project, sync-first for a
+  Flask one). Every real gotcha already recorded in `PRODUCT_ARCH.md`
+  §7.1 is folded into the relevant skill's `references/gotchas.md`
+  (task-discovery for taskiq/celery, `create_all()`-vs-migrations for
+  alembic/flask-migrate/flask-sqlalchemy/sqlalchemy, the
+  app-factory-avoids-import-time-DB-connection bug for flask).
+  Live-verified end-to-end across both frameworks and a range of
+  option combinations: correct skill selection, correct `.env`-style
+  `package_name` substitution, no leftover template syntax, and a real
+  `uv sync && uv run pytest` pass on the generated output.
+
 ## v0.8.1 — 2026-08-12
 
 ### Fixed

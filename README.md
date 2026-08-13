@@ -109,6 +109,14 @@ whatever the chosen template's `template.json` declares. Today:
   - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
   - Tests always run against an isolated SQLite database, same guarantee as `fastapi/rest-api`.
 
+Every generated project also gets `.agents/skills/` — deeper,
+library-specific reference material (`SKILL.md` + `references/` +
+`guides/`) for exactly the libraries it uses (only `fastapi`/`flask`
+themselves for a bare hello-world, up to a dozen for a fully-loaded
+rest-api), plus a generated `.agents/skills/README.md` index and an
+`AGENTS.md` section pointing at whichever apply. See
+`docs/PRODUCT_ARCH.md` §4.5.
+
 See `docs/PRODUCT_SPEC.md` for full v0 scope and non-goals.
 
 ## Docs
@@ -130,3 +138,7 @@ Adding a framework or template is a content-only change — no code edits
 needed. See `src/flint/templates/fastapi/hello-world/README.md` for the
 minimal layout a new template needs, or `src/flint/templates/fastapi/
 rest-api/template.json` for an example with options and gated layers.
+Adding a skill to the `.agents/skills/` catalog is the same kind of
+change — see `src/flint/skills/fastapi/` for the reference shape, then
+add `{"id": "your-skill", "when": {...}}` to whichever templates'
+`skills` list should include it.

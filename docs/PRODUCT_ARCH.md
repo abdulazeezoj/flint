@@ -86,6 +86,16 @@ flint/
 │                   ├── migrations-sqlalchemy/          # rendered iff migrations && orm == sqlalchemy; bare Alembic
 │                   ├── worker-celery/                   # rendered iff worker == celery; worker.py + tasks/example.py
 │                   └── redis/                            # rendered iff redis is true; core/redis.py
+│       └── skills/                                 # shared "agent skills" catalog — see §4.5
+│           ├── fastapi/
+│           │   ├── skill.json                      # {id, label, description} — not rendered
+│           │   └── content/                         # rendered into .agents/skills/fastapi/
+│           │       ├── SKILL.md.jinja
+│           │       ├── references/*.md.jinja
+│           │       └── guides/*.md.jinja
+│           ├── flask/ pydantic-settings/ sqlmodel/ sqlalchemy/
+│           │   flask-sqlalchemy/ alembic/ flask-migrate/ taskiq/
+│           │   celery/ redis/ pytest/                # same shape as fastapi/ above
 ├── tests/
 │   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
 │   ├── test_naming.py
@@ -413,6 +423,94 @@ consistency (`core/config.py`, not top-level `config.py`) even though a
 one-endpoint template doesn't need the rest of the `core/`/`routes/`/
 `tasks/` structure — a developer who's used one flint template shouldn't
 have to relearn where config lives in another.
+
+### 4.5 `.agents/skills/` — a shared, opt-in skills catalog
+
+Every generated project ships `AGENTS.md` (always-on, lightweight —
+run/test commands, layout, conventions). As of v0.9, richer,
+library-specific reference material is available too: `.agents/skills/
+<id>/` — a `SKILL.md`, `references/*.md`, and `guides/*.md` per
+library, copied in *only* for the libraries a given project actually
+ended up using. AGENTS.md's own "Agent skills" section points at
+whichever of these actually apply.
+
+**Why a separate catalog, not more template layers.** A layer
+(`db-sqlmodel`, `worker-taskiq`, ...) is *project content* — it's
+rendered as part of the app itself and is naturally scoped to one
+template. A skill is *reference material about a library*, and several
+libraries (`pytest`, `redis`, `sqlalchemy`, `pydantic-settings`,
+`alembic`, `celery`) are used identically-in-spirit by more than one
+template. Modeling skills as template-scoped layers would mean either
+duplicating that content across `fastapi/rest-api` and `flask/rest-api`
+(drifts the moment one copy gets a fix the other doesn't), or
+cross-linking between layer trees (fragile, nothing else in the
+template system does this). Instead, the catalog lives once, flat, at
+`src/flint/skills/<id>/` — outside `templates/` entirely — and each
+template's `template.json` references catalog entries by `id`.
+
+**Schema**, `skills` inside a template's `template.json`:
+
+```json
+"skills": [
+  { "id": "fastapi" },
+  { "id": "pydantic-settings" },
+  { "id": "sqlmodel", "when": { "orm": ["sqlmodel"] } },
+  { "id": "alembic", "when": { "migrations": [true] } }
+]
+```
+
+Same `id`/`when` shape as a `TemplateLayer`, evaluated with the exact
+same `when_matches(when, context)` predicate against the fully resolved
+answers — a skill with an empty/absent `when` is always included; one
+with a `when` is included only when it matches, exactly like a layer.
+
+**Catalog entry shape**, `src/flint/skills/<id>/`:
+
+```
+skill.json              # {id, label, description} — maintainer metadata,
+                         # never itself rendered (mirrors template.json
+                         # sitting beside files/, not inside it)
+content/
+  SKILL.md.jinja         # overview, when to use, quick reference, links
+  references/*.md.jinja  # deep-dive API/behavior docs
+  guides/*.md.jinja      # task-oriented how-tos
+```
+
+`content/` exists specifically so `_render_layer`'s `rglob` (which walks
+everything under the directory it's given) never sees `skill.json` —
+the same reason a template's own `template.json` sits beside `files/`
+rather than inside it. Every matched skill's `content/` is rendered
+into `.agents/skills/<id>/` in the generated project via the *same*
+`_render_layer` helper templates already use, just pointed at a
+different source root and a `.agents/skills/<id>/` destination instead
+of the project root — no new rendering logic, no new Jinja semantics.
+Because it's the same renderer, skill content gets the same
+`{{ package_name }}` substitution and `{% if %}` conditionals real
+template files do — a skill's code examples show the actual import
+paths a given generated project will have, and can branch on resolved
+options the same way `README.md.jinja` does (e.g. the shared
+`sqlalchemy` skill branches on `framework` to read async-first for a
+FastAPI project and sync-first for a Flask one, since it's genuinely
+one library used two different ways here).
+
+After rendering every matched skill, `render()` also writes a generated
+`.agents/skills/README.md` — a table of exactly the skills present with
+their one-line descriptions, sourced from each `skill.json`. Not
+authored content, just an index over what actually got included, since
+`git status`/directory-listing is a worse way to discover "what skills
+does this project have."
+
+**Bootstrapping**: the `fastapi` skill was hand-built first and used to
+validate the whole mechanism end-to-end (rendering, substitution,
+when-gating, the generated index) before the remaining ten
+(`flask`, `pydantic-settings`, `sqlmodel`, `sqlalchemy`,
+`flask-sqlalchemy`, `alembic`, `flask-migrate`, `taskiq`, `celery`,
+`redis`, `pytest`) were authored — each grounded directly in the real
+template source it documents, and each folding in the real gotchas
+already recorded in §7.1 below wherever relevant (task-discovery for
+taskiq/celery, `create_all()`-vs-migrations for alembic/flask-migrate/
+flask-sqlalchemy/sqlalchemy, the app-factory-avoids-import-time-DB-
+connection bug for flask).
 
 ## 5. Remembered preferences (`prefs.py`)
 
@@ -754,13 +852,5 @@ surfaced by actually running the generated tooling:
 - Package-manager choice (pip/poetry) — `postgen.py`'s install step is
   already isolated behind one function, swappable per an `Answers.pm`
   field if that's ever added.
-- Message brokers other than Redis for rest-api's `worker` option (e.g.
-  RabbitMQ for Celery) — would multiply the worker×broker combinations
-  to support and verify; deferred until there's real demand.
-- `.agents/skills/<framework>` — a directory of framework-specific,
-  agent-consumable skills shipped into generated projects. Deferred per
-  PRODUCT_SPEC §12: needs real content and a target skill format/consumer
-  decided, not just plumbing. `AGENTS.md` (always-on) ships now as the
-  lightweight version of "give agents context."
 - `--force` overwrite confirmation UX polish, `flint list-templates`
   introspection command.

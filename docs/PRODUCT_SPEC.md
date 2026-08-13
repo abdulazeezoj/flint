@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-12 (v0.8.1: migrations-vs-create_all bugfix in both frameworks' rest-api)
+**Last updated:** 2026-08-13 (v0.9.0: `.agents/skills/` catalog — deeper, library-specific agent reference material)
 
 ## 1. Vision
 
@@ -105,13 +105,13 @@ visible in the wizard):
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
 - Auth scaffolding, Docker Compose, CI workflow templates
-- `.agents/skills/<framework>` — see §12 Open Questions
 - A GUI or web-based wizard
 
 Database/ORM/migrations/worker selection — a v0.1/v0.2 non-goal — is now
 in scope as of v0.3, scoped specifically to the `rest-api` template. A
 RabbitMQ broker choice — a v0.1–v0.6 non-goal — is in scope as of v0.7.
-Docker Compose was briefly added and then deliberately removed within
+`.agents/skills/<framework>` — a v0.1–v0.8 non-goal — is in scope as of
+v0.9 (§11). Docker Compose was briefly added and then deliberately removed within
 v0.7 itself (see §11) — one Dockerfile per template is a reasonable
 default, but a generated `docker-compose.yml` bakes in an
 opinion about container topology (one service per app) that doesn't
@@ -235,6 +235,15 @@ hold for every project shape a generated app might end up living in
   on every boot, so autogenerate never saw a real schema diff to
   capture). Fixed in both `fastapi/rest-api` and `flask/rest-api` — see
   PRODUCT_ARCH.md §7.1.
+- `v0.9.0` — `.agents/skills/<id>/` catalog: eleven skills (`fastapi`,
+  `flask`, `pydantic-settings`, `sqlmodel`, `sqlalchemy`,
+  `flask-sqlalchemy`, `alembic`, `flask-migrate`, `taskiq`, `celery`,
+  `redis`, `pytest`), each a `SKILL.md` + `references/` + `guides/`,
+  shared across templates and included per generated project only for
+  the libraries it actually uses (declarative `skills` list in
+  `template.json`, same `when`-gating as layers) — plus a generated
+  `.agents/skills/README.md` index and an `AGENTS.md` section pointing
+  at whichever skills apply. See PRODUCT_ARCH.md §4.5.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -247,16 +256,14 @@ hold for every project shape a generated app might end up living in
   registry/remote-template model is a plausible v0.x/v1 direction, see
   `PRODUCT_ARCH.md` for how the template system is kept decoupled to
   allow this later.
-- **`AGENTS.md` vs. `.agents/skills/<framework>`**: `AGENTS.md` ships now
-  (since v0.2) — it's a single Jinja file, same mechanism as the README,
-  and gives any AI coding agent working in the generated project
-  immediate context (run/test commands, layout, conventions).
-  `.agents/skills/<framework>` — a directory of framework-specific,
-  agent-consumable skills — is a larger bet: it needs real per-framework
-  content (not just metadata), a decision on which skill format/consumers
-  to target, and is more provable now that `rest-api` gives more surface
-  to differentiate against. Tracked as a roadmap item, not committed to
-  a release yet.
+- **`AGENTS.md` vs. `.agents/skills/<framework>`**: resolved in v0.9 —
+  both ship, as complementary layers rather than a choice between them.
+  `AGENTS.md` (since v0.2) stays the always-on, lightweight layer (run/
+  test commands, layout, conventions). `.agents/skills/<id>/` (v0.9) is
+  the deeper layer: a shared catalog of per-library reference material
+  (`SKILL.md`/`references/`/`guides/`), included per project only for
+  the libraries it actually uses, with `AGENTS.md` itself pointing at
+  whichever apply. See `PRODUCT_ARCH.md` §4.5.
 - **Message broker choice for the worker option**: resolved in v0.7 —
   `rest-api` now offers Redis or RabbitMQ as the broker for both Taskiq
   and Celery (`broker` option), decoupled from the standalone `redis`

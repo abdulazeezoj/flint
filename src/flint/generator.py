@@ -28,8 +28,7 @@ Beyond the base file set, a template can declare:
   into `.agents/skills/<id>/` in the generated project — deeper,
   library-specific reference material (`SKILL.md`, `references/`,
   `guides/`) for exactly the stack that was chosen, alongside a
-  generated `.agents/skills/README.md` index. See §"skills" catalog
-  below and PRODUCT_ARCH.md §4.4.
+  generated `.agents/skills/README.md` index. See PRODUCT_ARCH.md §4.5.
 
 Both file/directory *names* and file *contents* are rendered through
 Jinja2, generation is all-or-nothing (rolled back on any failure), and

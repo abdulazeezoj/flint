@@ -251,6 +251,14 @@ regardless of which options were chosen. This is the same information
 printed in the CLI summary, so the user never has to re-discover it
 later.
 
+Deeper than `AGENTS.md`: `.agents/skills/<id>/` — one directory per
+library actually used (e.g. `fastapi`, `sqlmodel`, `alembic`, `pytest`),
+each with a `SKILL.md`, `references/`, and `guides/` going into real
+depth on that library *as this specific project uses it* — plus a
+generated `.agents/skills/README.md` index. `AGENTS.md`'s own "Agent
+skills" section links to whichever apply. See PRODUCT_ARCH.md §4.5 for
+how a template decides which skills to include.
+
 ## 8. Example transcript (interactive, rest-api with a real stack)
 
 ```
@@ -271,6 +279,8 @@ Using uv to manage dependencies.
 
 Options: database=postgres, orm=sqlmodel, migrations=True, worker=taskiq, broker=rabbitmq, redis=False
 Creating my-api/ from fastapi/rest-api...
+  ✔ .agents/skills/README.md
+  ✔ .agents/skills/fastapi/... (+ pydantic-settings, sqlmodel, alembic, taskiq, pytest — one skill per line, omitted here for brevity)
   ✔ .env
   ✔ .env.example
   ✔ .gitignore
