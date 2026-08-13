@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.10.1: CI/CD via GitHub Actions, PyPI publishing on tag push)
+**Last updated:** 2026-08-13 (v0.11.0: public docs site (MkDocs + GitHub Pages); internal product docs moved to `docs/_product/`)
 
 ## 1. Vision
 
@@ -255,6 +255,13 @@ hold for every project shape a generated app might end up living in
   to PyPI on a `v*` tag push, via Trusted Publishing (OIDC, no stored
   API token). No change to the `flint` CLI itself — release
   infrastructure only. See PRODUCT_ARCH.md §8.
+- `v0.11.0` — a public docs site (MkDocs, Material theme, GitHub Pages
+  via `.github/workflows/docs.yml`): install/getting-started, a full
+  CLI reference, one page per template, `.agents/skills/` explained,
+  remembered preferences, and a contributing guide. This document set
+  (`PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/`PRODUCT_ARCH.md`) moved to
+  `docs/_product/` — internal, excluded from the built site, still the
+  source of truth for development direction. See PRODUCT_ARCH.md §4.6.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

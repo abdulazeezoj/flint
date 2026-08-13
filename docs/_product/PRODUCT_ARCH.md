@@ -38,10 +38,32 @@ is a contained change, not a rewrite.
 
 ```
 flint/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                  # tests, every push/PR to main
+│       ├── cd.yml                  # PyPI publish, on a v* tag push
+│       └── docs.yml                # docs site build + GitHub Pages deploy — see §8
+├── mkdocs.yml                      # docs site config (Material theme) — see §4.6
 ├── docs/
-│   ├── PRODUCT_SPEC.md
-│   ├── PRODUCT_FLOW.md
-│   └── PRODUCT_ARCH.md
+│   ├── _product/                   # THIS document set — internal, excluded from the
+│   │   │                           # built docs site (mkdocs.yml's exclude_docs)
+│   │   ├── PRODUCT_SPEC.md
+│   │   ├── PRODUCT_FLOW.md
+│   │   └── PRODUCT_ARCH.md
+│   ├── index.md                    # docs site home page
+│   ├── getting-started.md
+│   ├── cli-reference.md
+│   ├── agent-skills.md
+│   ├── preferences.md
+│   ├── contributing.md
+│   └── project-templates/          # NOT docs/templates/ — MkDocs hardcodes a default
+│       │                           # exclusion for a root-level templates/ dir (reserved
+│       │                           # for theme customization), so this had to be renamed
+│       ├── index.md
+│       ├── fastapi-hello-world.md
+│       ├── fastapi-rest-api.md
+│       ├── flask-hello-world.md
+│       └── flask-rest-api.md
 ├── src/
 │   └── flint/
 │       ├── __init__.py          # __version__
@@ -512,6 +534,52 @@ taskiq/celery, `create_all()`-vs-migrations for alembic/flask-migrate/
 flask-sqlalchemy/sqlalchemy, the app-factory-avoids-import-time-DB-
 connection bug for flask).
 
+### 4.6 The docs site (`mkdocs.yml`) vs. this document set
+
+Two audiences, two places, deliberately not merged:
+
+- **This document set** (`docs/_product/PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/
+  `PRODUCT_ARCH.md`) is for whoever is *building* flint — spec-numbered
+  requirements, worked examples of the `when`/`skip_value` mechanism,
+  incident write-ups. It guides development direction and is the
+  source of truth this whole file is part of.
+- **The docs site** (`docs/*.md` outside `_product/`, built by
+  `mkdocs.yml` with the Material theme, published to GitHub Pages) is
+  for whoever is *using* flint — install instructions, a CLI reference,
+  one page per template, `.agents/skills/` explained, remembered
+  preferences, a contributing guide. Guide/reference tone, not spec
+  tone; content is substantially *derived from* this document set and
+  the per-template maintainer `README.md`s, rewritten for that
+  audience rather than duplicating spec language.
+
+**Why one `docs/` directory holds both, with one excluded**: keeping
+the internal docs physically inside the same tree they describe (not a
+separate repo/branch) is worth more than a clean top-level split — a
+PR touching `generator.py`'s skills mechanism naturally sits next to
+the `PRODUCT_ARCH.md` §4.5 update it needs. `mkdocs.yml`'s
+`exclude_docs: |\n  _product/\n` (MkDocs ≥1.5) fully excludes that
+subtree from the *built* site — not merely unlisted from nav, actually
+absent from the output, unreachable by direct URL — while leaving it
+exactly where a contributor browsing the repo would expect to find it.
+
+**Why `docs/project-templates/`, not `docs/templates/`**: MkDocs
+hardcodes a default exclusion pattern, `/templates/` at the docs root
+(`mkdocs/structure/files.py`'s `_default_exclude`), reserved for theme
+customization overrides — a name collision, not a design choice. Found
+by the exact failure mode `exclude_docs` itself produces (files
+silently absent from the build, `--strict` only warns that `nav`
+references a now-excluded page) — worth remembering if a future docs
+reorg reintroduces a `templates/` directory anywhere under `docs/`.
+
+**Build/deploy**: `uv sync --group docs` installs `mkdocs`/
+`mkdocs-material` (a separate dependency group from `dev` — CI/CD's
+`ci.yml`/`cd.yml` never need to install them). `uv run mkdocs build
+--strict` is the same command run locally, in `docs.yml`'s CI check,
+and is what fails the build on any broken internal link, missing nav
+target, or other structural issue (this is `--strict`'s job — content
+*quality* is still a human/review concern, `--strict` only catches
+structural breakage). See §8 for the deploy workflow itself.
+
 ## 5. Remembered preferences (`prefs.py`)
 
 `~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
@@ -873,6 +941,20 @@ surfaced by actually running the generated tooling:
   off of (repo, workflow filename, and environment name all have to
   match what's registered on PyPI's side for the token exchange to
   succeed).
+- **Docs** (`.github/workflows/docs.yml`, since v0.11.0): fires on a
+  push to `main` that touches `docs/**`, `mkdocs.yml`, or the workflow
+  file itself (path-filtered — a code-only change doesn't trigger a
+  docs rebuild), plus `workflow_dispatch` for a manual re-run. `build`
+  job: `uv sync --group docs`, `uv run mkdocs build --strict` (fails on
+  any broken link/nav reference — the same command a contributor runs
+  locally, see §4.6), uploads the built `site/` as a Pages artifact.
+  `deploy` job: `actions/deploy-pages` publishes it — no `gh-pages`
+  branch, no separate token; this uses GitHub's own OIDC-based Pages
+  deploy mechanism (`id-token: write` + `pages: write` permissions),
+  the same trusted-publishing *shape* as `cd.yml`'s PyPI publish, just
+  for a different provider. Requires one manual, one-time repo setting
+  (can't be done via a workflow file): **Settings → Pages → Build and
+  deployment → Source: "GitHub Actions"**.
 
 ## 9. Explicitly deferred (tracked, not forgotten)
 

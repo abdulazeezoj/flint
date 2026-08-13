@@ -1,6 +1,7 @@
 # flint
 
 [![CI](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml)
+[![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
 [![PyPI](https://img.shields.io/pypi/v/flint-cli)](https://pypi.org/project/flint-cli/)
 
 `create-next-app`, for Python. One command, a short interactive wizard,
@@ -40,6 +41,11 @@ Next steps:
   uv run taskiq worker my_api.worker:broker --app-dir src   # separate process
 ```
 
+**📖 Full documentation: [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)**
+— getting started, a full CLI reference, one page per template
+(options, generated layout, gotchas), the `.agents/skills/` catalog,
+remembered preferences, and how to contribute.
+
 ## Install
 
 ```
@@ -62,77 +68,25 @@ flint --version
 flint --help
 ```
 
-Every prompt has a matching flag: `--framework`, `--template`,
-`--option`/`-o key=value` (repeatable — one per template-specific
-choice, e.g. `-o database=postgres -o worker=celery`), `--docker/
---no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes`
-(accept all defaults), `--force` (generate into a non-empty dir — in
-interactive mode without `--force`, Flint asks "Overwrite?" instead of
-failing outright; non-interactive runs still require the flag).
+Every prompt has a matching flag, and Flint remembers your last
+choices in `~/.flint/last.json` as the new default next time. See the
+[CLI Reference](https://abdulazeezoj.github.io/flint/cli-reference/)
+and [Remembered Preferences](https://abdulazeezoj.github.io/flint/preferences/)
+docs for the full details.
 
-Flint remembers your last framework/template and per-template choices in
-`~/.flint/last.json`, and uses them as the new default the next time you
-run it — both for what the wizard preselects and for what a flagless
-`--yes`/CI run falls back to. An explicit flag or `--option` always wins
-regardless of what's remembered. Pass `--no-remember` to opt a single run
-out of both reading and writing that file.
+## What flint ships
 
-## What v0 ships
+A project is always generated from a `<framework>/<template>` pair —
+**FastAPI** and **Flask**, each with a **Hello World** and a fuller
+**REST API** template offering real head-start choices (database, ORM,
+migrations, a background worker, Redis). Every generated project also
+gets `.agents/skills/` — deeper, library-specific reference material
+for exactly the stack it uses. See the
+[Templates](https://abdulazeezoj.github.io/flint/project-templates/)
+and [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
+docs for what each one actually generates.
 
-A project is always generated from a `<framework>/<template>` pair — the
-**framework** is the underlying library (FastAPI, Flask, ...), the
-**template** is a specific project shape built on it (Hello World, REST
-API, ...). A template can declare its own follow-up **options** — Flint
-itself has no built-in notion of "database" or "worker," it just renders
-whatever the chosen template's `template.json` declares. Today:
-
-- **`fastapi/hello-world`** — a `uv`-managed, `src/`-layout FastAPI app
-  with a passing test and an `AGENTS.md`, ready to run with no edits.
-  `-o config=true` adds `pydantic-settings`-based configuration (`.env`
-  + a checked-in `.env.example`). `--docker` adds a `Dockerfile` +
-  `.dockerignore`.
-- **`fastapi/rest-api`** — the same, plus real head-start choices:
-  - `-o database=none|sqlite|postgres` (default: `sqlite`)
-  - `-o orm=sqlmodel|sqlalchemy` (only asked with a database; default: `sqlmodel`)
-  - `-o migrations=true|false` — async Alembic, autogenerate-ready (default: `true` with a database)
-  - `-o worker=none|taskiq|celery`, with a demo `/tasks/add` endpoint
-  - `-o broker=redis|rabbitmq` (only asked with a worker; default: `redis`)
-  - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
-  - Tests always run against an isolated SQLite database, whatever
-    production database was configured — `uv run pytest` never needs a
-    real Postgres.
-- **`flask/hello-world`** — the same shape as `fastapi/hello-world`,
-  built on a WSGI `Flask(__name__)` app instead. `-o config=true` and
-  `--docker` behave identically.
-- **`flask/rest-api`** — the sync counterpart to `fastapi/rest-api`,
-  using an application-factory (`create_app()`) so importing the app
-  module never opens a database connection:
-  - `-o database=none|sqlite|postgres` (default: `sqlite`)
-  - `-o orm=flask-sqlalchemy|sqlalchemy` (only asked with a database; default: `flask-sqlalchemy`)
-  - `-o migrations=true|false` — Flask-Migrate (flask-sqlalchemy) or bare Alembic (sqlalchemy) (default: `true` with a database)
-  - `-o worker=none|celery`, with a demo `/tasks/add` endpoint (Taskiq is async-only, so it's FastAPI-exclusive)
-  - `-o broker=redis|rabbitmq` (only asked with a worker; default: `redis`)
-  - `-o redis=true|false` — Redis for caching; implied whenever `broker == redis`, otherwise an independent choice
-  - Tests always run against an isolated SQLite database, same guarantee as `fastapi/rest-api`.
-
-Every generated project also gets `.agents/skills/` — deeper,
-library-specific reference material (`SKILL.md` + `references/` +
-`guides/`) for exactly the libraries it uses (only `fastapi`/`flask`
-themselves for a bare hello-world, up to a dozen for a fully-loaded
-rest-api), plus a generated `.agents/skills/README.md` index and an
-`AGENTS.md` section pointing at whichever apply. See
-`docs/_product/PRODUCT_ARCH.md` §4.5.
-
-See `docs/_product/PRODUCT_SPEC.md` for full v0 scope and non-goals.
-
-## Docs
-
-- [`docs/_product/PRODUCT_SPEC.md`](docs/_product/PRODUCT_SPEC.md) — vision, scope, requirements
-- [`docs/_product/PRODUCT_FLOW.md`](docs/_product/PRODUCT_FLOW.md) — exact wizard/CLI behavior
-- [`docs/_product/PRODUCT_ARCH.md`](docs/_product/PRODUCT_ARCH.md) — technical design
-- [`CHANGELOG.md`](CHANGELOG.md) — release history
-
-## Development
+## Contributing
 
 ```
 uv sync
@@ -140,31 +94,8 @@ uv run pytest       # also runs coverage — the suite fails under 100%
 uv run flint --help
 ```
 
-Adding a framework or template is a content-only change — no code edits
-needed. See `src/flint/templates/fastapi/hello-world/README.md` for the
-minimal layout a new template needs, or `src/flint/templates/fastapi/
-rest-api/template.json` for an example with options and gated layers.
-Adding a skill to the `.agents/skills/` catalog is the same kind of
-change — see `src/flint/skills/fastapi/` for the reference shape, then
-add `{"id": "your-skill", "when": {...}}` to whichever templates'
-`skills` list should include it.
-
-## Releasing
-
-CI (`.github/workflows/ci.yml`) runs the test suite on every push/PR.
-To ship a release: bump `__version__` in `src/flint/__init__.py` and
-`version` in `pyproject.toml` (kept in sync manually), add a
-`CHANGELOG.md` entry, commit, then tag and push:
-
-```
-git tag v0.10.1
-git push origin v0.10.1
-```
-
-`.github/workflows/cd.yml` picks up the tag, re-runs the test suite,
-verifies the tag matches `pyproject.toml`'s version, and publishes to
-PyPI via Trusted Publishing (OIDC) — no API token stored as a repo
-secret. One-time setup on PyPI's side: register a trusted publisher
-(Account → Publishing, or the project's own Settings → Publishing once
-it exists) with owner `abdulazeezoj`, repo `flint`, workflow
-`cd.yml`, and environment `pypi`.
+Adding a framework, template, or skill is a content-only change — no
+code edits needed. See the
+[Contributing](https://abdulazeezoj.github.io/flint/contributing/)
+docs for the full local-setup, template/skill-authoring, and release
+process, or [`CHANGELOG.md`](CHANGELOG.md) for release history.

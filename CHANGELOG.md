@@ -7,6 +7,38 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.11.0 — 2026-08-13
+
+### Added
+
+- **A public documentation site** at
+  [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)
+  (MkDocs, Material theme, deployed via `.github/workflows/docs.yml`
+  on every push to `main` that touches `docs/**`): a Getting Started
+  guide, a full CLI reference, one page per template (options,
+  generated layout, real gotchas), the `.agents/skills/` catalog
+  explained, remembered preferences, and a contributing guide.
+  Requires a one-time repo setting (Settings → Pages → Source: "GitHub
+  Actions") to go live.
+
+### Changed
+
+- **The internal product-decision docs moved to `docs/_product/`.**
+  `docs/PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/`PRODUCT_ARCH.md` — which
+  guide development direction, not end users — are now under
+  `docs/_product/`, fully excluded from the built docs site
+  (`mkdocs.yml`'s `exclude_docs`, not just unlisted from nav) while
+  staying in the same repo tree next to the code they describe. Fixed
+  the resulting links in `README.md`/`CHANGELOG.md` (only the actual
+  markdown links and current-state prose — historical CHANGELOG
+  entries and bare-filename citations in code docstrings are left
+  as-is, since those remain valid regardless of which folder the file
+  lives in).
+- **`README.md` is trimmed back to a front door** — install, a quick
+  example, and links out to the new docs site — now that the detailed
+  per-template options/CLI-flag/contributing content lives there
+  instead, with real depth a README isn't the right place for.
+
 ## v0.10.1 — 2026-08-13
 
 ### Added
