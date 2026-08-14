@@ -75,6 +75,11 @@ choices in `~/.flint/last.json` as the new default next time. See the
 and [Remembered Preferences](https://abdulazeezoj.github.io/flint/preferences/)
 docs for the full details.
 
+Driving flint from an AI coding agent? [`.claude/skills/flint/`](.claude/skills/flint/)
+is a portable Claude Code skill that teaches an agent how to invoke the
+CLI to scaffold a project — separate from the `.agents/skills/` catalog
+below, which covers using the *generated* project's own stack.
+
 ## What flint ships
 
 A project is always generated from a `<framework>/<template>` pair —
