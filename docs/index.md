@@ -79,7 +79,8 @@ already wired for them, instead of a blank slate you have to wire yourself.
   Every command, flag, and exit code.
 
 - **[Templates](project-templates/index.md)**
-  What `hello-world` and `rest-api` actually generate, for each framework.
+  What `hello-world`, `rest-api`, and `full-stack` actually generate, for
+  each framework.
 
 - **[Agent Skills](agent-skills.md)**
   How `.agents/skills/` is selected and what's in it.

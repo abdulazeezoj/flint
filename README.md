@@ -49,9 +49,15 @@ remembered preferences, and how to contribute.
 
 ## Install
 
+Persistent `flint` on PATH:
+
 ```
-uv tool install flint-kit   # persistent `flint` on PATH
-# or run it ephemerally, no install:
+uv tool install flint-kit
+```
+
+Or run it ephemerally, no install:
+
+```
 uvx --from flint-kit flint
 ```
 
@@ -83,11 +89,12 @@ below, which covers using the *generated* project's own stack.
 ## What flint ships
 
 A project is always generated from a `<framework>/<template>` pair —
-**FastAPI** and **Flask**, each with a **Hello World** and a fuller
+**FastAPI** and **Flask**, each with a **Hello World** starter, a fuller
 **REST API** template offering real head-start choices (database, ORM,
-migrations, a background worker, Redis). Every generated project also
-gets `.agents/skills/` — deeper, library-specific reference material
-for exactly the stack it uses. See the
+migrations, a background worker, Redis), and a **Full-Stack** template
+with the same choices rendered server-side with Jinja2 and HTMX instead
+of JSON. Every generated project also gets `.agents/skills/` — deeper,
+library-specific reference material for exactly the stack it uses. See the
 [Templates](https://abdulazeezoj.github.io/flint/project-templates/)
 and [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
 docs for what each one actually generates.

@@ -5,21 +5,24 @@ plus whatever options that template declares. Framework and template
 are picked with `--framework`/`--template`; options with repeatable
 `-o key=value`.
 
-## The four shipped combinations
+## The six shipped combinations
 
 | Framework | Template | What it is |
 |---|---|---|
 | `fastapi` | `hello-world` | A minimal FastAPI app, one Hello World endpoint. |
 | `fastapi` | `rest-api` | A layered FastAPI REST API: pydantic-settings, your choice of database/ORM, migrations, background worker (Taskiq or Celery), Redis caching. |
+| `fastapi` | `full-stack` | Same options as `rest-api`, server-rendered instead of JSON — Jinja2 + HTMX, a Todo list, no client-side JS framework. |
 | `flask` | `hello-world` | A minimal Flask app, one Hello World endpoint. |
 | `flask` | `rest-api` | A layered Flask REST API: pydantic-settings, your choice of database/ORM, migrations, a Celery background worker, optional Redis caching. |
+| `flask` | `full-stack` | Same options as `rest-api`, server-rendered instead of JSON — Jinja2 + HTMX, a Todo list, no client-side JS framework. |
 
-Both frameworks' `hello-world` and both frameworks' `rest-api` are
-deliberately the same shape — same options, same conventions — so
-picking one framework over the other for the same template isn't a
-relearn. Run `flint list-templates` to check this matrix is still
-current (a new framework/template could exist by the time this is
-read).
+Every template is deliberately the same shape across both frameworks —
+same options, same conventions — so picking one framework over the
+other for the same template isn't a relearn, and `full-stack` reuses
+`rest-api`'s exact option set (only the presentation layer differs: HTML
+fragments instead of JSON). Run `flint list-templates` to check this
+matrix is still current (a new framework/template could exist by the
+time this is read).
 
 ## `hello-world` options (same for both frameworks)
 
@@ -62,6 +65,16 @@ Note Flask's `rest-api` has no `taskiq` worker choice — Taskiq is
 async-first and doesn't fit Flask's sync/WSGI model, so Celery is the
 only worker option.
 
+## `full-stack` options (both frameworks)
+
+`fastapi/full-stack` takes exactly the options listed above for
+`fastapi/rest-api`; `flask/full-stack` takes exactly the options listed
+above for `flask/rest-api` — same keys, same defaults, same dependency
+wiring. Reach for `full-stack` instead of `rest-api` when the user wants
+server-rendered pages (a Todo list, HTML fragments swapped in via HTMX)
+rather than a JSON API; everything about the database/ORM/migrations/
+worker/broker/redis choices is unchanged.
+
 ## Example commands
 
 FastAPI, Postgres + SQLModel + migrations + a Taskiq worker over Redis:
@@ -83,4 +96,11 @@ Either `hello-world`, with the optional config module:
 
 ```bash
 flint new my-api --framework fastapi --template hello-world -o config=true --yes
+```
+
+FastAPI, server-rendered Todo list (HTMX) with SQLite + SQLModel:
+
+```bash
+flint new my-app --framework fastapi --template full-stack \
+  -o database=sqlite -o orm=sqlmodel --yes
 ```

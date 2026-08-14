@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-13 (v0.14.2: fixed release automation's PyPI Trusted Publishing verification — see §8)
+**Last updated:** 2026-08-14 (v0.16.0: added the `full-stack` template — see §4.7)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -128,6 +128,7 @@ flint/
 │   ├── test_generator.py
 │   ├── test_flask_hello_world.py
 │   ├── test_flask_rest_api.py
+│   ├── test_flask_full_stack.py
 │   ├── test_prompts.py
 │   ├── test_cli.py
 │   ├── test_postgen.py
@@ -600,6 +601,60 @@ Playwright screenshot pass, not the build log). Worth remembering for
 any future page that reaches for a Material "recipe" requiring raw HTML
 with nested markdown.
 
+### 4.7 Two Jinja2 environments in one project — `full-stack`'s `.jinja`-suffix rule
+
+`fastapi/full-stack` and `flask/full-stack` (v0.16.0) are the first
+templates whose generated project *itself* renders Jinja2 at runtime —
+`templates/base.html`, `templates/index.html`, and
+`templates/partials/*.html` are FastAPI/Flask templates, rendered by
+the generated app's own `Jinja2Templates`/`render_template()` on every
+request. This collides with flint's existing rule that any `.jinja`-
+suffixed file gets rendered through **flint's own** `generator._env` at
+*generation* time (§4, top of this section) — a rule every other
+template in the codebase relies on unconditionally.
+
+If `index.html.jinja` existed, flint's generator would render it once,
+at `flint new` time, using flint's context (`project_name`,
+`package_name`, the resolved options — no `todos`, no `todo`). Its
+`{% for todo in todos %}` would evaluate against an **undefined**
+`todos` (Jinja's default `Undefined` renders as empty in output, no
+error raised) and produce an empty loop body; `{{ todo.title }}` inside
+a `{% include %}`'d partial would do the same. The generated project
+would ship with a permanently empty-looking Todo list template, no
+error at generation time, no error at `uv run pytest` time (nothing
+asserts the *runtime* Jinja tags survived) — only a broken page in a
+browser would reveal it. This was caught before it shipped, not after:
+an initial draft of `base.html` used `.jinja` and a scripted check
+(`grep` for `{{`/`{%` across every rendered file, run against several
+option combos) flagged it immediately, well before any live-server
+check.
+
+**The fix**: `templates/*.html` and `static/css/style.css` carry **no**
+`.jinja` suffix. `generator._render_content` copies a non-`.jinja` file
+byte-for-byte (see the top of §4) — so these files pass through flint's
+generator completely untouched, `{% for %}`/`{{ }}` and all, and are
+only ever evaluated by the *generated app's* Jinja2 environment, once
+the project is actually running. The one flint-resolved value these
+templates need — `app_name` (ultimately `{{ project_name }}`, resolved
+by flint into `core/config.py`'s `Settings` at generation time) — is
+threaded through at *request* time instead, passed explicitly into the
+render call from the route handler:
+
+```python
+return templates.TemplateResponse(
+    request, "index.html", {"app_name": settings.app_name, "todos": todos}
+)
+```
+
+This is a general rule going forward, not a one-off fix: **any file a
+generated project renders with its own templating engine at runtime
+must never carry flint's `.jinja` suffix**, regardless of framework.
+`test_generator.py`'s `test_full_stack_no_leftover_jinja_in_runtime_templates`
+(and its `test_flask_full_stack.py` equivalent) encode this as a
+regression test — it asserts runtime Jinja syntax *does* survive inside
+`templates/`, and that no `{{`/`{%` survives anywhere else in a
+rendered project.
+
 ## 5. Remembered preferences (`prefs.py`)
 
 `~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
@@ -814,12 +869,18 @@ the gate temporarily.
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
   plus a plain `import flint.__main__` to cover the guard's not-taken
   branch.
-- `test_flask_hello_world.py` / `test_flask_rest_api.py` — Flask's
-  mirror of the FastAPI hello-world/rest-api coverage above (rendered
-  combinations, `ast.parse()`/`tomllib.loads()` checks). Kept as
-  standalone files rather than folded into `test_generator.py`, since
-  they exist purely to cover a second framework's content, not the
-  generator engine itself.
+- `test_flask_hello_world.py` / `test_flask_rest_api.py` /
+  `test_flask_full_stack.py` — Flask's mirror of the FastAPI
+  hello-world/rest-api/full-stack coverage above (rendered
+  combinations, `ast.parse()`/`tomllib.loads()` checks, plus a check
+  that `templates/`/`static/` content survives flint's generator with
+  its runtime Jinja2 syntax intact — see §4.7). Kept as standalone
+  files rather than folded into `test_generator.py`, since they exist
+  purely to cover a second framework's content, not the generator
+  engine itself. `full-stack`'s FastAPI-side tests, by contrast, live
+  inline in `test_generator.py` (mirroring `rest-api`'s own placement)
+  since FastAPI is the enabled-by-default framework and needs no
+  monkeypatch fixture.
 - **Live end-to-end verification (manual, done before every template
   change ships — not part of the automated suite or the coverage
   gate)**: actually run generated output through `uv sync && uv run

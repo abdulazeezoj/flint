@@ -1,0 +1,36 @@
+from httpx import AsyncClient
+
+
+async def test_index_renders_empty_state(client: AsyncClient) -> None:
+    response = await client.get("/")
+    assert response.status_code == 200
+    assert "Nothing to do yet" in response.text
+
+
+async def test_todo_lifecycle(client: AsyncClient) -> None:
+    create_response = await client.post("/todos", data={"title": "Buy milk"})
+    assert create_response.status_code == 200
+    assert "Buy milk" in create_response.text
+    todo_id = create_response.text.split('id="todo-')[1].split('"')[0]
+
+    index_response = await client.get("/")
+    assert "Buy milk" in index_response.text
+
+    toggle_response = await client.post(f"/todos/{todo_id}/toggle")
+    assert toggle_response.status_code == 200
+    assert 'class="todo-item done"' in toggle_response.text
+
+    delete_response = await client.delete(f"/todos/{todo_id}")
+    assert delete_response.status_code == 200
+    assert "Buy milk" not in delete_response.text
+
+    missing_response = await client.post(f"/todos/{todo_id}/toggle")
+    assert missing_response.status_code == 404
+
+
+async def test_delete_last_todo_shows_empty_state(client: AsyncClient) -> None:
+    create_response = await client.post("/todos", data={"title": "Only todo"})
+    todo_id = create_response.text.split('id="todo-')[1].split('"')[0]
+
+    delete_response = await client.delete(f"/todos/{todo_id}")
+    assert "Nothing to do yet" in delete_response.text

@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-14 (v0.15.0: added the `.claude/skills/flint/` skill — see §11)
+**Last updated:** 2026-08-14 (v0.16.0: added the `full-stack` template — see §11)
 
 ## 1. Vision
 
@@ -50,8 +50,8 @@ Three distinct concepts in the wizard — don't conflate them:
 - **Framework** — the underlying library, e.g. `fastapi`, `flask`.
   Selected first.
 - **Template** — a specific project shape built on that framework, e.g.
-  `hello-world`, `rest-api`. Selected second, scoped to the chosen
-  framework.
+  `hello-world`, `rest-api`, `full-stack`. Selected second, scoped to
+  the chosen framework.
 - **Option** — a further, template-specific choice, declared by the
   template itself (not hardcoded in Flint). E.g. `rest-api` asks for a
   database, ORM, whether to add migrations, a background worker, and
@@ -101,7 +101,7 @@ visible in the wizard):
 
 - Frameworks other than FastAPI and Flask (both are enabled as of v0.8;
   no other framework is stubbed on the roadmap yet, see §11)
-- Templates other than `hello-world` and `rest-api`
+- Templates other than `hello-world`, `rest-api`, and `full-stack`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
 - Auth scaffolding, Docker Compose, CI workflow templates
@@ -116,7 +116,10 @@ v0.7 itself (see §11) — one Dockerfile per template is a reasonable
 default, but a generated `docker-compose.yml` bakes in an
 opinion about container topology (one service per app) that doesn't
 hold for every project shape a generated app might end up living in
-(e.g. a monorepo with its own compose setup already).
+(e.g. a monorepo with its own compose setup already). A third template
+beyond `hello-world`/`rest-api` — a v0.1–v0.14 non-goal — is in scope
+as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
+`rest-api` reusing its exact option set (§11).
 
 ## 6. Personas
 
@@ -340,6 +343,23 @@ hold for every project shape a generated app might end up living in
   to `.claude/*` with a `!.claude/skills/` re-include, since a
   directory-level ignore pattern stops git from even traversing into
   it, so a plain negation of a path underneath it has no effect.
+- `v0.16.0` — a third template, `full-stack`, ships for both frameworks
+  (`fastapi/full-stack`, `flask/full-stack`): the exact same
+  database/ORM/migrations/worker/broker/redis options as `rest-api`,
+  server-rendered instead of JSON — Jinja2 templates plus HTMX for
+  add/toggle/delete on a Todo list, no client-side JS framework. Built
+  by copying each framework's `rest-api` template wholesale and
+  replacing only the presentation layer (`schemas.py`/`routes/items.py`
+  → a `templates/`+`static/` tree and `routes/todos.py`); the
+  docker/worker/redis/migrations layers are reused byte-for-byte (bar
+  one `Item`→`Todo` import in each `migrations-*` layer's `env.py`),
+  since they're generic infrastructure with no dependency on what the
+  app renders. See `PRODUCT_ARCH.md` §4.7 for the mechanic that made
+  this safe to build: `templates/`/`static/` files carry no `.jinja`
+  suffix, specifically so flint's own generator copies them verbatim
+  instead of rendering the *generated app's own* runtime Jinja2 syntax
+  (`{% block %}`, `{{ todo.title }}`) through flint's generator and
+  stripping it before the file ever reaches the project.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

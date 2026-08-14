@@ -1,0 +1,61 @@
+{% if database != "none" or worker == "taskiq" %}
+from contextlib import asynccontextmanager
+{% endif %}
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+from {{ package_name }}.core.config import settings
+{% if database != "none" and not migrations %}
+from {{ package_name }}.core.db import init_db
+{% endif %}
+from {{ package_name }}.routes.todos import router as todos_router
+{% if worker != "none" %}
+from {{ package_name }}.tasks.example import add
+{% endif %}
+{% if worker == "taskiq" %}
+from {{ package_name }}.worker import broker
+{% endif %}
+
+
+{% if database != "none" or worker == "taskiq" %}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    {% if database != "none" and not migrations %}
+    await init_db()
+    {% endif %}
+    {% if worker == "taskiq" %}
+    if not broker.is_worker_process:
+        await broker.startup()
+    {% endif %}
+    yield
+    {% if worker == "taskiq" %}
+    if not broker.is_worker_process:
+        await broker.shutdown()
+    {% endif %}
+
+
+app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+{% else %}
+app = FastAPI(title=settings.app_name, debug=settings.debug)
+{% endif %}
+app.mount(
+    "/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static"
+)
+app.include_router(todos_router)
+{% if worker == "taskiq" %}
+
+
+@app.post("/tasks/add")
+async def enqueue_add(a: int, b: int) -> dict[str, str]:
+    task = await add.kiq(a, b)
+    return {"task_id": task.task_id}
+{% elif worker == "celery" %}
+
+
+@app.post("/tasks/add")
+def enqueue_add(a: int, b: int) -> dict[str, str]:
+    task = add.delay(a, b)
+    return {"task_id": task.id}
+{% endif %}

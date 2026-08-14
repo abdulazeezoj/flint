@@ -43,16 +43,21 @@ plus whatever options that template declares:
    for; default to `fastapi` if they only said "an API" with no
    framework preference — it's the more common choice for a from-scratch
    API today.
-2. **Template**: `hello-world` (a minimal single-endpoint app) or
-   `rest-api` (a layered project with a real database, ORM, migrations,
-   background worker). Use `rest-api` whenever the user mentions a
-   database, persistence, a worker/queue, or anything beyond a toy
-   endpoint — `hello-world` is for genuinely minimal asks only.
-3. **Options** (`rest-api` only): `-o key=value`, repeatable. See
-   `references/templates.md` for the exact keys, choices, and defaults
-   per framework — they differ slightly between FastAPI and Flask (e.g.
-   FastAPI's `rest-api` offers `worker=taskiq`, Flask's doesn't — Taskiq
-   is async-first and doesn't fit Flask's sync/WSGI model).
+2. **Template**: `hello-world` (a minimal single-endpoint app),
+   `rest-api` (a layered JSON API with a real database, ORM, migrations,
+   background worker), or `full-stack` (the exact same layered options
+   as `rest-api`, server-rendered instead of JSON — Jinja2 + HTMX, no
+   client-side JS framework). Use `rest-api`/`full-stack` whenever the
+   user mentions a database, persistence, a worker/queue, or anything
+   beyond a toy endpoint — pick `full-stack` specifically if they want
+   server-rendered pages or a UI rather than a JSON API; `hello-world`
+   is for genuinely minimal asks only.
+3. **Options** (`rest-api`/`full-stack` only): `-o key=value`, repeatable.
+   See `references/templates.md` for the exact keys, choices, and
+   defaults per framework — they differ slightly between FastAPI and
+   Flask (e.g. FastAPI's templates offer `worker=taskiq`, Flask's
+   don't — Taskiq is async-first and doesn't fit Flask's sync/WSGI
+   model). `full-stack` takes exactly the same options as `rest-api`.
 
 Always generate **non-interactively** (`--yes` plus explicit flags/`-o`
 values for anything the user specified) rather than trying to drive the
@@ -89,9 +94,9 @@ generating anything with an unfamiliar flag combination.
 See `references/templates.md` for the exact option keys, types,
 choices, and dependency rules (some options only get asked — or only
 apply — depending on an earlier one, e.g. `orm` is skipped entirely if
-`database=none`) for all four shipped combinations
-(fastapi/hello-world, fastapi/rest-api, flask/hello-world,
-flask/rest-api).
+`database=none`) for all six shipped combinations (fastapi/hello-world,
+fastapi/rest-api, fastapi/full-stack, flask/hello-world, flask/rest-api,
+flask/full-stack).
 
 ## After generating
 

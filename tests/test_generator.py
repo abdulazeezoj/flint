@@ -650,6 +650,186 @@ class TestFastapiRestApiSkills:
         assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest", "celery"}
 
 
+def make_full_stack_answers(**option_overrides) -> Answers:
+    options = dict(
+        database="sqlite", orm="sqlmodel", migrations=True, worker="none", redis=False
+    )
+    options.update(option_overrides)
+    return make_answers(template="full-stack", options=options)
+
+
+def test_full_stack_in_memory_default(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(database="none", orm="none", migrations=False)
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/routes/todos.py") in created
+    assert Path("src/my_api/templates/index.html") in created
+    assert Path("src/my_api/templates/base.html") in created
+    assert Path("src/my_api/templates/partials/todo_item.html") in created
+    assert Path("src/my_api/static/css/style.css") in created
+    assert Path("src/my_api/core/db.py") not in created
+    assert Path("alembic.ini") not in created
+    routes = (target / "src/my_api/routes/todos.py").read_text()
+    assert "_todos" in routes  # the in-memory store
+    _assert_all_python_files_parse(target)
+    _assert_valid_toml(target / "pyproject.toml")
+
+
+def test_full_stack_sqlite_sqlmodel_with_migrations(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers()  # sqlite + sqlmodel + migrations=True
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/core/db.py") in created
+    assert Path("src/my_api/models.py") in created
+    assert Path("alembic.ini") in created
+    assert Path("alembic/env.py") in created
+
+    routes = (target / "src/my_api/routes/todos.py").read_text()
+    assert "get_session" in routes
+    models_py = (target / "src/my_api/models.py").read_text()
+    assert "class Todo" in models_py
+
+    env_py = (target / "alembic/env.py").read_text()
+    assert "Todo" in env_py
+    assert "Item" not in env_py
+
+    _assert_all_python_files_parse(target)
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert "sqlmodel>=0.0.22" in config["project"]["dependencies"]
+
+
+def test_full_stack_postgres_sqlalchemy_no_migrations(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(database="postgres", orm="sqlalchemy", migrations=False)
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/core/db.py") in created
+    assert Path("alembic.ini") not in created
+
+    models_py = (target / "src/my_api/models.py").read_text()
+    assert "class Todo(Base)" in models_py
+    env_file = (target / ".env").read_text()
+    assert "postgresql+asyncpg://" in env_file
+
+    _assert_all_python_files_parse(target)
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert "asyncpg>=0.30.0" in config["project"]["dependencies"]
+    assert not any("alembic" in dep for dep in config["project"]["dependencies"])
+
+
+def test_full_stack_worker_taskiq_implies_redis(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(
+        database="none", orm="none", migrations=False, worker="taskiq", redis=True
+    )
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/worker.py") in created
+    assert Path("src/my_api/tasks/example.py") in created
+    assert Path("src/my_api/core/redis.py") in created
+
+    main_py = (target / "src/my_api/main.py").read_text()
+    assert "lifespan" in main_py
+    assert "/tasks/add" in main_py
+    assert "StaticFiles" in main_py
+    _assert_all_python_files_parse(target)
+
+
+def test_full_stack_worker_celery(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(
+        database="none", orm="none", migrations=False, worker="celery"
+    )
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/worker.py") in created
+    worker_py = (target / "src/my_api/worker.py").read_text()
+    assert "Celery(" in worker_py
+    main_py = (target / "src/my_api/main.py").read_text()
+    assert "add.delay" in main_py
+    _assert_all_python_files_parse(target)
+
+
+def test_full_stack_all_features_combined(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(
+        database="postgres",
+        orm="sqlalchemy",
+        migrations=True,
+        worker="celery",
+        broker="redis",
+        redis=True,
+    )
+    created = render("fastapi", "full-stack", target, answers, force=True)
+
+    for expected in [
+        "src/my_api/core/db.py",
+        "src/my_api/models.py",
+        "alembic.ini",
+        "src/my_api/worker.py",
+        "src/my_api/tasks/example.py",
+        "src/my_api/core/redis.py",
+        "src/my_api/templates/index.html",
+        "src/my_api/static/css/style.css",
+    ]:
+        assert Path(expected) in created, expected
+
+    _assert_all_python_files_parse(target)
+    _assert_valid_toml(target / "pyproject.toml")
+
+
+def test_full_stack_no_leftover_jinja_in_runtime_templates(tmp_path: Path):
+    # The templates/ and static/ files carry the *generated app's own*
+    # runtime Jinja2 syntax ({% block %}, {{ todo.title }}) and must NOT
+    # be rendered by flint's own generator — they have no .jinja suffix
+    # specifically so they're copied verbatim (see fastapi/full-stack's
+    # README.md gotcha #1). This asserts that syntax survives untouched.
+    target = tmp_path / "app"
+    answers = make_full_stack_answers()
+    render("fastapi", "full-stack", target, answers)
+
+    index_html = (target / "src/my_api/templates/index.html").read_text()
+    assert "{% for todo in todos %}" in index_html
+    assert "{% include" in index_html
+
+    todo_item_html = (target / "src/my_api/templates/partials/todo_item.html").read_text()
+    assert "{{ todo.title }}" in todo_item_html
+    assert "{{ todo.id }}" in todo_item_html
+
+    # Everything else must be fully resolved — no leftover flint-level
+    # or app-level Jinja outside templates/.
+    for path in target.rglob("*"):
+        if path.is_dir() or "templates" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        assert "{{" not in text, path
+        assert "{%" not in text, path
+
+
+class TestFastapiFullStackSkills:
+    def test_sqlmodel_with_migrations(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers()  # sqlite + sqlmodel + migrations=True
+        created = render("fastapi", "full-stack", target, answers)
+
+        assert _skill_ids(created) == {
+            "fastapi",
+            "pydantic-settings",
+            "pytest",
+            "sqlmodel",
+            "alembic",
+        }
+
+    def test_no_database_no_worker_no_redis(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers(database="none", orm="none", migrations=False)
+        created = render("fastapi", "full-stack", target, answers)
+
+        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest"}
+
+
 def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monkeypatch):
     # A layer can be declared in template.json with a `when` that matches
     # but have no directory on disk (e.g. a template-authoring slip) —

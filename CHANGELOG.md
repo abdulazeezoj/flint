@@ -7,6 +7,31 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.16.0 — 2026-08-14
+
+### Added
+
+- **A third template: `full-stack`, for both FastAPI and Flask.** Same
+  layered options as `rest-api` (database, ORM, migrations, background
+  worker, broker, Redis caching) — the only thing that changes is what
+  a route returns. `rest-api` returns JSON; `full-stack` returns
+  server-rendered HTML: a Jinja2 page for `GET /`, and an HTML fragment
+  (swapped in via [HTMX](https://htmx.org), no page reload, no
+  client-side JS framework) for every state-changing request. Ships
+  with a Todo list — add, toggle, delete — as the example resource,
+  including an out-of-band HTMX swap that clears/restores the
+  "nothing to do yet" message at the right moments.
+  `docker`/`worker-*`/`redis`/`migrations-*` layers are reused
+  byte-for-byte from `rest-api`, since they're generic infrastructure
+  with no dependency on what the app renders. `templates/*.html` and
+  `static/css/style.css` deliberately carry no `.jinja` suffix — they
+  hold Jinja2 syntax meant for the *generated app's own* runtime
+  template engine, and a `.jinja` suffix would make flint's own
+  generator render (and silently strip) that syntax at generation time
+  instead. See `docs/_product/PRODUCT_ARCH.md` §4.7 for the full
+  mechanic, and the new `docs/project-templates/fastapi-full-stack.md`
+  / `flask-full-stack.md` pages for usage.
+
 ## v0.15.0 — 2026-08-14
 
 ### Added

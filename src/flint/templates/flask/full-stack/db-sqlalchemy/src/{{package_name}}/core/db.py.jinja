@@ -1,0 +1,52 @@
+from flask import Flask
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
+
+from {{ package_name }}.models import Base
+
+SessionLocal = scoped_session(sessionmaker())
+
+
+def init_db(app: Flask, *, testing: bool = False) -> None:
+    database_url = app.config["SQLALCHEMY_DATABASE_URI"]
+    connect_args: dict = {}
+    engine_kwargs: dict = {}
+    if database_url.startswith("sqlite"):
+        # A SQLite `:memory:` database only exists for the lifetime of a
+        # single connection — the default pool hands out a *new* one per
+        # checkout, silently losing everything written in a previous
+        # request. `StaticPool` keeps one connection alive for the app's
+        # lifetime instead. This only ever triggers for `:memory:` (used
+        # by the test suite, see tests/conftest.py); a real file-based
+        # SQLite database doesn't need it.
+        connect_args["check_same_thread"] = False
+        if ":memory:" in database_url:
+            from sqlalchemy.pool import StaticPool
+
+            engine_kwargs["poolclass"] = StaticPool
+
+    engine = create_engine(database_url, connect_args=connect_args, **engine_kwargs)
+    SessionLocal.configure(bind=engine)
+{% if migrations %}
+    if testing:
+        # Tests run against an isolated in-memory database with no
+        # migration history to replay, so the schema is created directly
+        # from the models here instead. Real usage must NOT do this: it
+        # would leave `alembic revision --autogenerate` permanently
+        # unable to detect a schema change, since the tables would
+        # already match the models before any migration ever ran. Real
+        # schema comes from `alembic upgrade head` — see README.md's
+        # "Migrations" section.
+        Base.metadata.create_all(engine)
+{% else %}
+    Base.metadata.create_all(engine)
+{% endif %}
+    app.teardown_appcontext(lambda exc=None: SessionLocal.remove())
+
+
+def get_session() -> Session:
+    """A session bound to the current app/request context. Don't create
+    engines/sessions ad hoc — `SessionLocal` is a `scoped_session`, torn
+    down automatically at the end of every request/app context (see
+    `init_db` above)."""
+    return SessionLocal()

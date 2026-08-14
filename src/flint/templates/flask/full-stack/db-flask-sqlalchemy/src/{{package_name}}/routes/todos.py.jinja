@@ -1,0 +1,44 @@
+from flask import Blueprint, render_template, request
+
+from {{ package_name }}.core.config import settings
+from {{ package_name }}.core.db import db
+from {{ package_name }}.models import Todo
+
+bp = Blueprint("todos", __name__)
+
+
+@bp.get("/")
+def index():
+    todos = db.session.execute(db.select(Todo)).scalars().all()
+    return render_template("index.html", app_name=settings.app_name, todos=todos)
+
+
+@bp.post("/todos")
+def create_todo():
+    todo = Todo(title=request.form["title"])
+    db.session.add(todo)
+    db.session.commit()
+    return render_template("partials/todo_created.html", todo=todo)
+
+
+@bp.post("/todos/<int:todo_id>/toggle")
+def toggle_todo(todo_id: int):
+    todo = db.session.get(Todo, todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    todo.done = not todo.done
+    db.session.commit()
+    return render_template("partials/todo_item.html", todo=todo)
+
+
+@bp.delete("/todos/<int:todo_id>")
+def delete_todo(todo_id: int):
+    todo = db.session.get(Todo, todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    db.session.delete(todo)
+    db.session.commit()
+    remaining = db.session.execute(db.select(Todo)).scalars().first()
+    if remaining is None:
+        return render_template("partials/empty_state.html")
+    return ""

@@ -1,0 +1,22 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_name: str = "{{ project_name }}"
+    debug: bool = False
+{% if database == "sqlite" %}
+    database_url: str = "sqlite+aiosqlite:///./app.db"
+{% elif database == "postgres" %}
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/{{ package_name }}"
+{% endif %}
+{% if redis %}
+    redis_url: str = "redis://localhost:6379/0"
+{% endif %}
+{% if broker == "rabbitmq" %}
+    rabbitmq_url: str = "amqp://guest:guest@localhost:5672//"
+{% endif %}
+
+
+settings = Settings()

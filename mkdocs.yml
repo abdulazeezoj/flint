@@ -21,8 +21,10 @@ nav:
       - Overview: project-templates/index.md
       - FastAPI · Hello World: project-templates/fastapi-hello-world.md
       - FastAPI · REST API: project-templates/fastapi-rest-api.md
+      - FastAPI · Full-Stack: project-templates/fastapi-full-stack.md
       - Flask · Hello World: project-templates/flask-hello-world.md
       - Flask · REST API: project-templates/flask-rest-api.md
+      - Flask · Full-Stack: project-templates/flask-full-stack.md
   - Agent Skills: agent-skills.md
   - Remembered Preferences: preferences.md
   - Contributing: contributing.md

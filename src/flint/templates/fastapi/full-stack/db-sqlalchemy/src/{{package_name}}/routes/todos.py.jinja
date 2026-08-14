@@ -1,0 +1,62 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from {{ package_name }}.core.config import settings
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.core.templates import templates
+from {{ package_name }}.models import Todo
+
+router = APIRouter()
+
+
+@router.get("/", response_class=HTMLResponse)
+async def index(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
+    result = await session.execute(select(Todo))
+    todos = list(result.scalars().all())
+    return templates.TemplateResponse(
+        request, "index.html", {"app_name": settings.app_name, "todos": todos}
+    )
+
+
+@router.post("/todos", response_class=HTMLResponse)
+async def create_todo(
+    request: Request, title: Annotated[str, Form()], session: AsyncSession = Depends(get_session)
+) -> HTMLResponse:
+    todo = Todo(title=title)
+    session.add(todo)
+    await session.commit()
+    await session.refresh(todo)
+    return templates.TemplateResponse(request, "partials/todo_created.html", {"todo": todo})
+
+
+@router.post("/todos/{todo_id}/toggle", response_class=HTMLResponse)
+async def toggle_todo(
+    request: Request, todo_id: int, session: AsyncSession = Depends(get_session)
+) -> HTMLResponse:
+    todo = await session.get(Todo, todo_id)
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    todo.done = not todo.done
+    session.add(todo)
+    await session.commit()
+    await session.refresh(todo)
+    return templates.TemplateResponse(request, "partials/todo_item.html", {"todo": todo})
+
+
+@router.delete("/todos/{todo_id}", response_class=HTMLResponse)
+async def delete_todo(
+    request: Request, todo_id: int, session: AsyncSession = Depends(get_session)
+) -> HTMLResponse:
+    todo = await session.get(Todo, todo_id)
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    await session.delete(todo)
+    await session.commit()
+    remaining = await session.execute(select(Todo))
+    if remaining.first() is None:
+        return templates.TemplateResponse(request, "partials/empty_state.html", {})
+    return HTMLResponse("")
