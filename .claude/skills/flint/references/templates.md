@@ -1,0 +1,86 @@
+# Framework / template / option matrix
+
+Every project comes from exactly one `<framework>/<template>` pair,
+plus whatever options that template declares. Framework and template
+are picked with `--framework`/`--template`; options with repeatable
+`-o key=value`.
+
+## The four shipped combinations
+
+| Framework | Template | What it is |
+|---|---|---|
+| `fastapi` | `hello-world` | A minimal FastAPI app, one Hello World endpoint. |
+| `fastapi` | `rest-api` | A layered FastAPI REST API: pydantic-settings, your choice of database/ORM, migrations, background worker (Taskiq or Celery), Redis caching. |
+| `flask` | `hello-world` | A minimal Flask app, one Hello World endpoint. |
+| `flask` | `rest-api` | A layered Flask REST API: pydantic-settings, your choice of database/ORM, migrations, a Celery background worker, optional Redis caching. |
+
+Both frameworks' `hello-world` and both frameworks' `rest-api` are
+deliberately the same shape — same options, same conventions — so
+picking one framework over the other for the same template isn't a
+relearn. Run `flint list-templates` to check this matrix is still
+current (a new framework/template could exist by the time this is
+read).
+
+## `hello-world` options (same for both frameworks)
+
+| Flag | Values | Default | Effect |
+|---|---|---|---|
+| `-o config=<bool>` | `true` / `false` | `false` | Adds a `pydantic-settings`-based `core/config.py` module instead of hardcoded values. |
+
+## `fastapi/rest-api` options
+
+Resolved in this order — later options can depend on earlier ones:
+
+| Option | Choices | Default | Depends on |
+|---|---|---|---|
+| `database` | `none` (in-memory), `sqlite`, `postgres` | `sqlite` | — |
+| `orm` | `sqlmodel`, `sqlalchemy` | `sqlmodel` | only asked if `database != none`; resolves to `none` otherwise |
+| `migrations` | yes/no | `true` | only asked if `database != none`; resolves to `false` otherwise |
+| `worker` | `none`, `taskiq`, `celery` | `none` | — |
+| `broker` | `redis`, `rabbitmq` | `redis` | only asked if `worker != none`; resolves to `none` otherwise |
+| `redis` | yes/no | `false` | only asked if `broker` is `rabbitmq` or `none`; resolves to `true` if `broker == redis` |
+
+The last row is easy to misread: **`redis` (the caching add-on)
+depends on `broker`, not on `worker`.** Picking `broker=redis` for a
+worker already implies Redis is in play, so the caching question is
+skipped and resolves to `true`. Picking `broker=rabbitmq` (or no
+worker at all) means Redis isn't already present, so the question is
+actually asked.
+
+## `flask/rest-api` options
+
+| Key | Choices | Default | Depends on |
+|---|---|---|---|
+| `database` | `none`, `sqlite`, `postgres` | `sqlite` | — |
+| `orm` | `flask-sqlalchemy`, `sqlalchemy` (manual) | `flask-sqlalchemy` | asked only if `database != none`; otherwise skipped, resolves to `none` |
+| `migrations` | yes/no | `true` | asked only if `database != none`; otherwise skipped, resolves to `false` |
+| `worker` | `none`, `celery` | `none` | — |
+| `broker` | `redis`, `rabbitmq` | `redis` | asked only if `worker == celery`; otherwise skipped, resolves to `none` |
+| `redis` | yes/no | `false` | asked only if `broker` is `rabbitmq` or `none`; if `broker == redis`, skipped and resolves to `true` |
+
+Note Flask's `rest-api` has no `taskiq` worker choice — Taskiq is
+async-first and doesn't fit Flask's sync/WSGI model, so Celery is the
+only worker option.
+
+## Example commands
+
+FastAPI, Postgres + SQLModel + migrations + a Taskiq worker over Redis:
+
+```bash
+flint new my-api --framework fastapi --template rest-api \
+  -o database=postgres -o orm=sqlmodel -o migrations=true \
+  -o worker=taskiq -o broker=redis --yes
+```
+
+Flask, SQLite + manual SQLAlchemy, no worker:
+
+```bash
+flint new my-api --framework flask --template rest-api \
+  -o database=sqlite -o orm=sqlalchemy --yes
+```
+
+Either `hello-world`, with the optional config module:
+
+```bash
+flint new my-api --framework fastapi --template hello-world -o config=true --yes
+```

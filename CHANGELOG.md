@@ -7,6 +7,26 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.15.0 — 2026-08-14
+
+### Added
+
+- **A Claude Code skill teaching an agent how to *use* flint itself**
+  (`.claude/skills/flint/`). Separate from — and unrelated to — the
+  `.agents/skills/` catalog flint bundles into *generated* projects
+  (which teaches an agent about the libraries a generated project uses,
+  like FastAPI or SQLModel); this new skill instead covers invoking the
+  `flint` CLI to scaffold a project in the first place: the
+  `uvx --from flint-kit flint ...` gotcha, the framework/template/option
+  decision process, and a full CLI/options reference split into
+  `references/cli-reference.md` and `references/templates.md`. Every
+  example command in it was live-verified, including against the real
+  published `flint-kit` PyPI package.
+- `.gitignore` now carves out `.claude/skills/` from the otherwise-blanket
+  `.claude/` ignore rule, so this shared skill can actually be committed
+  and distributed with the repo (everything else under `.claude/` — local
+  tool state, agent worktrees — stays ignored).
+
 ## v0.14.3 — 2026-08-13
 
 ### Changed

@@ -1,6 +1,6 @@
 [project]
 name = "flint-kit"
-version = "0.14.3"
+version = "0.15.0"
 description = "Strike a spark, get a running project — create-next-app, for FastAPI, Flask, and friends."
 readme = "README.md"
 license = "MIT"

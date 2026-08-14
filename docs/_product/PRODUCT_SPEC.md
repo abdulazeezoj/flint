@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-13 (v0.14.2: fixed release automation's PyPI Trusted Publishing verification — see PRODUCT_ARCH.md §8)
+**Last updated:** 2026-08-14 (v0.15.0: added the `.claude/skills/flint/` skill — see §11)
 
 ## 1. Vision
 
@@ -331,6 +331,15 @@ hold for every project shape a generated app might end up living in
   original `push: tags: v*` trigger is unchanged, so a tag pushed by a
   human still works too. See PRODUCT_ARCH.md §8. No change to the
   `flint` CLI itself.
+- `v0.15.0` — a portable Claude Code skill (`.claude/skills/flint/`) ships
+  in the repo, teaching an agent how to *use* the `flint` CLI to
+  scaffold a project — distinct from the `.agents/skills/` catalog
+  flint generates *into* projects (§8/§9 elsewhere in this doc), which
+  instead teaches an agent about the libraries a generated project
+  itself uses. `.gitignore`'s blanket `.claude/` exclusion is narrowed
+  to `.claude/*` with a `!.claude/skills/` re-include, since a
+  directory-level ignore pattern stops git from even traversing into
+  it, so a plain negation of a path underneath it has no effect.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

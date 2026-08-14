@@ -217,5 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Claude Code local tool state (e.g. agent worktrees)
-.claude/
+# Claude Code local tool state (e.g. agent worktrees) -- everything
+# under .claude/ except the shared skill this repo distributes (a
+# directory match can't be re-included by negating paths inside it, so
+# this ignores .claude/'s *contents* via a wildcard instead of the
+# directory itself, letting the skills/ negation actually take effect)
+.claude/*
+!.claude/skills/
