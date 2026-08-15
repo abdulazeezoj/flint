@@ -1,0 +1,29 @@
+# `@theme` namespaces and utilities
+
+`@theme` tokens are grouped by a `--<namespace>-*` prefix; the namespace determines which utility classes a token generates. This project's `input.css` only defines `--color-*` tokens (`accent`, `accent-dark`), but the mechanism is the same for any of these:
+
+| Namespace | Generates utilities for | Example token → example class |
+|---|---|---|
+| `--color-*` | Text, background, border, ring, accent colors | `--color-brand: #123456;` → `bg-brand`, `text-brand` |
+| `--font-*` | Font families | `--font-display: "Inter", sans-serif;` → `font-display` |
+| `--font-weight-*` | Font weights | `--font-weight-heavy: 800;` → `font-heavy` |
+| `--text-*` | Font sizes (with line-height) | `--text-huge: 3rem;` → `text-huge` |
+| `--spacing-*` | Padding, margin, gap, width, height | `--spacing-18: 4.5rem;` → `p-18`, `gap-18` |
+| `--radius-*` | Border radius | `--radius-xl2: 1.25rem;` → `rounded-xl2` |
+| `--shadow-*` | Box shadow | `--shadow-glow: 0 0 20px ...;` → `shadow-glow` |
+| `--breakpoint-*` | Responsive variants | `--breakpoint-3xl: 1920px;` → `3xl:...` |
+| `--animate-*` | Animation | `--animate-wiggle: wiggle 1s ease-in-out infinite;` → `animate-wiggle` |
+
+To add a new brand color (say, a secondary accent), add one line to the `@theme` block in `input.css`:
+
+```css
+@theme {
+  --color-accent: #e8622c;
+  --color-accent-dark: #f27a44;
+  --color-secondary: #2563eb;
+}
+```
+
+Rebuild (`uv run tailwindcss -i ... -o ... --minify`, or leave `--watch` running), and `bg-secondary`/`text-secondary`/`border-secondary`/... are usable immediately in any template — no separate step to "register" the class, no edit anywhere else.
+
+Values that shouldn't generate a utility class — a one-off value used in exactly one place — don't need a `@theme` entry at all; Tailwind's arbitrary-value syntax (`bg-[#2563eb]`, `p-[3px]`) covers that without touching the theme. Reach for `@theme` specifically when a value is meant to be *reused* as a named, consistent token — that's the signal it belongs there rather than inline.

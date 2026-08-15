@@ -1,0 +1,17 @@
+# Gotchas
+
+## 4xx/5xx responses aren't swapped by default — this project's 404s currently fail silently
+
+htmx's default `responseHandling` config only swaps 2xx/3xx responses; 4xx and 5xx are treated as errors and left alone — the response body is available on the `htmx:responseError` event, but nothing swaps into the page automatically. `routes/todos.py`'s `toggle_todo`/`delete_todo` return {% if framework == "fastapi" %}a 404 via `HTTPException`{% else %}a `404` response{% endif %} when a todo id doesn't exist — with the current setup, clicking a stale checkbox/delete button (e.g. after it was deleted in another tab) does nothing visible at all, not even an error message. That's the honest current behavior, not a bug to "fix" by reflex — but if you want a visible error, it needs an explicit `htmx:responseError` listener (or `hx-on::response-error="..."` on the element) that renders something; the framework doesn't give you one for free.
+
+## `hx-swap-oob` needs a matching element already in the DOM
+
+An out-of-band swap works by `id` lookup against what's *already rendered* — it can't create an element that doesn't exist yet. If you add a new `hx-swap-oob` element pointing at an `id` that isn't in `base.html`/`index.html`'s initial render, the oob swap is a silent no-op (same failure mode as the id-mismatch case in `references/attributes-and-swaps.md`). Whenever you add an oob swap, double-check the target `id` exists in the page *before* the request that's supposed to update it.
+
+## A fragment has to be valid, self-contained HTML
+
+Routes return exactly the HTML that gets inserted — no wrapping `<html>`/`<body>`, but also no half-open tags relying on a parent to close them. `todo_item.html` is one complete `<li>...</li>`; if you're building a new partial, render it standalone in your head (or literally open it as its own file) and make sure it doesn't depend on markup outside itself to be well-formed. This matters more than it sounds: the browser's HTML parser is forgiving about malformed fragments in ways that can silently drop or reparent elements, so a subtly broken fragment often *looks* fine until you inspect the actual DOM.
+
+## `hx-target`/`hx-swap-oob` overlap isn't validated for you
+
+Nothing stops you from writing an `hx-swap-oob` id that happens to also sit inside the element `hx-target` points at — htmx doesn't warn about the overlap, it just processes both, and the order/outcome can be surprising. Keep oob targets and the normal `hx-target` pointed at genuinely separate parts of the page, the way `todo_created.html` does (`#todo-list` for the new item, `#empty-state` for the oob delete — never the same id twice).

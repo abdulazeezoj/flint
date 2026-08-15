@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §11)
+**Last updated:** 2026-08-15 (v0.18.0: `jinja2`/`htmx`/`tailwind` skills added to the `.agents/skills/` catalog — see §11)
 
 ## 1. Vision
 
@@ -387,6 +387,24 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   real-world pairings with server-rendered Jinja2+HTMX Python apps (the
   other being a fully decoupled React/Next.js frontend, deliberately
   out of scope for this release — see §12).
+- `v0.17.1` — the `flint` agent skill moves from `.claude/skills/flint/`
+  to `.agents/skills/flint/`, a more tool-neutral convention;
+  `.claude/skills/flint` becomes a symlink to it so Claude Code's own
+  discovery path is unaffected. README rewritten dash-free with a new
+  "Project structure" section, and the project description
+  (`pyproject.toml`, `mkdocs.yml`) updated to match, dropping the
+  `create-next-app` comparison entirely.
+- `v0.18.0` — three new `.agents/skills/` catalog entries: `jinja2`,
+  `htmx`, `tailwind`, researched against each library's current official
+  docs (see PRODUCT_ARCH.md §4.5 for the catalog mechanism, §4.8 for
+  `full-stack`'s `css` option this extends). `jinja2`/`htmx` are always
+  included for `fastapi/full-stack` and `flask/full-stack`; `tailwind`
+  only when `css=tailwind`. Fourteen skills now exist in the catalog.
+  Also bumps `full-stack`'s bundled htmx from a stale `2.0.4` to
+  `2.0.10` (discovered while researching the `htmx` skill), and fixes
+  the `fastapi-full-stack`/`flask-full-stack` docs pages, which had
+  claimed an "identical skill set" to `rest-api` — no longer true once
+  `full-stack` carries its own presentation-layer skills.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

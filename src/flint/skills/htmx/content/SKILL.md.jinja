@@ -1,0 +1,29 @@
+---
+name: htmx
+description: hx-post/hx-target/hx-swap/hx-trigger, out-of-band swaps (hx-swap-oob), and the fragment-response contract — how this project's Todo list updates in place with zero client-side JS framework. Use when wiring a new interactive element, deciding what a route should return, or debugging a swap that doesn't update what you expect (or a 404/500 that silently does nothing).
+---
+
+# HTMX
+
+This project has no client-side JS framework — interactivity comes from htmx attributes on plain HTML, loaded once via a `<script>` tag in `templates/base.html`. Every interactive element makes a request, and the {% if framework == "fastapi" %}FastAPI{% else %}Flask{% endif %} route it hits returns an HTML fragment (never JSON) that htmx swaps into the page. This skill covers the attributes and the request/response contract this project actually relies on — not the whole htmx surface.
+
+## When to reach for this
+
+- Wiring a new interactive element (a button, a form, a toggle) that should update the page without a full reload.
+- Deciding what shape a route's response should be — how much HTML, and whether it needs an out-of-band piece too.
+- A swap isn't updating what you expect — wrong element updated, or nothing visibly happens.
+- A 404/500 from a route doesn't seem to do anything on the page — see `references/gotchas.md`, this is expected default behavior, not a bug.
+
+## Quick reference
+
+- **Loaded via CDN**: `templates/base.html` pulls htmx from `<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" defer></script>` — no npm install, no bundler. Bump the version number there when a newer htmx ships; nothing else in this project references it.
+- **The two request attributes this project uses**: `hx-post` (create, toggle) and `hx-delete` (delete) — htmx also has `hx-get`/`hx-put`/`hx-patch`, unused here since every write in this app is a create/toggle/delete. Each is paired with `hx-target` (which element receives the response) and `hx-swap` (how it's inserted) — see `references/attributes-and-swaps.md` for the full vocabulary.
+- **Response = fragment, not JSON**: every route the Todo UI talks to returns rendered HTML ({% if framework == "fastapi" %}`HTMLResponse` via `templates.TemplateResponse()`{% else %}`render_template()`{% endif %}) — see the {% if framework == "fastapi" %}`fastapi`{% else %}`flask`{% endif %} skill for the route definitions, and the `jinja2` skill for the templates themselves. A new interactive element needs a route that returns the fragment to swap in, not a JSON body.
+- **The empty-state trick (`hx-swap-oob`)**: adding the *first* todo needs two things to happen in one response — the new `<li>` inserted, *and* the "nothing yet" placeholder removed. `partials/todo_created.html` does both: the normal swap target gets the new `<li>` fragment, and a second element in the same response, an empty `<li id="empty-state" hx-swap-oob="delete">`, is pulled out and applied to whatever already has `id="empty-state"` in the page, independent of `hx-target`. See `references/attributes-and-swaps.md` for exactly how `hx-swap-oob` matches elements.
+- **`hx-on::after-request` for one-off client logic**: the todo form uses `hx-on::after-request="if (event.detail.successful) this.reset()"` to clear the input after a successful submit — htmx's inline event-handler syntax, for the rare bit of behavior that doesn't belong in the response itself. Reach for this sparingly; if it grows past a one-liner, it usually means the server response should be doing the work instead.
+
+## Go deeper
+
+- `references/attributes-and-swaps.md` — the full `hx-swap` value table, `hx-target` selector syntax (`closest`, `next`, `find`), `hx-trigger` modifiers, `hx-boost`, and `hx-swap-oob` matching rules, each tied to where this project uses (or could use) them.
+- `references/gotchas.md` — 4xx/5xx responses aren't swapped by default (so this project's 404s currently fail silently on the page), `hx-swap-oob` needs a matching `id` already in the DOM, and fragments must be self-contained valid HTML.
+- `guides/add-an-htmx-action.md` — wiring a brand new interactive element end to end, the same shape `toggle`/`delete` already follow.

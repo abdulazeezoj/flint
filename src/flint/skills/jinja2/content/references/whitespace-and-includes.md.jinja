@@ -1,0 +1,12 @@
+# Whitespace and includes
+
+## No `trim_blocks`/`lstrip_blocks` here
+
+Jinja2 has two `Environment` settings that remove the whitespace a block tag leaves behind: `trim_blocks` (strips the newline immediately after a block tag) and `lstrip_blocks` (strips leading whitespace before a block tag that's alone on its line). {% if framework == "fastapi" %}This project's `Jinja2Templates(directory=...)` doesn't set either{% else %}This project's Flask app doesn't set either on `app.jinja_env`{% endif %}, so both are off — Jinja's own default. That means a {% raw %}{% for %}{% endraw %}/{% raw %}{% if %}{% endraw %} tag on its own line leaves a blank line behind in the rendered output. This project's templates are small enough that nobody's minded; if you're adding a template where the extra blank lines actually matter (an email body, `<pre>` content), you have two options:
+
+- Turn `trim_blocks`/`lstrip_blocks` on for the whole environment ({% if framework == "fastapi" %}`templates.env.trim_blocks = True` / `templates.env.lstrip_blocks = True` in `core/templates.py`, right after constructing `Jinja2Templates`{% else %}`app.jinja_env.trim_blocks = True` / `app.jinja_env.lstrip_blocks = True` in the app factory{% endif %}) — changes every template's whitespace behavior at once, so check the others don't rely on the current spacing.
+- Add manual trim markers to just the tags that need it: {% raw %}{%- if todos -%}{% endraw %} strips whitespace on both sides of that one tag, without touching the environment default.
+
+## `{% raw %}{% include %}{% endraw %}` scope, precisely
+
+{% raw %}{% include "partials/todo_item.html" %}{% endraw %} renders the included template as if its content were pasted in place, with the including template's full variable scope visible — this is the `with context` behavior, and it's the default (you'd write {% raw %}{% include "..." without context %}{% endraw %} to opt out, which this project never does). Concretely: `index.html`'s {% raw %}{% for todo in todos %}{% endraw %} loop makes `todo` visible inside `todo_item.html` purely because the include sits inside the loop body — there's no explicit "pass `todo` in" step, unlike a Jinja *macro* call ({% raw %}{{ my_macro(todo) }}{% endraw %}), which only sees the arguments you hand it. This project doesn't use macros yet; if you add one, remember its scope rules are the opposite of {% raw %}{% include %}{% endraw %}'s — nothing is visible inside a macro except what's explicitly passed as an argument.

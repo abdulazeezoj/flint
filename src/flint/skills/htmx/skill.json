@@ -1,0 +1,5 @@
+{
+  "id": "htmx",
+  "label": "HTMX",
+  "description": "hx-post/hx-target/hx-swap/hx-trigger, out-of-band swaps, and the fragment-response contract — how this project's Todo list updates in place without a client-side JS framework."
+}

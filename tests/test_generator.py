@@ -800,9 +800,12 @@ def test_full_stack_no_leftover_jinja_in_runtime_templates(tmp_path: Path):
     assert "{{ todo.id }}" in todo_item_html
 
     # Everything else must be fully resolved — no leftover flint-level
-    # or app-level Jinja outside templates/.
+    # or app-level Jinja outside templates/. .agents/skills/ is exempt:
+    # the jinja2/htmx skills legitimately document literal {{ }}/{% %}
+    # syntax as prose (escaped via {% raw %} at generation time), which
+    # isn't the same thing as unrendered flint-level Jinja leaking out.
     for path in target.rglob("*"):
-        if path.is_dir() or "templates" in path.parts:
+        if path.is_dir() or "templates" in path.parts or ".agents/skills" in path.as_posix():
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         assert "{{" not in text, path
@@ -868,6 +871,8 @@ class TestFastapiFullStackSkills:
             "fastapi",
             "pydantic-settings",
             "pytest",
+            "jinja2",
+            "htmx",
             "sqlmodel",
             "alembic",
         }
@@ -877,7 +882,23 @@ class TestFastapiFullStackSkills:
         answers = make_full_stack_answers(database="none", orm="none", migrations=False)
         created = render("fastapi", "full-stack", target, answers)
 
-        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest"}
+        assert _skill_ids(created) == {"fastapi", "pydantic-settings", "pytest", "jinja2", "htmx"}
+
+    def test_css_tailwind_adds_tailwind_skill(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers(
+            database="none", orm="none", migrations=False, css="tailwind"
+        )
+        created = render("fastapi", "full-stack", target, answers)
+
+        assert _skill_ids(created) == {
+            "fastapi",
+            "pydantic-settings",
+            "pytest",
+            "jinja2",
+            "htmx",
+            "tailwind",
+        }
 
 
 def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monkeypatch):

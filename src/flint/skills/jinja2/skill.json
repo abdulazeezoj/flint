@@ -1,0 +1,5 @@
+{
+  "id": "jinja2",
+  "label": "Jinja2",
+  "description": "Template inheritance, includes, autoescaping, and whitespace control — how this project's server-rendered pages (base.html, index.html, partials/) use Jinja2."
+}

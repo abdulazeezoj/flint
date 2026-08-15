@@ -91,11 +91,14 @@
     { "id": "flask" },
     { "id": "pydantic-settings" },
     { "id": "pytest" },
+    { "id": "jinja2" },
+    { "id": "htmx" },
     { "id": "flask-sqlalchemy", "when": { "orm": ["flask-sqlalchemy"] } },
     { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
     { "id": "flask-migrate", "when": { "orm": ["flask-sqlalchemy"], "migrations": [true] } },
     { "id": "alembic", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
     { "id": "celery", "when": { "worker": ["celery"] } },
-    { "id": "redis", "when": { "redis": [true] } }
+    { "id": "redis", "when": { "redis": [true] } },
+    { "id": "tailwind", "when": { "css": ["tailwind"] } }
   ]
 }

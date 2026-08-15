@@ -31,7 +31,7 @@ def root(
         bool, typer.Option("--version", help="Show the version and exit.")
     ] = False,
 ) -> None:
-    """Flint — strike a spark, get a running Python project."""
+    """Flint: strike a spark, get a running Python project."""
     if version:
         console.print(f"flint {__version__}")
         raise typer.Exit()
@@ -154,7 +154,7 @@ def list_templates_cmd() -> None:
     console.print(
         "\nPass a pair with e.g. [bold]flint new my-api --framework fastapi "
         "--template rest-api[/bold]. Templates with their own choices "
-        "(database, ORM, ...) take -o key=value — see the wizard or each "
+        "(database, ORM, ...) take -o key=value. See the wizard or each "
         "template's README for available keys."
     )
 
@@ -219,7 +219,7 @@ def _run_new(
         if docker_requested and not chosen_template.supports_docker:
             console.print(
                 f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
-                "--docker yet — skipping the Dockerfile."
+                "--docker yet. Skipping the Dockerfile."
             )
             docker_requested = False
 

@@ -1,0 +1,75 @@
+# Guide: add a new htmx-powered action
+
+Walks through adding an "edit a todo's title" action — click a todo's title, get an inline text input, submit to save — following the same shape `toggle`/`delete` already use. Copy this shape for any new interactive element rather than inventing a new request/response pattern.
+
+## 1. Decide the swap target and what changes
+
+Every existing action targets the todo's `<li id="todo-...">` itself with `hx-swap="outerHTML"` and re-renders `partials/todo_item.html` — the whole item is small enough that regenerating it is simpler than patching one piece of it. Editing a title fits the same shape: an edit form replaces the `<li>`, and submitting it replaces the `<li>` again with the updated (non-editing) version.
+
+## 2. Add the template pieces
+
+In `templates/partials/todo_item.html`, add an edit trigger next to the title:
+
+```html
+{% raw %}<span class="title" hx-get="/todos/{{ todo.id }}/edit" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML">{{ todo.title }}</span>{% endraw +%}
+```
+
+Add a new partial, `templates/partials/todo_item_edit.html`, for the editing state:
+
+```html
+{% raw %}<li id="todo-{{ todo.id }}">
+  <form hx-post="/todos/{{ todo.id }}/edit" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML">
+    <input type="text" name="title" value="{{ todo.title }}" autofocus />
+  </form>
+</li>{% endraw +%}
+```
+
+## 3. Add the routes
+
+{% if framework == "fastapi" %}
+In `src/{{ package_name }}/routes/todos.py`, alongside `toggle_todo`:
+
+```python
+@router.get("/todos/{todo_id}/edit", response_class=HTMLResponse)
+def edit_todo_form(request: Request, todo_id: int) -> HTMLResponse:
+    if todo_id not in _todos:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return templates.TemplateResponse(
+        request, "partials/todo_item_edit.html", {"todo": _todos[todo_id]}
+    )
+
+
+@router.post("/todos/{todo_id}/edit", response_class=HTMLResponse)
+def edit_todo(request: Request, todo_id: int, title: Annotated[str, Form()]) -> HTMLResponse:
+    if todo_id not in _todos:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    _todos[todo_id].title = title
+    return templates.TemplateResponse(request, "partials/todo_item.html", {"todo": _todos[todo_id]})
+```
+{% else %}
+In `src/{{ package_name }}/routes/todos.py`, alongside `toggle_todo`:
+
+```python
+@bp.get("/todos/<int:todo_id>/edit")
+def edit_todo_form(todo_id: int):
+    todo = _todos.get(todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    return render_template("partials/todo_item_edit.html", todo=todo)
+
+
+@bp.post("/todos/<int:todo_id>/edit")
+def edit_todo(todo_id: int):
+    todo = _todos.get(todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    todo.title = request.form["title"]
+    return render_template("partials/todo_item.html", todo=todo)
+```
+{% endif %}
+
+Both routes return the *same* `outerHTML`-swappable `<li>` shape `toggle_todo`/`delete_todo` already return — this consistency is what makes `hx-target="#todo-<id>"` + `hx-swap="outerHTML"` reusable across every action on a todo, not just this one.
+
+## 4. Test it
+
+Add a test that gets the edit form (`GET /todos/{id}/edit`, asserts the `<input>` is present) and one that submits it (`POST /todos/{id}/edit`, asserts the new title appears and the input doesn't) — see the `pytest` skill for this project's fixture conventions, and `tests/test_main.py` for the existing toggle/delete tests to mirror.

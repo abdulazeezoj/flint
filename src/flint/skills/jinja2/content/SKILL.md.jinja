@@ -1,0 +1,31 @@
+---
+name: jinja2
+description: Template inheritance ({% raw %}{% extends %}{% endraw %} / {% raw %}{% block %}{% endraw %}), includes, autoescaping, and whitespace control — how this project's server-rendered Todo UI (templates/base.html, index.html, partials/) uses Jinja2. Use when adding a page or partial, changing a {% raw %}{% block %}{% endraw %}, or debugging HTML that renders escaped wrong or has odd blank lines.
+---
+
+# Jinja2
+
+This project's UI is server-rendered: {% if framework == "fastapi" %}FastAPI{% else %}Flask{% endif %} returns HTML built from templates in `src/{{ package_name }}/templates/`, not JSON. This skill covers how *this project* uses Jinja2's templating language — inheritance, includes, autoescaping, whitespace — not the whole library surface. For which route returns which template and why, see the {% if framework == "fastapi" %}`fastapi`{% else %}`flask`{% endif %} skill; for how the returned HTML gets swapped into the page, see the `htmx` skill.
+
+## When to reach for this
+
+- Adding a new page or a route that renders HTML instead of returning JSON.
+- Adding a new partial — a fragment included from a page, or returned directly by a route as an HTMX response.
+- Adding or changing a {% raw %}{% block %}{% endraw %} in `base.html`.
+- A variable renders as escaped text (`&lt;script&gt;`) when you expected raw HTML, or the reverse — see `references/autoescaping.md`.
+- Rendered HTML has extra blank lines or unexpected indentation around {% raw %}{% if %}{% endraw %}/{% raw %}{% for %}{% endraw %} tags — see `references/whitespace-and-includes.md`.
+
+## Quick reference
+
+- **Layout**: `templates/base.html` is the one `<html>` shell — `<head>`, the htmx `<script>` tag, and two blocks every page fills in: {% raw %}{% block title %}{% endraw %} and {% raw %}{% block content %}{% endraw %}. A new page starts with {% raw %}{% extends "base.html" %}{% endraw %} as its first line — Jinja requires `extends` to be the first tag in the file, nothing (not even a comment) can come before it.
+- **Pages**: `templates/index.html` is the only page today — one {% raw %}{% block content %}{% endraw %} holding the whole Todo UI.
+- **Partials**: `templates/partials/` — fragments either {% raw %}{% include %}{% endraw %}'d from a page, or returned directly by a route as an HTMX swap (see the `htmx` skill for which route returns which partial). `todo_item.html` is one `<li>`; `empty_state.html` is the "nothing yet" placeholder; `todo_created.html` composes both (see the `htmx` skill's `hx-swap-oob` section).
+- **{% raw %}{% include %}{% endraw %} shares scope by default**: index.html's {% raw %}{% for todo in todos %}{% include "partials/todo_item.html" %}{% endfor %}{% endraw %} works because an included template sees every variable the including template has in scope — `todo` doesn't need to be passed explicitly. That's the default (`with context`); this project never uses {% raw %}{% include "..." without context %}{% endraw %}, so don't reach for it unless you specifically want to hide variables from an include.
+- **`for`/`else`, not a separate `if`**: the empty-Todo-list state is {% raw %}{% for todo in todos %}...{% else %}...{% endfor %}{% endraw %} in index.html — a `for` loop's {% raw %}{% else %}{% endraw %} branch runs when the loop iterates zero times, not on a boolean condition. Wrapping it in a separate {% raw %}{% if todos %}{% endraw %} works too, but duplicates the emptiness check Jinja already gives you for free.
+- **Autoescaping is on, but that's not Jinja2's own default**: bare Jinja2 ships with autoescaping *off*. {% if framework == "fastapi" %}This project's `Jinja2Templates` (Starlette){% else %}This project's `render_template()` (Flask){% endif %} turns it on automatically for any `.html`/`.htm`/`.xml` template, so {% raw %}{{ todo.title }}{% endraw %} is HTML-escaped on output — a todo titled `<script>alert(1)</script>` renders as inert text, not a live tag. See `references/autoescaping.md` before reaching for `|safe` to turn that off for something.
+
+## Go deeper
+
+- `references/autoescaping.md` — what's actually on by default here, `|safe`, and when disabling escaping for one value is legitimate versus an XSS bug waiting to happen.
+- `references/whitespace-and-includes.md` — why {% raw %}{% if %}{% endraw %}/{% raw %}{% for %}{% endraw %} tags leave blank lines by default here, the `trim_blocks`/`lstrip_blocks` settings that would remove them, and {% raw %}{%- -%}{% endraw %} trim markers for a one-off fix.
+- `guides/add-a-page.md` — adding a brand new page end to end: the template, the route that renders it, and registering it{% if framework == "fastapi" %} on the router{% else %} on the blueprint{% endif %}.

@@ -1,0 +1,39 @@
+---
+name: tailwind
+description: The @theme directive (CSS-first config, no tailwind.config.js), utility classes, and the standalone-CLI build step (pytailwindcss, no Node.js) — how this project's css=tailwind option styles pages. Use when adding or changing styling, adding a new design token (color/spacing/font), or the page has no styling at all after a fresh clone.
+---
+
+# Tailwind CSS
+
+This project was generated with `css=tailwind`: pages are styled with Tailwind utility classes instead of the hand-written stylesheet the `css=vanilla` option would have used. This skill covers how *this project's* Tailwind setup works — the CSS-first `@theme` config and the no-Node build step — not the whole utility-class reference (there are hundreds; reach for the class names as you need them, same as you'd search any CSS framework's docs).
+
+## When to reach for this
+
+- Styling a new page or partial.
+- Adding a new design token — a brand color, a spacing value, a font — that should be reusable as a utility class, not a one-off inline style.
+- A freshly generated (or freshly cloned) project has **no styling at all** — this is expected, see Quick reference below, not a bug.
+- Debugging a utility class that doesn't seem to do anything.
+
+## Quick reference
+
+- **No Node.js, no `tailwind.config.js`**: this project uses Tailwind's standalone CLI via the `pytailwindcss` PyPI package (an ordinary dependency in `pyproject.toml`) — it downloads the platform binary on first use and wraps it as `uv run tailwindcss`. There's no `npm install`, no `package.json`, and — because this is Tailwind v4 — no `tailwind.config.js` either.
+- **Config lives in CSS, not JS**: `src/{{ package_name }}/static/css/input.css` starts with `@import "tailwindcss";` followed by an `@theme` block defining this project's design tokens as CSS custom properties:
+  ```css
+  @theme {
+    --color-accent: #e8622c;
+    --color-accent-dark: #f27a44;
+  }
+  ```
+  Each entry both defines a real CSS variable (usable as `var(--color-accent)`) *and* generates matching utility classes automatically — `bg-accent`, `text-accent`, `border-accent`, `accent-accent` (used on the todo checkbox), etc. That's `@theme`'s whole point, and what makes it different from a plain `:root { --color-accent: ...; }` block, which would only give you the variable, not the utilities.
+- **You have to build it — nothing watches automatically**: `input.css` is the source; `static/css/style.css` (the file `base.html` actually links) is generated output, gitignored, and **does not exist until you build it once**:
+  ```
+  uv run tailwindcss -i src/{{ package_name }}/static/css/input.css -o src/{{ package_name }}/static/css/style.css --minify
+  ```
+  Add `--watch` while iterating on styles so it rebuilds on save. If `--docker` was also chosen, the Dockerfile runs this build automatically as part of the image build — that combination needs no manual step.
+- **No content config needed**: Tailwind v4's standalone CLI scans the project directory for class names automatically (no `content: [...]` array to keep in sync, unlike Tailwind v3) — a class typed in any `.html` file under this project is picked up the next time you build, with nothing extra to configure.
+- **Everything else is plain utility classes**: `templates/index.html` and `templates/partials/*.html` compose Tailwind's existing utilities directly in `class="..."` (e.g. `bg-white dark:bg-neutral-800 border rounded-xl shadow-sm p-8`) rather than named CSS classes — there's no separate stylesheet rule to go find for "what does this look like", the class list on the element *is* the styling.
+
+## Go deeper
+
+- `references/theme-and-utilities.md` — the `@theme` namespaces this project could use beyond `--color-*` (spacing, fonts, radius, shadows...), and how a new token turns into new utility classes automatically.
+- `references/gotchas.md` — the no-styling-until-built trap, editing the wrong CSS file, and why deleting `style.css` isn't a mistake worth panicking over.

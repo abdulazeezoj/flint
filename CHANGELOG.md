@@ -7,6 +7,58 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.18.0 — 2026-08-15
+
+### Added
+
+- **Three new `.agents/skills/` catalog entries: `jinja2`, `htmx`,
+  `tailwind`** — researched against each library's current official docs
+  and grounded in exactly how `full-stack`'s templates use them, not
+  generic library reference material. `jinja2` and `htmx` are always
+  included for `fastapi/full-stack` and `flask/full-stack` (template
+  inheritance/includes/autoescaping/whitespace for the former;
+  hx-target/hx-swap/hx-trigger and the `hx-swap-oob` empty-state trick
+  for the latter, including the fact that this project's 4xx/5xx
+  responses aren't swapped by htmx's own default). `tailwind` is added
+  only when `css=tailwind`, covering the `@theme` CSS-first config and
+  the standalone-CLI build step. Fourteen skills now exist in the
+  catalog; see the [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
+  docs for the full table.
+
+### Changed
+
+- **`full-stack`'s bundled htmx bumped from 2.0.4 to 2.0.10**
+  (`templates/base.html`'s `<script>` tag), and its CDN switched from
+  `unpkg.com` to `cdn.jsdelivr.net/npm/htmx.org@.../dist/htmx.min.js` —
+  the version had drifted stale since the template first shipped, and
+  the new `htmx` skill documents the exact URL to bump it at next time.
+- The `fastapi-full-stack`/`flask-full-stack` docs pages' `.agents/skills/`
+  section no longer claims an "identical skill set" to `rest-api` — that
+  stopped being true the moment `jinja2`/`htmx` (and conditionally
+  `tailwind`) were added; it now lists the two/three skills `full-stack`
+  adds on top of `rest-api`'s set.
+
+## v0.17.1 — 2026-08-15
+
+### Changed
+
+- **The `flint` agent skill moves from `.claude/skills/flint/` to
+  `.agents/skills/flint/`, with `.claude/skills/flint` kept as a
+  symlink** (`.claude/skills/flint -> ../../.agents/skills/flint`) so
+  Claude Code's own discovery path still finds it. `.agents/skills/` is
+  the more tool-neutral convention, and the symlink means both paths
+  resolve to the same content with nothing to keep in sync by hand.
+  Content unchanged.
+- **README rewritten**: no more em/en dashes, and the opening tagline
+  now matches the project description used everywhere else ("Strike a
+  spark, get a running project. Instant scaffolding for popular
+  unopinionated Python web frameworks..."), dropping the earlier
+  `create-next-app` comparison entirely. Also adds a new "Project
+  structure" section showing the generated layout directly in the
+  README, not just linked out to the docs site.
+- `pyproject.toml`'s `description` and `mkdocs.yml`'s `site_description`
+  updated to the same tagline, also dash-free.
+
 ## v0.17.0 — 2026-08-14
 
 ### Added

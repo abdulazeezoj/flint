@@ -104,6 +104,12 @@ Here's the (trimmed) list from `fastapi/rest-api`'s `template.json`:
 `orm=flask-sqlalchemy`, or plain `alembic` when `orm=sqlalchemy` — and no
 `taskiq`, since that worker is FastAPI/async-only in Flint today.
 
+`fastapi/full-stack` and `flask/full-stack` take their framework's
+`rest-api` list above and add two more, always: `jinja2` and `htmx` — the
+templating and interactivity this template's server-rendered pages are
+built on. `css=tailwind` adds a third, `tailwind`, covering the
+`@theme`-based build step; `css=vanilla` (the default) doesn't need it.
+
 So in practice:
 
 - A bare `fastapi/hello-world` gets **`fastapi`** and **`pytest`** — and
@@ -144,7 +150,7 @@ every folder.
 
 ## The full catalog
 
-Eleven skills exist today. Every generated project gets some subset of
+Fourteen skills exist today. Every generated project gets some subset of
 these, per the `when` rules above — never one that doesn't apply to what
 you picked.
 
@@ -162,6 +168,9 @@ you picked.
 | `celery` | FastAPI or Flask, `worker=celery` | Task definition, enqueuing, and result-checking conventions for this project's Celery background worker. |
 | `redis` | FastAPI or Flask, `redis=true` | Module-level Redis client setup and basic get/set/delete caching conventions for this project's Redis add-on. |
 | `pytest` | FastAPI + Flask | Fixtures, async test setup, the isolated-test-database pattern, and parametrize — how this project's test suite is built and how to extend it. |
+| `jinja2` | FastAPI + Flask, `full-stack` | Template inheritance, includes, autoescaping, and whitespace control — how this project's server-rendered pages use Jinja2. |
+| `htmx` | FastAPI + Flask, `full-stack` | hx-post/hx-target/hx-swap/hx-trigger, out-of-band swaps, and the fragment-response contract — how this project's Todo list updates in place without a client-side JS framework. |
+| `tailwind` | FastAPI + Flask, `full-stack` with `css=tailwind` | The `@theme` directive, utility classes, and the standalone-CLI build step — how this project's `css=tailwind` option styles pages without Node.js. |
 
 ## Why this exists
 

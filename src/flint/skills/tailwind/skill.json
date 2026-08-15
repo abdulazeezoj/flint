@@ -1,0 +1,5 @@
+{
+  "id": "tailwind",
+  "label": "Tailwind CSS",
+  "description": "The @theme directive, utility classes, and the standalone-CLI build step — how this project's css=tailwind option styles pages without Node.js or a tailwind.config.js."
+}
