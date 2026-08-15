@@ -4,9 +4,10 @@
 [![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
 [![PyPI](https://img.shields.io/pypi/v/flint-kit)](https://pypi.org/project/flint-kit/)
 
-`create-next-app`, for Python — strike it and it throws a spark. One
-command, a short interactive wizard, and you have a running project —
-no hand-written boilerplate. Pick a richer template and the same
+Strike a spark, get a running project. Instant scaffolding for popular
+unopinionated Python web frameworks (FastAPI, Flask, and friends). One
+command, a short interactive wizard, and you have a running project.
+No hand-written boilerplate. Pick a richer template and the same
 wizard wires up a real database, migrations, and a background worker
 too.
 
@@ -42,10 +43,10 @@ Next steps:
   uv run taskiq worker my_api.worker:broker --app-dir src   # separate process
 ```
 
-**📖 Full documentation: [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)**
-— getting started, a full CLI reference, one page per template
-(options, generated layout, gotchas), the `.agents/skills/` catalog,
-remembered preferences, and how to contribute.
+**📖 Full documentation: [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)**.
+Getting started, a full CLI reference, one page per template (options,
+generated layout, gotchas), the `.agents/skills/` catalog, remembered
+preferences, and how to contribute.
 
 ## Install
 
@@ -81,33 +82,72 @@ choices in `~/.flint/last.json` as the new default next time. See the
 and [Remembered Preferences](https://abdulazeezoj.github.io/flint/preferences/)
 docs for the full details.
 
-Driving flint from an AI coding agent? [`.claude/skills/flint/`](.claude/skills/flint/)
-is a portable Claude Code skill that teaches an agent how to invoke the
-CLI to scaffold a project — separate from the `.agents/skills/` catalog
-below, which covers using the *generated* project's own stack.
+Driving flint from an AI coding agent? [`.agents/skills/flint/`](.agents/skills/flint/)
+is a portable agent skill that teaches an agent how to invoke the CLI
+to scaffold a project. It's symlinked at `.claude/skills/flint/` for
+Claude Code's own discovery path. Separate from the `.agents/skills/`
+catalog described below, which covers using the *generated* project's
+own stack.
 
 ## What flint ships
 
-A project is always generated from a `<framework>/<template>` pair —
+A project is always generated from a `<framework>/<template>` pair:
 **FastAPI** and **Flask**, each with a **Hello World** starter, a fuller
 **REST API** template offering real head-start choices (database, ORM,
 migrations, a background worker, Redis), and a **Full-Stack** template
 with the same choices rendered server-side with Jinja2 and HTMX instead
-of JSON. Every generated project also gets `.agents/skills/` — deeper,
-library-specific reference material for exactly the stack it uses. See the
+of JSON (optionally styled with Tailwind CSS). Every generated project
+also gets `.agents/skills/`: deeper, library-specific reference
+material for exactly the stack it uses. See the
 [Templates](https://abdulazeezoj.github.io/flint/project-templates/)
 and [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
 docs for what each one actually generates.
+
+## Project structure
+
+Every generated project follows the same opinionated layout, borrowed
+from Next.js: fixed entrypoints, one file per resource, shared
+infrastructure grouped under `core/`. Here's `fastapi/rest-api` with a
+database, migrations, and a background worker:
+
+```
+my-api/
+  src/my_api/
+    main.py              FastAPI entrypoint: app, lifespan, mounted routers
+    worker.py            worker entrypoint (only if a worker is chosen)
+    routes/               one module per HTTP resource
+      items.py
+    tasks/                 one module per background job (only if a worker is chosen)
+      example.py
+    core/                   shared infrastructure
+      config.py               settings (pydantic-settings)
+      db.py                    async engine/session (only if a database is chosen)
+      redis.py                 Redis client (only if redis resolves true)
+    schemas.py             Pydantic request/response models
+    models.py               ORM models (only if a database is chosen)
+  tests/
+  alembic/                 migrations (only if migrations is on)
+  .agents/skills/          library-specific reference material for AI agents
+  AGENTS.md
+  Dockerfile               (only if --docker)
+```
+
+`hello-world` is the same shape, minus the extras. `full-stack` swaps
+`routes/` + `schemas.py` for `routes/` returning HTML fragments plus
+`templates/` + `static/` (Jinja2 + HTMX, optionally Tailwind CSS). See
+[Templates](https://abdulazeezoj.github.io/flint/project-templates/)
+for the exact generated layout of every framework and template
+combination.
 
 ## Contributing
 
 ```
 uv sync
-uv run pytest       # also runs coverage — the suite fails under 100%
+uv run pytest       # also runs coverage; the suite fails under 100%
 uv run flint --help
 ```
 
-Adding a framework, template, or skill is a content-only change — no
+Adding a framework, template, or skill is a content-only change. No
 code edits needed. See the
 [Contributing](https://abdulazeezoj.github.io/flint/contributing/)
 docs for the full local-setup, template/skill-authoring, and release

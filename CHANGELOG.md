@@ -7,6 +7,27 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.17.1 — 2026-08-15
+
+### Changed
+
+- **The `flint` agent skill moves from `.claude/skills/flint/` to
+  `.agents/skills/flint/`, with `.claude/skills/flint` kept as a
+  symlink** (`.claude/skills/flint -> ../../.agents/skills/flint`) so
+  Claude Code's own discovery path still finds it. `.agents/skills/` is
+  the more tool-neutral convention, and the symlink means both paths
+  resolve to the same content with nothing to keep in sync by hand.
+  Content unchanged.
+- **README rewritten**: no more em/en dashes, and the opening tagline
+  now matches the project description used everywhere else ("Strike a
+  spark, get a running project. Instant scaffolding for popular
+  unopinionated Python web frameworks..."), dropping the earlier
+  `create-next-app` comparison entirely. Also adds a new "Project
+  structure" section showing the generated layout directly in the
+  README, not just linked out to the docs site.
+- `pyproject.toml`'s `description` and `mkdocs.yml`'s `site_description`
+  updated to the same tagline, also dash-free.
+
 ## v0.17.0 — 2026-08-14
 
 ### Added

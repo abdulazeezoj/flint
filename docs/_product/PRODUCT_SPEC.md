@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §11)
+**Last updated:** 2026-08-15 (v0.17.1: `.agents/skills/flint/` relocation + README/description rewrite — see §11)
 
 ## 1. Vision
 
@@ -387,6 +387,13 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   real-world pairings with server-rendered Jinja2+HTMX Python apps (the
   other being a fully decoupled React/Next.js frontend, deliberately
   out of scope for this release — see §12).
+- `v0.17.1` — the `flint` agent skill moves from `.claude/skills/flint/`
+  to `.agents/skills/flint/`, a more tool-neutral convention;
+  `.claude/skills/flint` becomes a symlink to it so Claude Code's own
+  discovery path is unaffected. README rewritten dash-free with a new
+  "Project structure" section, and the project description
+  (`pyproject.toml`, `mkdocs.yml`) updated to match, dropping the
+  `create-next-app` comparison entirely.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

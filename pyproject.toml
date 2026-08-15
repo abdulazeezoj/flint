@@ -1,7 +1,7 @@
 [project]
 name = "flint-kit"
-version = "0.17.0"
-description = "Strike a spark, get a running project — create-next-app, for FastAPI, Flask, and friends."
+version = "0.17.1"
+description = "Strike a spark, get a running project. Instant scaffolding for popular unopinionated Python web frameworks (FastAPI, Flask, and friends)."
 readme = "README.md"
 license = "MIT"
 authors = [

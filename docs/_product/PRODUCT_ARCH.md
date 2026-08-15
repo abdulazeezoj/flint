@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §4.8)
+**Last updated:** 2026-08-15 (v0.17.1: repo layout tree updated for `.agents/skills/flint/` + `.claude/skills/flint` symlink — see §3)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -42,6 +42,19 @@ is a contained change, not a rewrite.
 
 ```
 flint/
+├── .agents/
+│   └── skills/
+│       └── flint/                  # portable agent skill teaching an agent how to *use*
+│           │                       # the flint CLI itself — unrelated to SKILLS_DIR (§4.5),
+│           │                       # which flint bundles *into generated projects*
+│           ├── SKILL.md
+│           └── references/
+│               ├── cli-reference.md
+│               └── templates.md
+├── .claude/
+│   └── skills/
+│       └── flint -> ../../.agents/skills/flint   # symlink, for Claude Code's own
+│                                                   # discovery path (repo-relative)
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                  # tests, every push/PR to main
@@ -66,8 +79,10 @@ flint/
 │       ├── index.md
 │       ├── fastapi-hello-world.md
 │       ├── fastapi-rest-api.md
+│       ├── fastapi-full-stack.md
 │       ├── flask-hello-world.md
-│       └── flask-rest-api.md
+│       ├── flask-rest-api.md
+│       └── flask-full-stack.md
 ├── src/
 │   └── flint/
 │       ├── __init__.py          # __version__
