@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-14 (v0.16.0: added the `full-stack` template — see §11)
+**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §11)
 
 ## 1. Vision
 
@@ -360,6 +360,33 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   instead of rendering the *generated app's own* runtime Jinja2 syntax
   (`{% block %}`, `{{ todo.title }}`) through flint's generator and
   stripping it before the file ever reaches the project.
+- `v0.17.0` — `full-stack` gains a `css` option (`vanilla`, the
+  existing hand-written stylesheet, or `tailwind`): Tailwind CSS v4 via
+  its standalone CLI, wrapped by the pip-installable `pytailwindcss` —
+  no Node.js/npm anywhere in the generated project, matching the
+  "everything through `uv`" story every other template already has.
+  Modeled on `litestar-tailwind-cli`'s reference approach (source
+  `input.css` in, built `style.css` out, the CLI binary downloaded and
+  cached on first run). Implemented as two new layers,
+  `css-vanilla`/`css-tailwind`, gated the same way `db-*`/`worker-*`
+  already are — the base `files/` layer no longer ships
+  `static/css/style.css` directly, since that file's *content* now
+  depends on which `css` value was chosen. `--docker` gets one
+  conditional `RUN uv run tailwindcss ... --minify` line so a container
+  always ships current CSS. Caught during this release, not before
+  shipping: `tests/test_main.py.jinja` (shared by every `css` variant)
+  had a toggle-endpoint assertion hardcoded to `css-vanilla`'s
+  `class="todo-item done"` string — passed under `ast.parse()` but
+  failed the instant `uv run pytest` actually ran against a generated
+  `css=tailwind` project, since that markup doesn't exist there. Fixed
+  by asserting the `checked` attribute instead (present in both
+  variants), and both templates' maintainer `README.md` now calls this
+  out as a standing rule for `full-stack`'s shared test file. Motivated
+  by wanting flint to meet developers where they already are rather
+  than impose a single opinion — Tailwind is one of the two dominant
+  real-world pairings with server-rendered Jinja2+HTMX Python apps (the
+  other being a fully decoupled React/Next.js frontend, deliberately
+  out of scope for this release — see §12).
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -400,3 +427,17 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   streaming completion endpoint + `pydantic-settings` for the
   key/model," deliberately smaller than the RAG/agent-framework
   templates common in the wild.
+- **Decoupled frontend (React/Next.js + FastAPI/Flask API), deliberately
+  deferred, not decided against**: research done ahead of v0.17
+  confirmed this is the more common real-world "full-stack Python"
+  pairing today than server-rendered Jinja2+HTMX (tiangolo's own
+  official `full-stack-fastapi-template` ships exactly this shape:
+  React+Vite+Tailwind+shadcn/ui frontend, FastAPI+SQLModel backend, an
+  OpenAPI-generated TypeScript client, Docker Compose). v0.17 chose the
+  narrower, bounded move instead — a `css` option on the existing
+  `full-stack` template — specifically because a decoupled-frontend
+  template is a different *project topology* (a `backend/`+`frontend/`
+  monorepo, CORS wiring, a generated client), not a new layer on the
+  existing one, and warrants its own scoping pass rather than riding
+  along with a CSS-tooling change. Revisit as a dedicated effort if
+  there's demand.

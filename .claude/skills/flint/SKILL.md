@@ -57,7 +57,11 @@ plus whatever options that template declares:
    defaults per framework — they differ slightly between FastAPI and
    Flask (e.g. FastAPI's templates offer `worker=taskiq`, Flask's
    don't — Taskiq is async-first and doesn't fit Flask's sync/WSGI
-   model). `full-stack` takes exactly the same options as `rest-api`.
+   model). `full-stack` takes the same database/ORM/migrations/worker
+   options as `rest-api`, plus one it alone has: `-o css=tailwind` swaps
+   the plain stylesheet for Tailwind CSS v4 (via the standalone CLI — no
+   Node.js/npm needed). Reach for it whenever the user mentions Tailwind
+   or wants a more polished look than a bare stylesheet.
 
 Always generate **non-interactively** (`--yes` plus explicit flags/`-o`
 values for anything the user specified) rather than trying to drive the

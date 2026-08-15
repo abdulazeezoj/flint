@@ -18,7 +18,7 @@ async def test_todo_lifecycle(client: AsyncClient) -> None:
 
     toggle_response = await client.post(f"/todos/{todo_id}/toggle")
     assert toggle_response.status_code == 200
-    assert 'class="todo-item done"' in toggle_response.text
+    assert "checked" in toggle_response.text
 
     delete_response = await client.delete(f"/todos/{todo_id}")
     assert delete_response.status_code == 200

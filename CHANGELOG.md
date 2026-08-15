@@ -7,6 +7,36 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.17.0 — 2026-08-14
+
+### Added
+
+- **`full-stack` gains a `css` option: `vanilla` (the existing
+  hand-written stylesheet, unchanged, still the default) or `tailwind`
+  — Tailwind CSS v4 via its standalone CLI, wrapped by the
+  pip-installable `pytailwindcss`.** No Node.js or npm anywhere in the
+  generated project, matching every other template's "everything
+  through `uv`" story. `css=tailwind` ships `static/css/input.css`
+  (the source, tracked — a few lines: `@import "tailwindcss"` plus an
+  `@theme` block for the accent color, Tailwind v4's CSS-first config)
+  and rewrites `templates/index.html` and
+  `templates/partials/{todo_item,empty_state}.html` to use Tailwind
+  utility classes; `static/css/style.css` becomes a git-ignored build
+  artifact, produced by `uv run tailwindcss -i .../input.css -o
+  .../style.css` (documented in the generated `README.md`'s new
+  "Styling" section — a freshly generated `css=tailwind` project has no
+  styling until that command runs once, the same "one required setup
+  step" shape `migrations=true` already has). `--docker` runs the build
+  automatically as part of the image. Implemented as two new peer
+  layers, `css-vanilla`/`css-tailwind`, replacing what used to be a
+  fixed `static/css/style.css` in the base `files/` layer. See
+  `docs/_product/PRODUCT_ARCH.md` §4.8 for the full design writeup,
+  including a real bug this release caught: a shared test file had a
+  toggle-endpoint assertion hardcoded to `css-vanilla`'s CSS class name,
+  which only failed when actually run against a generated
+  `css=tailwind` project — fixed to assert behavior (`checked`), not
+  presentation.
+
 ## v0.16.0 — 2026-08-14
 
 ### Added

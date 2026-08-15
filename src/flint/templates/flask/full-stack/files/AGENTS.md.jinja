@@ -29,6 +29,12 @@ Apply migrations first: `uv run alembic upgrade head`.
 {% if worker == "celery" %}
 Run the worker (separate process): `PYTHONPATH=src uv run celery -A {{ package_name }}.worker.celery_app worker --loglevel=info`.
 {% endif %}
+{% if css == "tailwind" %}
+Build the CSS first, or the page has no styling: `uv run tailwindcss -i
+src/{{ package_name }}/static/css/input.css -o
+src/{{ package_name }}/static/css/style.css` (add `--watch` while iterating
+on templates).
+{% endif %}
 
 ## Test
 
@@ -56,8 +62,11 @@ Next.js only enforces structure for routing, nothing else):
   page; `partials/` holds the fragments routes return directly for
   HTMX swaps (`todo_item.html`, `empty_state.html`, `todo_created.html`).
 - `src/{{ package_name }}/static/` — served at `/static` automatically,
-  same default-layout story. `css/style.css` is the whole UI — no build
-  step, no framework, edit it directly.
+  same default-layout story.{% if css == "tailwind" %} `css/input.css` is the
+  Tailwind source (edit this, plus template class names); `css/style.css`
+  is the **built, git-ignored** output — rebuild it after any change (see
+  "Run" above) or edits won't show up.{% else %} `css/style.css` is the whole
+  UI — no build step, no framework, edit it directly.{% endif %}
 {% if worker != "none" %}
 - `src/{{ package_name }}/worker.py` — **the** {{ worker }} entrypoint:
   broker/app setup, importing every `tasks/` module so the worker

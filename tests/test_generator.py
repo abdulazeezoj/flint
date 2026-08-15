@@ -652,7 +652,8 @@ class TestFastapiRestApiSkills:
 
 def make_full_stack_answers(**option_overrides) -> Answers:
     options = dict(
-        database="sqlite", orm="sqlmodel", migrations=True, worker="none", redis=False
+        database="sqlite", orm="sqlmodel", migrations=True, worker="none", redis=False,
+        css="vanilla",
     )
     options.update(option_overrides)
     return make_answers(template="full-stack", options=options)
@@ -806,6 +807,55 @@ def test_full_stack_no_leftover_jinja_in_runtime_templates(tmp_path: Path):
         text = path.read_text(encoding="utf-8", errors="ignore")
         assert "{{" not in text, path
         assert "{%" not in text, path
+
+
+def test_full_stack_css_vanilla_is_default(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers()  # css="vanilla" by default
+    created = render("fastapi", "full-stack", target, answers)
+
+    assert Path("src/my_api/static/css/style.css") in created
+    assert Path("src/my_api/static/css/input.css") not in created
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert not any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+
+def test_full_stack_css_tailwind(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(css="tailwind")
+    created = render("fastapi", "full-stack", target, answers)
+
+    # input.css (source, tracked) ships; style.css (build output) does not —
+    # it's produced by the Tailwind CLI, not by flint (see README.md's
+    # "no .jinja suffix" gotcha and the Styling section it points to).
+    assert Path("src/my_api/static/css/input.css") in created
+    assert Path("src/my_api/static/css/style.css") not in created
+
+    input_css = (target / "src/my_api/static/css/input.css").read_text()
+    assert '@import "tailwindcss"' in input_css
+    assert "--color-accent" in input_css
+
+    index_html = (target / "src/my_api/templates/index.html").read_text()
+    assert "bg-accent" in index_html  # Tailwind utility classes, not vanilla CSS
+
+    config = _assert_valid_toml(target / "pyproject.toml")
+    assert any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+    gitignore = (target / ".gitignore").read_text()
+    assert "static/css/style.css" in gitignore
+
+    _assert_all_python_files_parse(target)
+
+
+def test_full_stack_css_tailwind_docker_build_step(tmp_path: Path):
+    target = tmp_path / "app"
+    answers = make_full_stack_answers(css="tailwind").model_copy(update={"docker": True})
+    created = render("fastapi", "full-stack", target, answers, force=True)
+
+    assert Path("Dockerfile") in created
+    dockerfile = (target / "Dockerfile").read_text()
+    assert "uv run tailwindcss" in dockerfile
+    assert "--minify" in dockerfile
 
 
 class TestFastapiFullStackSkills:

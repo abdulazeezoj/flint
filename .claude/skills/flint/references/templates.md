@@ -73,7 +73,24 @@ above for `flask/rest-api` — same keys, same defaults, same dependency
 wiring. Reach for `full-stack` instead of `rest-api` when the user wants
 server-rendered pages (a Todo list, HTML fragments swapped in via HTMX)
 rather than a JSON API; everything about the database/ORM/migrations/
-worker/broker/redis choices is unchanged.
+worker/broker/redis choices is unchanged. `full-stack` has one extra
+option neither `rest-api` nor `hello-world` has, since it's about
+presentation, not the backend stack:
+
+| Option | Choices | Default |
+|---|---|---|
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI — no Node.js/npm) | `vanilla` |
+
+Reach for `-o css=tailwind` whenever the user mentions Tailwind, wants a
+more polished/production-ready look than a plain stylesheet, or is
+already a Tailwind user — it's still zero extra tooling to install
+beyond what `uv sync` already pulls in (`pytailwindcss` downloads the
+platform binary itself). One thing to flag: a freshly generated
+`css=tailwind` project has **no styling until the CSS is built once** —
+`uv run tailwindcss -i src/<package>/static/css/input.css -o
+src/<package>/static/css/style.css` (add `--watch` while iterating). If
+`--docker` was also passed, the Dockerfile runs this automatically as
+part of the image build, so that combination needs no extra step.
 
 ## Example commands
 
@@ -103,4 +120,11 @@ FastAPI, server-rendered Todo list (HTMX) with SQLite + SQLModel:
 ```bash
 flint new my-app --framework fastapi --template full-stack \
   -o database=sqlite -o orm=sqlmodel --yes
+```
+
+Flask, server-rendered with Tailwind CSS instead of the vanilla stylesheet:
+
+```bash
+flint new my-app --framework flask --template full-stack \
+  -o database=sqlite -o css=tailwind --yes
 ```

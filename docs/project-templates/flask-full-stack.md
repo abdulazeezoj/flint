@@ -20,12 +20,20 @@ a JSON contract.
 
 ## Options
 
-Identical to `rest-api`'s — same keys, same defaults, same dependency
-wiring, same Flask-SQLAlchemy/manual-SQLAlchemy split, same
-Celery-only worker choice. See
-[Flask · REST API → Options](flask-rest-api.md#options) for the full
-table and the reasoning behind each of those; it's not repeated here
-because it's genuinely the same logic, unmodified.
+The database/ORM/migrations/worker/broker/redis options are identical
+to `rest-api`'s — same keys, same defaults, same dependency wiring,
+same Flask-SQLAlchemy/manual-SQLAlchemy split, same Celery-only worker
+choice. See [Flask · REST API → Options](flask-rest-api.md#options)
+for the full table and the reasoning behind each of those; it's not
+repeated here because it's genuinely the same logic, unmodified. One
+option is unique to this template, since it's about presentation, not
+the backend stack:
+
+| Option | Choices | Default |
+|---|---|---|
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI) | `vanilla` |
+
+See [Styling](#styling-cssvanilla-vs-csstailwind) below.
 
 ## `create_app()`, unchanged
 
@@ -62,7 +70,8 @@ src/{package_name}/
       empty_state.html         the "nothing to do yet" message
       todo_created.html        todo_item.html + an out-of-band delete of empty_state
   static/               served at /static, same automatic resolution
-    css/style.css          the whole UI — no build step, no framework
+    css/style.css          the whole UI (css=vanilla), or...
+    css/input.css          ...the Tailwind source, style.css built + git-ignored (css=tailwind)
   core/                  shared infrastructure
     config.py              Settings (pydantic-settings, always)
     db.py                  engine/session setup (iff database != none)
@@ -107,6 +116,25 @@ same `partials/todo_created.html` file, copied byte-for-byte — see
 for the full explanation of the `hx-swap-oob="delete"` trick and how
 `DELETE /todos/<id>` mirrors it in the other direction.
 
+## Styling: `css=vanilla` vs `css=tailwind`
+
+Identical mechanism to the FastAPI template's — same `css=tailwind`
+option, same [standalone-CLI](https://tailwindcss.com/blog/standalone-cli)
+approach (no Node.js/npm), same `input.css`/`style.css` split, same
+`@theme`-based accent color, and the exact same `templates/index.html`/
+`partials/todo_item.html` Tailwind markup, copied byte-for-byte from
+`fastapi/full-stack`. See
+[FastAPI · Full-Stack → Styling](fastapi-full-stack.md#styling-cssvanilla-vs-csstailwind)
+for the full explanation, including why a freshly generated
+`css=tailwind` project has no styling until you build once:
+
+```bash
+uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css
+```
+
+`--docker` runs this automatically (with `--minify`) as part of the
+image build.
+
 ## A full example
 
 ```bash
@@ -140,7 +168,9 @@ returning a small HTML fragment instead of a full page or JSON.
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework flask --template full-stack`, has an interactive
 equivalent if you just run `flint new my-app` and answer the prompts
-instead.
+instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
+instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
+above.
 
 ## Gotchas worth knowing before you edit the generated code
 
@@ -192,7 +222,10 @@ skills you get, since the underlying stack choices are the same.
 Pass `--docker` and flint adds a `Dockerfile` (`uv`-based) plus
 `.dockerignore` — identical to `rest-api`'s, including running under
 **gunicorn** via its factory-call syntax
-(`{package_name}.main:create_app()`), not the Flask dev server:
+(`{package_name}.main:create_app()`), not the Flask dev server. With
+`css=tailwind`, the Dockerfile has one extra `RUN uv run tailwindcss
+... --minify` step so the built image always has current CSS (see
+[Styling](#styling-cssvanilla-vs-csstailwind) above):
 
 ```bash
 docker build -t my-app .

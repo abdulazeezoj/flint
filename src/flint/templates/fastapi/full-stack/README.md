@@ -21,9 +21,17 @@ templates feel like siblings, not two unrelated designs.
 
 ## Options (`template.json`, resolved in this order)
 
-Identical to `rest-api`'s — see that template's `README.md` for the
-full table. Kept in lockstep deliberately: same keys, same defaults,
-same `when`/`skip_value` wiring.
+The database/ORM/migrations/worker/broker/redis options are identical
+to `rest-api`'s — see that template's `README.md` for the full table.
+Kept in lockstep deliberately: same keys, same defaults, same
+`when`/`skip_value` wiring. One option is unique to this template,
+since it's about presentation, not the backend stack:
+
+| key | type | default | choices |
+|---|---|---|---|
+| `css` | select | `vanilla` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 via the standalone CLI) |
+
+No `when`/`skip_value` — it's independent of every other option.
 
 ## Layout (of this template's directory, not the generated project)
 
@@ -32,8 +40,9 @@ template.json            options + layers (see below) — same shape as rest-api
 README.md                this file
 files/                    always rendered — main.py, core/config.py,
                           core/templates.py (shared Jinja2Templates instance),
-                          routes/todos.py (in-memory), templates/, static/css/style.css,
-                          tests/test_main.py, env.jinja (renders to both .env and .env.example)
+                          routes/todos.py (in-memory), templates/base.html +
+                          index.html + partials/ (vanilla-styled), tests/test_main.py,
+                          env.jinja (renders to both .env and .env.example)
 docker/                   iff --docker
 db-sqlmodel/              iff orm == sqlmodel — overrides routes/todos.py,
                           adds core/db.py + top-level models.py
@@ -45,16 +54,24 @@ worker-taskiq/            iff worker == taskiq — worker.py, tasks/example.py;
 worker-celery/            iff worker == celery — same shape, Celery; same
                           broker-branching in worker.py
 redis/                    iff redis resolves true — core/redis.py client
+css-vanilla/              iff css == vanilla (the default) — static/css/style.css,
+                          the hand-written CSS `files/`'s templates are styled for
+css-tailwind/             iff css == tailwind — static/css/input.css (Tailwind
+                          source) + overrides templates/index.html and
+                          templates/partials/{todo_item,empty_state}.html with
+                          Tailwind utility classes instead
 ```
 
 `docker/`, `worker-taskiq/`, `worker-celery/`, `redis/`, and both
 `migrations-*/` layers (bar one import line — `Item` → `Todo` in
 `env.py`) are **copied verbatim from `rest-api`** — they're generic
 infrastructure with no dependency on what the app actually renders.
-Only the presentation layer (`files/` and the `routes/todos.py` in each
-`db-*` layer) is genuinely new content. `db-sqlmodel`/`db-sqlalchemy`'s
-`core/db.py` and `tests/conftest.py` are also unchanged from `rest-api`
-— fully generic, no `Item`/`Todo` reference in either.
+`db-sqlmodel`/`db-sqlalchemy`'s `core/db.py` and `tests/conftest.py` are
+also unchanged from `rest-api` — fully generic, no `Item`/`Todo`
+reference in either. `docker/`'s `Dockerfile.jinja` has exactly one
+`css`-aware line: a `RUN uv run tailwindcss ... --minify` build step,
+gated `{% if css == "tailwind" %}`, so a container always ships current
+CSS regardless of which variant was chosen.
 
 The **generated project's** layout (what a developer actually sees) is:
 
@@ -64,7 +81,9 @@ src/{package_name}/
   worker.py            {worker} entrypoint — fixed name/location (iff a worker is chosen)
   routes/               one module per HTTP resource — returns HTML, not JSON
   templates/             Jinja2 templates: base.html, index.html, partials/
-  static/css/            the UI (style.css) — served at /static
+  static/css/            served at /static — style.css (iff css == vanilla),
+                          or input.css (tracked) + style.css (git-ignored build
+                          output, iff css == tailwind)
   tasks/                 one module per background job (iff a worker is chosen)
   core/                   shared infrastructure: config.py, templates.py, db.py, redis.py
   models.py                {orm} models — iff a database is chosen
@@ -109,6 +128,18 @@ here unchanged). Specific to `full-stack`:
    now empty and returns `partials/empty_state.html` (swapped in over
    the deleted `<li>`) instead of an empty response, so the message
    comes back when the last todo goes.
+3. **`tests/test_main.py.jinja` lives in `files/`, shared by every `css`
+   variant — never assert against a CSS class name in it.** An earlier
+   draft asserted `'class="todo-item done"' in toggle_response.text` to
+   check the toggle endpoint marks a todo done; that string is
+   `css-vanilla`-only and doesn't exist in `css-tailwind`'s utility-class
+   markup, so the shared test failed the instant `css=tailwind` was
+   exercised end-to-end (caught by actually running `uv run pytest`
+   against a generated `css=tailwind` project, not by `ast.parse()`).
+   Fixed by asserting `"checked" in toggle_response.text` instead — the
+   checkbox's `checked` attribute is present in both variants' markup,
+   so the test verifies the actual behavior (toggling `done`) without
+   depending on how that state happens to be styled.
 
 ## Testing this template
 

@@ -30,7 +30,7 @@ def test_todo_lifecycle() -> None:
 
     toggle_response = client.post(f"/todos/{todo_id}/toggle")
     assert toggle_response.status_code == 200
-    assert b'class="todo-item done"' in toggle_response.data
+    assert b'checked' in toggle_response.data
 
     delete_response = client.delete(f"/todos/{todo_id}")
     assert delete_response.status_code == 200

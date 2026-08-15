@@ -17,10 +17,19 @@ a JSON contract.
 
 ## Options
 
-Identical to `rest-api`'s — same keys, same defaults, same dependency
-wiring. See [FastAPI · REST API → Options](fastapi-rest-api.md#options)
-for the full table and the `redis`/`broker` decoupling explanation; it's
-not repeated here because it's genuinely the same logic, unmodified.
+The database/ORM/migrations/worker/broker/redis options are identical
+to `rest-api`'s — same keys, same defaults, same dependency wiring. See
+[FastAPI · REST API → Options](fastapi-rest-api.md#options) for the
+full table and the `redis`/`broker` decoupling explanation; it's not
+repeated here because it's genuinely the same logic, unmodified. One
+option is unique to this template, since it's about presentation, not
+the backend stack:
+
+| Option | Choices | Default |
+|---|---|---|
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI) | `vanilla` |
+
+See [Styling](#styling-cssvanilla-vs-csstailwind) below.
 
 ## What gets generated
 
@@ -38,7 +47,8 @@ src/{{ package_name }}/
       empty_state.html         the "nothing to do yet" message
       todo_created.html        todo_item.html + an out-of-band delete of empty_state
   static/               served at /static
-    css/style.css          the whole UI — no build step, no framework
+    css/style.css          the whole UI (css=vanilla), or...
+    css/input.css          ...the Tailwind source, style.css built + git-ignored (css=tailwind)
   tasks/                 one module per background job (iff a worker is chosen)
     example.py
   core/                   shared infrastructure
@@ -124,6 +134,54 @@ This is the one piece of this template's behavior that's easy to get
 subtly wrong and have it still look fine in a quick glance — see the
 gotcha below.
 
+## Styling: `css=vanilla` vs `css=tailwind`
+
+`css=vanilla` (the default) is exactly what's shown above: a single
+hand-written `static/css/style.css`, no build step, no dependency —
+open it and edit it directly.
+
+`css=tailwind` swaps in [Tailwind CSS v4](https://tailwindcss.com)
+instead, via the [standalone CLI](https://tailwindcss.com/blog/standalone-cli)
+([`pytailwindcss`](https://pypi.org/project/pytailwindcss/), a
+`pyproject.toml` dependency, downloads and manages the platform binary
+on first run) — **no Node.js or npm required**, matching the rest of
+this template's "everything through `uv`" story. The source of truth
+becomes `static/css/input.css`:
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #e8622c;
+  --color-accent-dark: #f27a44;
+}
+```
+
+That `@theme` block is Tailwind v4's CSS-first configuration — no
+`tailwind.config.js` needed to define custom design tokens like the
+accent color, which then become ordinary utility classes
+(`bg-accent`, `text-accent-dark`, ...) usable straight in templates.
+`templates/index.html` and `templates/partials/todo_item.html` are
+rewritten to use Tailwind utility classes in this mode; `static/css/style.css`
+becomes a **build artifact**, git-ignored, produced by actually running
+the CLI:
+
+```bash
+# One-off build:
+uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css
+
+# Watch and rebuild on every change, while developing:
+uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css --watch
+```
+
+This means a freshly generated `css=tailwind` project has **no styling
+at all** until you run the build once — the same "one required setup
+step before first run" shape as `migrations=true` needing a migration
+applied first. `--docker` covers this automatically: the Dockerfile
+runs the one-off build (with `--minify`) as part of the image, so a
+container always ships current, correctly-styled CSS regardless of
+whether you remembered to build it locally.
+
 ## A full example
 
 ```bash
@@ -156,7 +214,9 @@ returning a small HTML fragment instead of a full page or JSON.
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework fastapi --template full-stack`, has an interactive
 equivalent if you just run `flint new my-app` and answer the prompts
-instead.
+instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
+instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
+above.
 
 ## Gotchas worth knowing before you edit the generated code
 
@@ -211,7 +271,10 @@ skills you get, since the underlying stack choices are the same.
 Pass `--docker` and flint adds a `Dockerfile` (plus a matching
 `.dockerignore`) to the project root — identical to `rest-api`'s, since
 containerizing an HTML-rendering FastAPI app needs nothing different
-from containerizing a JSON one:
+from containerizing a JSON one. The one addition specific to this
+template: with `css=tailwind`, the Dockerfile has one extra `RUN uv run
+tailwindcss ... --minify` step so the built image always has current CSS
+(see [Styling](#styling-cssvanilla-vs-csstailwind) above).
 
 ```bash
 docker build -t my-app .

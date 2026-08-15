@@ -56,6 +56,7 @@ def make_full_stack_answers(**option_overrides) -> Answers:
         worker="none",
         broker="none",
         redis=False,
+        css="vanilla",
     )
     options.update(option_overrides)
     return make_answers(options=options, docker=docker)
@@ -83,12 +84,20 @@ class TestTemplateMetadata:
         ids = {t.id for t in list_templates("flask")}
         assert "full-stack" in ids
 
-    def test_declares_same_options_as_rest_api(self):
-        # Deliberately kept in lockstep with rest-api's options — see this
+    def test_declares_rest_apis_options_plus_css(self):
+        # Deliberately kept in lockstep with rest-api's non-presentation
+        # options, plus one extra (css) unique to this template — see this
         # template's README.md "Options" section.
         full_stack = get_template("flask", "full-stack")
         rest_api = get_template("flask", "rest-api")
-        assert [o.key for o in full_stack.options] == [o.key for o in rest_api.options]
+        full_stack_keys = [o.key for o in full_stack.options]
+        assert full_stack_keys == [o.key for o in rest_api.options] + ["css"]
+
+    def test_css_option_offers_vanilla_and_tailwind(self):
+        template = get_template("flask", "full-stack")
+        css_option = next(o for o in template.options if o.key == "css")
+        assert css_option.default == "vanilla"
+        assert {c["value"] for c in css_option.choices} == {"vanilla", "tailwind"}
 
     def test_supports_docker(self):
         template = get_template("flask", "full-stack")
@@ -242,6 +251,53 @@ class TestFullStackRender:
             text = path.read_text(encoding="utf-8", errors="ignore")
             assert "{{" not in text, path
             assert "{%" not in text, path
+
+
+class TestFullStackCSS:
+    def test_vanilla_is_default(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers()  # css="vanilla" by default
+        created = render("flask", "full-stack", target, answers)
+
+        assert Path("src/my_api/static/css/style.css") in created
+        assert Path("src/my_api/static/css/input.css") not in created
+        config = _assert_valid_toml(target / "pyproject.toml")
+        assert not any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+    def test_tailwind(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers(css="tailwind")
+        created = render("flask", "full-stack", target, answers)
+
+        # input.css (source, tracked) ships; style.css (build output) does
+        # not — it's produced by the Tailwind CLI, not by flint.
+        assert Path("src/my_api/static/css/input.css") in created
+        assert Path("src/my_api/static/css/style.css") not in created
+
+        input_css = (target / "src/my_api/static/css/input.css").read_text()
+        assert '@import "tailwindcss"' in input_css
+        assert "--color-accent" in input_css
+
+        index_html = (target / "src/my_api/templates/index.html").read_text()
+        assert "bg-accent" in index_html  # Tailwind utility classes
+
+        config = _assert_valid_toml(target / "pyproject.toml")
+        assert any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+        gitignore = (target / ".gitignore").read_text()
+        assert "static/css/style.css" in gitignore
+
+        _assert_all_python_files_parse(target)
+
+    def test_tailwind_docker_build_step(self, tmp_path: Path):
+        target = tmp_path / "app"
+        answers = make_full_stack_answers(css="tailwind", docker=True)
+        created = render("flask", "full-stack", target, answers, force=True)
+
+        assert Path("Dockerfile") in created
+        dockerfile = (target / "Dockerfile").read_text()
+        assert "uv run tailwindcss" in dockerfile
+        assert "--minify" in dockerfile
 
 
 class TestFullStackSkills:

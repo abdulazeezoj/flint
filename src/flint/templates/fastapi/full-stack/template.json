@@ -65,6 +65,16 @@
       "default": false,
       "when": { "broker": ["rabbitmq", "none"] },
       "skip_value": true
+    },
+    {
+      "key": "css",
+      "label": "Styling",
+      "type": "select",
+      "default": "vanilla",
+      "choices": [
+        { "value": "vanilla", "label": "Plain CSS (no build step)" },
+        { "value": "tailwind", "label": "Tailwind CSS (standalone CLI, no Node.js)" }
+      ]
     }
   ],
   "layers": [
@@ -75,7 +85,9 @@
     { "dir": "migrations-sqlalchemy", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
     { "dir": "worker-taskiq", "when": { "worker": ["taskiq"] } },
     { "dir": "worker-celery", "when": { "worker": ["celery"] } },
-    { "dir": "redis", "when": { "redis": [true] } }
+    { "dir": "redis", "when": { "redis": [true] } },
+    { "dir": "css-vanilla", "when": { "css": ["vanilla"] } },
+    { "dir": "css-tailwind", "when": { "css": ["tailwind"] } }
   ],
   "skills": [
     { "id": "fastapi" },
