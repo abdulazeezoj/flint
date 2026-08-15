@@ -7,6 +7,37 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.18.0 — 2026-08-15
+
+### Added
+
+- **Three new `.agents/skills/` catalog entries: `jinja2`, `htmx`,
+  `tailwind`** — researched against each library's current official docs
+  and grounded in exactly how `full-stack`'s templates use them, not
+  generic library reference material. `jinja2` and `htmx` are always
+  included for `fastapi/full-stack` and `flask/full-stack` (template
+  inheritance/includes/autoescaping/whitespace for the former;
+  hx-target/hx-swap/hx-trigger and the `hx-swap-oob` empty-state trick
+  for the latter, including the fact that this project's 4xx/5xx
+  responses aren't swapped by htmx's own default). `tailwind` is added
+  only when `css=tailwind`, covering the `@theme` CSS-first config and
+  the standalone-CLI build step. Fourteen skills now exist in the
+  catalog; see the [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
+  docs for the full table.
+
+### Changed
+
+- **`full-stack`'s bundled htmx bumped from 2.0.4 to 2.0.10**
+  (`templates/base.html`'s `<script>` tag), and its CDN switched from
+  `unpkg.com` to `cdn.jsdelivr.net/npm/htmx.org@.../dist/htmx.min.js` —
+  the version had drifted stale since the template first shipped, and
+  the new `htmx` skill documents the exact URL to bump it at next time.
+- The `fastapi-full-stack`/`flask-full-stack` docs pages' `.agents/skills/`
+  section no longer claims an "identical skill set" to `rest-api` — that
+  stopped being true the moment `jinja2`/`htmx` (and conditionally
+  `tailwind`) were added; it now lists the two/three skills `full-stack`
+  adds on top of `rest-api`'s set.
+
 ## v0.17.1 — 2026-08-15
 
 ### Changed

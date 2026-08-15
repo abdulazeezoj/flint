@@ -1,0 +1,48 @@
+# Guide: add a new page
+
+Walks through adding a static "About" page — a second full page alongside `index.html`, not an HTMX partial. Follow this shape for any new page; for a new *interactive element on an existing page*, see the `htmx` skill's `guides/add-an-htmx-action.md` instead.
+
+## 1. Add the template
+
+Create `src/{{ package_name }}/templates/about.html`:
+
+```html
+{% raw %}{% extends "base.html" %}
+
+{% block title %}About{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1>About</h1>
+  <p>...</p>
+</div>
+{% endblock %}{% endraw +%}
+```
+
+{% raw %}{% extends %}{% endraw %} has to be the first line — nothing, not even a blank line or comment, can precede it.
+
+## 2. Add the route
+
+{% if framework == "fastapi" %}
+In `src/{{ package_name }}/routes/todos.py` (or a new `routes/pages.py` if this is growing past one file):
+
+```python
+@router.get("/about", response_class=HTMLResponse)
+def about(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "about.html", {})
+```
+{% else %}
+In `src/{{ package_name }}/routes/todos.py` (or a new `routes/pages.py` if this is growing past one file):
+
+```python
+@bp.get("/about")
+def about():
+    return render_template("about.html")
+```
+{% endif %}
+
+If you split routes into a new module, register it in `main.py` the same way `todos`{% if framework == "fastapi" %}'s router{% else %}'s blueprint{% endif %} already is.
+
+## 3. Link to it
+
+Add an `<a href="/about">About</a>` wherever makes sense — a plain link, no HTMX attributes needed, since this is a full page navigation, not a partial swap. If you want it to feel like an in-page transition instead of a full reload, that's what `hx-boost` is for; see the `htmx` skill's `references/attributes-and-swaps.md`.

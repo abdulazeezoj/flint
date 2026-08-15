@@ -1,0 +1,40 @@
+# Attributes and swaps
+
+## Request attributes
+
+`hx-get` / `hx-post` / `hx-put` / `hx-patch` / `hx-delete` issue a request of that method to the given URL when the element's default trigger fires (a `<form>` submits, a `<button>`/link clicks, everything else defaults to `change`). This project uses only `hx-post` (create, toggle) and `hx-delete` (delete) — `routes/todos.py`'s handlers match one-to-one with these.
+
+## `hx-target`
+
+Which element in the DOM receives the swapped response, as a CSS selector. Defaults to the element that made the request if omitted. Beyond plain selectors (`#todo-list`), htmx extends CSS with a few relative keywords worth knowing even though this project doesn't need them yet: `this` (the element itself), `closest <selector>` (nearest matching ancestor), `next <selector>` / `previous <selector>` (nearest matching sibling in that direction), `find <selector>` (first match inside the element). Reach for these once a target isn't reachable by a plain id/class — e.g. removing a row from inside a `<tr>` without giving every row its own id.
+
+## `hx-swap` values
+
+| Value | Effect |
+|---|---|
+| `innerHTML` (default) | Replace the target's contents. |
+| `outerHTML` | Replace the target element itself. Used by `todo_item.html`'s toggle/delete buttons — the whole `<li>` is regenerated, since `done` changes which class it renders with. |
+| `beforeend` | Append inside the target, after its last child. Used by the new-todo form (`hx-target="#todo-list"`, `hx-swap="beforeend"`) — the new `<li>` lands at the end of the list. |
+| `afterbegin` | Prepend inside the target, before its first child. |
+| `beforebegin` / `afterend` | Insert as the target's previous/next sibling, outside it entirely. |
+| `delete` | Remove the target from the DOM; the response body (if any) is ignored. |
+| `none` | Don't touch the target at all — used when a response exists only to carry an out-of-band swap (see below), with nothing for the normal target to do. |
+
+## `hx-swap-oob`
+
+An out-of-band swap updates an element **by matching `id`**, completely independent of the request's own `hx-target`/`hx-swap`. Any top-level element in the response HTML carrying `hx-swap-oob="true"` (or a specific swap style, e.g. `hx-swap-oob="delete"`) is pulled out of the response, matched against the DOM by `id`, and swapped there — the rest of the response goes to the normal target as usual. This project's `partials/todo_created.html` is exactly this:
+
+```html
+{% raw %}{% include "partials/todo_item.html" %}
+<li id="empty-state" hx-swap-oob="delete"></li>{% endraw +%}
+```
+
+The first line is the normal response body (the new `<li>`, swapped via the form's `hx-target="#todo-list"`/`hx-swap="beforeend"`). The second line never reaches `#todo-list` at all — htmx finds the existing `id="empty-state"` element already in the page and deletes it, in the same round trip. **The `id` has to match exactly** — rename `empty_state.html`'s `id="empty-state"` without updating this line (or vice versa) and the oob swap silently does nothing; the element you meant to remove just stays there.
+
+## `hx-trigger`
+
+Controls *when* the request fires. Every element in this project uses its implicit default (`submit` for `<form>`, `click` for buttons), so `hx-trigger` doesn't appear anywhere yet. Reach for it explicitly once you need something other than the default — common modifiers: `delay:500ms` (debounce), `throttle:1s`, `changed` (skip firing if the value didn't actually change), `once`, or `every 2s` (polling). `hx-trigger="revealed"` / `load` are the two "fire without user interaction" triggers, useful for lazy-loading a section as it scrolls into view or right on page load.
+
+## `hx-boost`
+
+Not used in this project (there's exactly one page, `index.html`, so there's nothing to boost between). If you add more pages (see the `jinja2` skill's `guides/add-a-page.md`) and want plain `<a>`/`<form>` navigation between them to feel like an in-page transition instead of a full reload, `hx-boost="true"` on a common ancestor (or `<body>`) converts every boostable link/form underneath it into an htmx request targeting the whole page — no per-element `hx-get`/`hx-target` needed, and it degrades to a normal navigation with JS disabled.

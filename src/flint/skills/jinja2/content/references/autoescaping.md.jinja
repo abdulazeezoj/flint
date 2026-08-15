@@ -1,0 +1,19 @@
+# Autoescaping
+
+## What's on, and why
+
+Jinja2's own default is autoescaping **off** — a bare `Environment()` prints {% raw %}{{ value }}{% endraw %} exactly as given, HTML and all. If this project relied on that default, every todo title containing `<` or `&` would corrupt the page, and a title like `<script>` would be a stored XSS bug.
+
+It doesn't, because {% if framework == "fastapi" %}`Jinja2Templates` (from `fastapi.templating`, itself Starlette's wrapper) constructs its Jinja `Environment` with `autoescape=True` for `.html`/`.htm`/`.xml`/`.xhtml` templates{% else %}Flask's `render_template()` configures its Jinja `Environment` with `select_autoescape()`, which turns escaping on for `.html`/`.htm`/`.xml`/`.xhtml` templates{% endif %} — every template in `templates/` qualifies. This is a property of {% if framework == "fastapi" %}Starlette's wrapper{% else %}Flask's wrapper{% endif %}, not of Jinja2 itself; if you ever build a Jinja `Environment` by hand elsewhere in this project (a report generator, an email templater), it starts unescaped again unless you opt in explicitly (`Environment(autoescape=True)` or `select_autoescape(...)`).
+
+## What autoescaping actually does
+
+Every {% raw %}{{ expression }}{% endraw %} output is passed through an HTML escaper before being written — `<`, `>`, `&`, `'`, `"` become their entity equivalents. It only applies to {% raw %}{{ }}{% endraw %} output; it says nothing about the literal HTML you write yourself in the template (the `<li>` tags in `partials/todo_item.html` render as real `<li>` tags, obviously — only *interpolated* values get escaped).
+
+## `|safe` and when it's legitimate
+
+{% raw %}{{ value|safe }}{% endraw %} (or wrapping a Python string in `markupsafe.Markup(...)` before passing it to the template) marks a value as "already safe HTML" and skips escaping for that one output. This project doesn't use it anywhere today — every value rendered is plain text (a todo title). Reach for `|safe` only when the value is HTML *you* generated and trust (e.g. output from a markdown renderer you control), never for anything that traces back to user input without being sanitized first. If you're tempted to add `|safe` to make a todo title "render nicely" with some markup in it, that's the exact XSS bug this default was preventing — don't.
+
+## The `{% raw %}{% autoescape %}{% endraw %}` block
+
+Jinja2 also has a block form, {% raw %}{% autoescape false %}...{% endautoescape %}{% endraw %}, to turn escaping off for a whole region. This project never uses it. If you see it show up in a diff, ask why — it's a much bigger surface to get wrong than a single `|safe` on one value.

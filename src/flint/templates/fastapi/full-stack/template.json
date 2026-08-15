@@ -93,11 +93,14 @@
     { "id": "fastapi" },
     { "id": "pydantic-settings" },
     { "id": "pytest" },
+    { "id": "jinja2" },
+    { "id": "htmx" },
     { "id": "sqlmodel", "when": { "orm": ["sqlmodel"] } },
     { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
     { "id": "alembic", "when": { "migrations": [true] } },
     { "id": "taskiq", "when": { "worker": ["taskiq"] } },
     { "id": "celery", "when": { "worker": ["celery"] } },
-    { "id": "redis", "when": { "redis": [true] } }
+    { "id": "redis", "when": { "redis": [true] } },
+    { "id": "tailwind", "when": { "css": ["tailwind"] } }
   ]
 }

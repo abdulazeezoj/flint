@@ -1,0 +1,17 @@
+# Gotchas
+
+## A fresh generation (or fresh clone) has no styling until you build once
+
+`static/css/style.css` — the file `base.html` actually links — is build output, not a source file: it's gitignored, and doesn't exist until `uv run tailwindcss -i .../input.css -o .../style.css --minify` has run at least once. Cloning the repo, or generating the project for the first time, and opening it in a browser before running that command shows completely unstyled HTML — expected, not a broken template. (If `--docker` was chosen, the image build runs this step for you; running the app outside Docker still needs the manual build, or `--watch` while developing.)
+
+## Edit `input.css`, never `style.css`
+
+`style.css` is regenerated wholesale on every build and is gitignored specifically because it's disposable — hand-editing it is real work that silently disappears the next time anyone runs the build (including CI, or a Docker image rebuild). Every style change belongs in `input.css` (the `@theme` block for tokens, or a small custom rule for anything utilities genuinely can't express) or in a template's `class="..."` attributes.
+
+## Deleting `style.css` is safe; forgetting to rebuild after is the actual mistake
+
+Because `style.css` is pure build output, deleting it (or a `git clean` picking it up) never loses work — it regenerates identically from `input.css` on the next build. The failure mode isn't the deletion, it's forgetting the rebuild step afterward and being confused why styling vanished. If a page looks suddenly unstyled, check whether `style.css` exists and is current before suspecting the templates or classes themselves.
+
+## A new utility class not "working" is usually a stale build, not a wrong class name
+
+Since the CLI has to actually re-run to pick up new classes typed into a template, a class that "does nothing" after adding it is, far more often than not, a stale `style.css` from before the class was added — not a typo'd class name. Confirm `--watch` is actually running (or rebuild manually) before spending time double-checking the class name itself.

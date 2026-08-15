@@ -261,10 +261,15 @@ looking at is stale from before HTMX processed the swap.
 Every generated project ships an `AGENTS.md` plus a `.agents/skills/`
 catalog scoped to exactly the stack your options produced — see
 [Agent Skills](../agent-skills.md) for how the catalog itself works.
-Identical skill set to `rest-api`'s (see
-[FastAPI · REST API → `.agents/skills/`](fastapi-rest-api.md#agentsskills)) —
-picking `full-stack` over `rest-api` doesn't change which library
-skills you get, since the underlying stack choices are the same.
+Same database/ORM/migrations/worker/redis skill set as `rest-api`'s
+(see [FastAPI · REST API → `.agents/skills/`](fastapi-rest-api.md#agentsskills))
+plus two `full-stack` always adds for the presentation layer:
+
+| Skill | When |
+|---|---|
+| `jinja2` | Always — template inheritance, includes, autoescaping. |
+| `htmx` | Always — hx-swap/hx-target/hx-trigger, out-of-band swaps. |
+| `tailwind` | Only with `css=tailwind` — the `@theme` directive and the standalone-CLI build step. |
 
 ## Docker
 
