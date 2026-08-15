@@ -7,14 +7,17 @@ picked in this order:
 - **Framework** — the underlying library: `fastapi` or `flask`. Selected
   first.
 - **Template** — a specific project shape built on that framework:
-  `hello-world` or `rest-api`. Selected second, scoped to the framework you
-  just picked.
+  `hello-world`, `rest-api`, or `full-stack`. Selected second, scoped to
+  the framework you just picked.
 - **Option** — a further, template-specific choice, declared by the template
   itself — not hardcoded in Flint. `hello-world` asks only whether to add
-  `pydantic-settings` config; `rest-api` asks for a database, an ORM,
-  whether to add migrations, a background worker, a message broker, and
-  Redis. Flint's wizard has no built-in notion of "database" or "worker" —
-  it just renders whatever the chosen template's `template.json` declares.
+  `pydantic-settings` config; `rest-api` and `full-stack` ask for a
+  database, an ORM, whether to add migrations, a background worker, a
+  message broker, and Redis — the same options for both, since
+  `full-stack` only changes what a route *returns* (HTML instead of
+  JSON), not the underlying stack choices. Flint's wizard has no
+  built-in notion of "database" or "worker" — it just renders whatever
+  the chosen template's `template.json` declares.
 
 ```text
 flint new my-api --framework fastapi --template rest-api -o database=postgres
@@ -54,17 +57,19 @@ The Jinja mechanics behind rendering (how `{{package_name}}` path segments
 and `*.jinja` files work) are contributor-facing detail — see
 [Contributing](../contributing.md) if you're curious or adding a template.
 
-## The four shipped templates
+## The six shipped templates
 
-Two frameworks, two templates each, same shape on both — so switching
-between FastAPI and Flask isn't a relearn.
+Two frameworks, three templates each, same shape across both — so
+switching between FastAPI and Flask isn't a relearn.
 
 | Framework | Template | What it is | Docs |
 |---|---|---|---|
 | FastAPI | Hello World | A minimal FastAPI app with a single Hello World endpoint, managed with uv. | [FastAPI · Hello World](fastapi-hello-world.md) |
 | FastAPI | REST API | A layered FastAPI REST API with pydantic-settings, and your choice of database/ORM, migrations, background worker (Redis or RabbitMQ), and Redis caching. | [FastAPI · REST API](fastapi-rest-api.md) |
+| FastAPI | Full-Stack | The same layered options as REST API, server-rendered instead of JSON — Jinja2 + HTMX, a Todo list, no client-side JS framework. | [FastAPI · Full-Stack](fastapi-full-stack.md) |
 | Flask | Hello World | A minimal Flask app with a single Hello World endpoint, managed with uv. | [Flask · Hello World](flask-hello-world.md) |
 | Flask | REST API | A layered Flask REST API with pydantic-settings, and your choice of database/ORM, migrations, and a Celery background worker (Redis or RabbitMQ) with optional Redis caching. | [Flask · REST API](flask-rest-api.md) |
+| Flask | Full-Stack | The same layered options as REST API, server-rendered instead of JSON — Jinja2 + HTMX, a Todo list, no client-side JS framework. | [Flask · Full-Stack](flask-full-stack.md) |
 
 !!! tip
     Not sure what's available or which options a template accepts? Run

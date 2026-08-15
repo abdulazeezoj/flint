@@ -1,0 +1,101 @@
+{
+  "id": "full-stack",
+  "label": "Full-Stack",
+  "description": "A layered Flask full-stack app: server-rendered pages (Jinja2 + HTMX) with a Todo list, pydantic-settings, and your choice of database/ORM, migrations, and a Celery background worker (Redis or RabbitMQ) with optional Redis caching.",
+  "enabled": true,
+  "options": [
+    {
+      "key": "database",
+      "label": "Database",
+      "type": "select",
+      "default": "sqlite",
+      "choices": [
+        { "value": "none", "label": "None (in-memory store)" },
+        { "value": "sqlite", "label": "SQLite" },
+        { "value": "postgres", "label": "PostgreSQL" }
+      ]
+    },
+    {
+      "key": "orm",
+      "label": "ORM",
+      "type": "select",
+      "default": "flask-sqlalchemy",
+      "choices": [
+        { "value": "flask-sqlalchemy", "label": "Flask-SQLAlchemy" },
+        { "value": "sqlalchemy", "label": "SQLAlchemy (manual)" }
+      ],
+      "when": { "database": ["sqlite", "postgres"] },
+      "skip_value": "none"
+    },
+    {
+      "key": "migrations",
+      "label": "Add Flask-Migrate/Alembic migrations?",
+      "type": "confirm",
+      "default": true,
+      "when": { "database": ["sqlite", "postgres"] },
+      "skip_value": false
+    },
+    {
+      "key": "worker",
+      "label": "Background worker",
+      "type": "select",
+      "default": "none",
+      "choices": [
+        { "value": "none", "label": "None" },
+        { "value": "celery", "label": "Celery" }
+      ]
+    },
+    {
+      "key": "broker",
+      "label": "Message broker",
+      "type": "select",
+      "default": "redis",
+      "choices": [
+        { "value": "redis", "label": "Redis" },
+        { "value": "rabbitmq", "label": "RabbitMQ" }
+      ],
+      "when": { "worker": ["celery"] },
+      "skip_value": "none"
+    },
+    {
+      "key": "redis",
+      "label": "Add Redis (caching)?",
+      "type": "confirm",
+      "default": false,
+      "when": { "broker": ["rabbitmq", "none"] },
+      "skip_value": true
+    },
+    {
+      "key": "css",
+      "label": "Styling",
+      "type": "select",
+      "default": "vanilla",
+      "choices": [
+        { "value": "vanilla", "label": "Plain CSS (no build step)" },
+        { "value": "tailwind", "label": "Tailwind CSS (standalone CLI, no Node.js)" }
+      ]
+    }
+  ],
+  "layers": [
+    { "dir": "docker", "when": { "docker": [true] } },
+    { "dir": "db-flask-sqlalchemy", "when": { "orm": ["flask-sqlalchemy"] } },
+    { "dir": "db-sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "dir": "migrations-flask-sqlalchemy", "when": { "orm": ["flask-sqlalchemy"], "migrations": [true] } },
+    { "dir": "migrations-sqlalchemy", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
+    { "dir": "worker-celery", "when": { "worker": ["celery"] } },
+    { "dir": "redis", "when": { "redis": [true] } },
+    { "dir": "css-vanilla", "when": { "css": ["vanilla"] } },
+    { "dir": "css-tailwind", "when": { "css": ["tailwind"] } }
+  ],
+  "skills": [
+    { "id": "flask" },
+    { "id": "pydantic-settings" },
+    { "id": "pytest" },
+    { "id": "flask-sqlalchemy", "when": { "orm": ["flask-sqlalchemy"] } },
+    { "id": "sqlalchemy", "when": { "orm": ["sqlalchemy"] } },
+    { "id": "flask-migrate", "when": { "orm": ["flask-sqlalchemy"], "migrations": [true] } },
+    { "id": "alembic", "when": { "orm": ["sqlalchemy"], "migrations": [true] } },
+    { "id": "celery", "when": { "worker": ["celery"] } },
+    { "id": "redis", "when": { "redis": [true] } }
+  ]
+}

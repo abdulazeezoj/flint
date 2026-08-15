@@ -28,7 +28,8 @@ $ flint
   ❯ FastAPI
     Flask
 ? Which template? › (Use arrow keys)
-  ❯ Hello World
+  ❯ Full-Stack
+    Hello World
     REST API
 Using uv to manage dependencies.
 ? Add a Dockerfile? (y/N)
@@ -37,10 +38,11 @@ Using uv to manage dependencies.
 ```
 
 Every project is generated from a **framework** (the underlying library —
-FastAPI or Flask) and a **template** (a project shape built on it — `hello-world`
-or `rest-api`). Pick `rest-api` and the wizard keeps going: database, ORM,
-migrations, background worker — each template declares its own follow-up
-questions, so what you're asked depends entirely on what you picked. See
+FastAPI or Flask) and a **template** (a project shape built on it —
+`hello-world`, `rest-api`, or `full-stack`). Pick `rest-api` or
+`full-stack` and the wizard keeps going: database, ORM, migrations,
+background worker — each template declares its own follow-up questions,
+so what you're asked depends entirely on what you picked. See
 [Templates](project-templates/index.md) for exactly what each one asks and generates.
 
 When it's done:

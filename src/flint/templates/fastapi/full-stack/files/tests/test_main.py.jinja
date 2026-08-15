@@ -1,0 +1,51 @@
+import pytest
+from fastapi.testclient import TestClient
+
+from {{ package_name }}.main import app
+from {{ package_name }}.routes import todos as todos_module
+
+client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_todos() -> None:
+    """Each test gets an empty in-memory store — this module-level dict
+    would otherwise leak state between tests (there's no request-scoped
+    reset the way a real database session gets)."""
+    todos_module._todos.clear()
+    todos_module._next_id = 1
+
+
+def test_index_renders_empty_state() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "Nothing to do yet" in response.text
+
+
+def test_todo_lifecycle() -> None:
+    create_response = client.post("/todos", data={"title": "Buy milk"})
+    assert create_response.status_code == 200
+    assert "Buy milk" in create_response.text
+    todo_id = create_response.text.split('id="todo-')[1].split('"')[0]
+
+    index_response = client.get("/")
+    assert "Buy milk" in index_response.text
+
+    toggle_response = client.post(f"/todos/{todo_id}/toggle")
+    assert toggle_response.status_code == 200
+    assert "checked" in toggle_response.text
+
+    delete_response = client.delete(f"/todos/{todo_id}")
+    assert delete_response.status_code == 200
+    assert "Buy milk" not in delete_response.text
+
+    missing_response = client.post(f"/todos/{todo_id}/toggle")
+    assert missing_response.status_code == 404
+
+
+def test_delete_last_todo_shows_empty_state() -> None:
+    create_response = client.post("/todos", data={"title": "Only todo"})
+    todo_id = create_response.text.split('id="todo-')[1].split('"')[0]
+
+    delete_response = client.delete(f"/todos/{todo_id}")
+    assert "Nothing to do yet" in delete_response.text

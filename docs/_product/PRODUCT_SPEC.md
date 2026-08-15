@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-14 (v0.15.0: added the `.claude/skills/flint/` skill — see §11)
+**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §11)
 
 ## 1. Vision
 
@@ -50,8 +50,8 @@ Three distinct concepts in the wizard — don't conflate them:
 - **Framework** — the underlying library, e.g. `fastapi`, `flask`.
   Selected first.
 - **Template** — a specific project shape built on that framework, e.g.
-  `hello-world`, `rest-api`. Selected second, scoped to the chosen
-  framework.
+  `hello-world`, `rest-api`, `full-stack`. Selected second, scoped to
+  the chosen framework.
 - **Option** — a further, template-specific choice, declared by the
   template itself (not hardcoded in Flint). E.g. `rest-api` asks for a
   database, ORM, whether to add migrations, a background worker, and
@@ -101,7 +101,7 @@ visible in the wizard):
 
 - Frameworks other than FastAPI and Flask (both are enabled as of v0.8;
   no other framework is stubbed on the roadmap yet, see §11)
-- Templates other than `hello-world` and `rest-api`
+- Templates other than `hello-world`, `rest-api`, and `full-stack`
 - A plugin system / third-party or remote templates
 - Monorepo or multi-service scaffolding
 - Auth scaffolding, Docker Compose, CI workflow templates
@@ -116,7 +116,10 @@ v0.7 itself (see §11) — one Dockerfile per template is a reasonable
 default, but a generated `docker-compose.yml` bakes in an
 opinion about container topology (one service per app) that doesn't
 hold for every project shape a generated app might end up living in
-(e.g. a monorepo with its own compose setup already).
+(e.g. a monorepo with its own compose setup already). A third template
+beyond `hello-world`/`rest-api` — a v0.1–v0.14 non-goal — is in scope
+as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
+`rest-api` reusing its exact option set (§11).
 
 ## 6. Personas
 
@@ -340,6 +343,50 @@ hold for every project shape a generated app might end up living in
   to `.claude/*` with a `!.claude/skills/` re-include, since a
   directory-level ignore pattern stops git from even traversing into
   it, so a plain negation of a path underneath it has no effect.
+- `v0.16.0` — a third template, `full-stack`, ships for both frameworks
+  (`fastapi/full-stack`, `flask/full-stack`): the exact same
+  database/ORM/migrations/worker/broker/redis options as `rest-api`,
+  server-rendered instead of JSON — Jinja2 templates plus HTMX for
+  add/toggle/delete on a Todo list, no client-side JS framework. Built
+  by copying each framework's `rest-api` template wholesale and
+  replacing only the presentation layer (`schemas.py`/`routes/items.py`
+  → a `templates/`+`static/` tree and `routes/todos.py`); the
+  docker/worker/redis/migrations layers are reused byte-for-byte (bar
+  one `Item`→`Todo` import in each `migrations-*` layer's `env.py`),
+  since they're generic infrastructure with no dependency on what the
+  app renders. See `PRODUCT_ARCH.md` §4.7 for the mechanic that made
+  this safe to build: `templates/`/`static/` files carry no `.jinja`
+  suffix, specifically so flint's own generator copies them verbatim
+  instead of rendering the *generated app's own* runtime Jinja2 syntax
+  (`{% block %}`, `{{ todo.title }}`) through flint's generator and
+  stripping it before the file ever reaches the project.
+- `v0.17.0` — `full-stack` gains a `css` option (`vanilla`, the
+  existing hand-written stylesheet, or `tailwind`): Tailwind CSS v4 via
+  its standalone CLI, wrapped by the pip-installable `pytailwindcss` —
+  no Node.js/npm anywhere in the generated project, matching the
+  "everything through `uv`" story every other template already has.
+  Modeled on `litestar-tailwind-cli`'s reference approach (source
+  `input.css` in, built `style.css` out, the CLI binary downloaded and
+  cached on first run). Implemented as two new layers,
+  `css-vanilla`/`css-tailwind`, gated the same way `db-*`/`worker-*`
+  already are — the base `files/` layer no longer ships
+  `static/css/style.css` directly, since that file's *content* now
+  depends on which `css` value was chosen. `--docker` gets one
+  conditional `RUN uv run tailwindcss ... --minify` line so a container
+  always ships current CSS. Caught during this release, not before
+  shipping: `tests/test_main.py.jinja` (shared by every `css` variant)
+  had a toggle-endpoint assertion hardcoded to `css-vanilla`'s
+  `class="todo-item done"` string — passed under `ast.parse()` but
+  failed the instant `uv run pytest` actually ran against a generated
+  `css=tailwind` project, since that markup doesn't exist there. Fixed
+  by asserting the `checked` attribute instead (present in both
+  variants), and both templates' maintainer `README.md` now calls this
+  out as a standing rule for `full-stack`'s shared test file. Motivated
+  by wanting flint to meet developers where they already are rather
+  than impose a single opinion — Tailwind is one of the two dominant
+  real-world pairings with server-rendered Jinja2+HTMX Python apps (the
+  other being a fully decoupled React/Next.js frontend, deliberately
+  out of scope for this release — see §12).
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -380,3 +427,17 @@ hold for every project shape a generated app might end up living in
   streaming completion endpoint + `pydantic-settings` for the
   key/model," deliberately smaller than the RAG/agent-framework
   templates common in the wild.
+- **Decoupled frontend (React/Next.js + FastAPI/Flask API), deliberately
+  deferred, not decided against**: research done ahead of v0.17
+  confirmed this is the more common real-world "full-stack Python"
+  pairing today than server-rendered Jinja2+HTMX (tiangolo's own
+  official `full-stack-fastapi-template` ships exactly this shape:
+  React+Vite+Tailwind+shadcn/ui frontend, FastAPI+SQLModel backend, an
+  OpenAPI-generated TypeScript client, Docker Compose). v0.17 chose the
+  narrower, bounded move instead — a `css` option on the existing
+  `full-stack` template — specifically because a decoupled-frontend
+  template is a different *project topology* (a `backend/`+`frontend/`
+  monorepo, CORS wiring, a generated client), not a new layer on the
+  existing one, and warrants its own scoping pass rather than riding
+  along with a CSS-tooling change. Revisit as a dedicated effort if
+  there's demand.

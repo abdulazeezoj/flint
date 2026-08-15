@@ -162,8 +162,10 @@ template's label, description, and whether it supports `--docker`:
 ┏━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
 ┃ Framework ┃ Template    ┃ Description                       ┃ Docker ┃
 ┡━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ FastAPI   │ Full-Stack  │ A layered FastAPI full-stack...   │   ✓    │
 │ FastAPI   │ Hello World │ A minimal FastAPI app with a...   │   ✓    │
 │ FastAPI   │ REST API    │ A layered FastAPI REST API...     │   ✓    │
+│ Flask     │ Full-Stack  │ A layered Flask full-stack...     │   ✓    │
 │ Flask     │ Hello World │ A minimal Flask app with a...     │   ✓    │
 │ Flask     │ REST API    │ A layered Flask REST API...       │   ✓    │
 └──────────┴─────────────┴───────────────────────────────────┴────────┘

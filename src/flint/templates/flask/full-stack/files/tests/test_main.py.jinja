@@ -1,0 +1,48 @@
+from {{ package_name }}.main import create_app
+from {{ package_name }}.routes import todos as todos_module
+
+app = create_app(testing=True)
+client = app.test_client()
+
+
+def setup_function() -> None:
+    """Each test gets an empty in-memory store — this module-level dict
+    would otherwise leak state between tests (there's no request-scoped
+    reset the way a real database session gets)."""
+    todos_module._todos.clear()
+    todos_module._next_id = 1
+
+
+def test_index_renders_empty_state() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"Nothing to do yet" in response.data
+
+
+def test_todo_lifecycle() -> None:
+    create_response = client.post("/todos", data={"title": "Buy milk"})
+    assert create_response.status_code == 200
+    assert b"Buy milk" in create_response.data
+    todo_id = create_response.get_data(as_text=True).split('id="todo-')[1].split('"')[0]
+
+    index_response = client.get("/")
+    assert b"Buy milk" in index_response.data
+
+    toggle_response = client.post(f"/todos/{todo_id}/toggle")
+    assert toggle_response.status_code == 200
+    assert b'checked' in toggle_response.data
+
+    delete_response = client.delete(f"/todos/{todo_id}")
+    assert delete_response.status_code == 200
+    assert b"Buy milk" not in delete_response.data
+
+    missing_response = client.post(f"/todos/{todo_id}/toggle")
+    assert missing_response.status_code == 404
+
+
+def test_delete_last_todo_shows_empty_state() -> None:
+    create_response = client.post("/todos", data={"title": "Only todo"})
+    todo_id = create_response.get_data(as_text=True).split('id="todo-')[1].split('"')[0]
+
+    delete_response = client.delete(f"/todos/{todo_id}")
+    assert b"Nothing to do yet" in delete_response.data

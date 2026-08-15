@@ -1,0 +1,7 @@
+<li class="todo-item{{ ' done' if todo.done else '' }}" id="todo-{{ todo.id }}">
+  <input type="checkbox" {% if todo.done %}checked{% endif %}
+         hx-post="/todos/{{ todo.id }}/toggle" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML" />
+  <span class="title">{{ todo.title }}</span>
+  <button type="button" class="delete" aria-label="Delete todo"
+          hx-delete="/todos/{{ todo.id }}" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML">&#x2715;</button>
+</li>

@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-13 (v0.14.2: fixed release automation's PyPI Trusted Publishing verification — see §8)
+**Last updated:** 2026-08-14 (v0.17.0: `full-stack` gained a `css=tailwind` option — see §4.8)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `flint` CLI itself (not the projects it generates).
@@ -128,6 +128,7 @@ flint/
 │   ├── test_generator.py
 │   ├── test_flask_hello_world.py
 │   ├── test_flask_rest_api.py
+│   ├── test_flask_full_stack.py
 │   ├── test_prompts.py
 │   ├── test_cli.py
 │   ├── test_postgen.py
@@ -600,6 +601,141 @@ Playwright screenshot pass, not the build log). Worth remembering for
 any future page that reaches for a Material "recipe" requiring raw HTML
 with nested markdown.
 
+### 4.7 Two Jinja2 environments in one project — `full-stack`'s `.jinja`-suffix rule
+
+`fastapi/full-stack` and `flask/full-stack` (v0.16.0) are the first
+templates whose generated project *itself* renders Jinja2 at runtime —
+`templates/base.html`, `templates/index.html`, and
+`templates/partials/*.html` are FastAPI/Flask templates, rendered by
+the generated app's own `Jinja2Templates`/`render_template()` on every
+request. This collides with flint's existing rule that any `.jinja`-
+suffixed file gets rendered through **flint's own** `generator._env` at
+*generation* time (§4, top of this section) — a rule every other
+template in the codebase relies on unconditionally.
+
+If `index.html.jinja` existed, flint's generator would render it once,
+at `flint new` time, using flint's context (`project_name`,
+`package_name`, the resolved options — no `todos`, no `todo`). Its
+`{% for todo in todos %}` would evaluate against an **undefined**
+`todos` (Jinja's default `Undefined` renders as empty in output, no
+error raised) and produce an empty loop body; `{{ todo.title }}` inside
+a `{% include %}`'d partial would do the same. The generated project
+would ship with a permanently empty-looking Todo list template, no
+error at generation time, no error at `uv run pytest` time (nothing
+asserts the *runtime* Jinja tags survived) — only a broken page in a
+browser would reveal it. This was caught before it shipped, not after:
+an initial draft of `base.html` used `.jinja` and a scripted check
+(`grep` for `{{`/`{%` across every rendered file, run against several
+option combos) flagged it immediately, well before any live-server
+check.
+
+**The fix**: `templates/*.html` and `static/css/style.css` carry **no**
+`.jinja` suffix. `generator._render_content` copies a non-`.jinja` file
+byte-for-byte (see the top of §4) — so these files pass through flint's
+generator completely untouched, `{% for %}`/`{{ }}` and all, and are
+only ever evaluated by the *generated app's* Jinja2 environment, once
+the project is actually running. The one flint-resolved value these
+templates need — `app_name` (ultimately `{{ project_name }}`, resolved
+by flint into `core/config.py`'s `Settings` at generation time) — is
+threaded through at *request* time instead, passed explicitly into the
+render call from the route handler:
+
+```python
+return templates.TemplateResponse(
+    request, "index.html", {"app_name": settings.app_name, "todos": todos}
+)
+```
+
+This is a general rule going forward, not a one-off fix: **any file a
+generated project renders with its own templating engine at runtime
+must never carry flint's `.jinja` suffix**, regardless of framework.
+`test_generator.py`'s `test_full_stack_no_leftover_jinja_in_runtime_templates`
+(and its `test_flask_full_stack.py` equivalent) encode this as a
+regression test — it asserts runtime Jinja syntax *does* survive inside
+`templates/`, and that no `{{`/`{%` survives anywhere else in a
+rendered project.
+
+### 4.8 `full-stack`'s `css` option: a build-time/runtime split, not a template split
+
+v0.17 added `css` (`vanilla` | `tailwind`) to both `full-stack`
+templates. The interesting design decision wasn't the option itself —
+it's a plain `select` like any other — but **where `static/css/style.css`
+lives and what "shipping" it means**, which differs fundamentally
+between the two values:
+
+- **`css=vanilla`**: `style.css` is hand-written source, checked in,
+  rendered by flint like any other file. What you see generated is
+  exactly what serves in production.
+- **`css=tailwind`**: `style.css` is a **build artifact**. The checked-in
+  source is `static/css/input.css` (a few lines: `@import "tailwindcss"`
+  plus an `@theme` block for custom design tokens — Tailwind v4's
+  CSS-first config, no `tailwind.config.js`). `style.css` is produced by
+  actually *running* the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
+  against `input.css` — flint never writes it, and it's `.gitignore`d in
+  the generated project. This mirrors a pattern already established for
+  `migrations=true` (schema comes from running a migration, not from
+  `flint new`) and the worker option (a worker process flint doesn't
+  start) — a real "one command you must run before this works" step,
+  not something to fake at generation time.
+
+**Why the standalone CLI, not a Node.js build pipeline**: every other
+tool this project depends on installs through `uv`. A `package.json` +
+`npm install` + Tailwind's PostCSS plugin would introduce Node.js as a
+second toolchain into an otherwise Python-only generated project — a
+real cost for a CSS framework. Tailwind v4's standalone CLI removes
+that tradeoff entirely: it's a self-contained platform binary with no
+Node runtime dependency. [`pytailwindcss`](https://pypi.org/project/pytailwindcss/)
+wraps it as an ordinary `pyproject.toml` dependency — `uv sync` installs
+the wrapper, and the wrapper downloads/caches the actual binary the
+first time `uv run tailwindcss ...` executes. The design (source CSS in,
+built CSS out, binary managed transparently, `init`/`watch`/`build`-
+shaped commands) is modeled directly on
+[`litestar-tailwind-cli`](https://github.com/Tobi-De/litestar-tailwind-cli),
+the reference implementation of this pattern for a Python web framework
+— flint doesn't reimplement binary-downloading logic itself, just
+depends on the already-published wrapper.
+
+**Layer structure**: `static/css/style.css` moved *out* of the base
+`files/` layer entirely and into two new peer layers, `css-vanilla/`
+(the pre-existing hand-written CSS, relocated unchanged) and
+`css-tailwind/` (`input.css` + Tailwind-utility-class rewrites of
+`templates/index.html` and `templates/partials/{todo_item,empty_state}.html`),
+gated the same `when`-mechanism as `db-*`/`worker-*`. This is the
+"layer, not inline `{% if %}`" choice from §4.2 applied to CSS: the two
+variants' `templates/index.html` are genuinely different files (custom
+class names vs. Tailwind utility classes), not one file with a
+conditional class-name mapping, and forcing that into `{% if %}`
+branches would make an already-verbose runtime-Jinja template (§4.7)
+far harder to read. One consequence worth flagging for future template
+authors: because neither `css-vanilla` nor `css-tailwind` has a
+fallback, **`render()` called with `css` absent from `options` ships no
+`static/css/style.css` and no `static/css/input.css` at all** — neither
+layer's `when` matches a missing key. This is consistent with every
+other option (`render()` never applies `template.json`'s declared
+defaults; that's `prompts.py`'s job — see §4), but it was a real gap
+caught during this release: `test_generator.py`'s
+`make_full_stack_answers()` helper predates the `css` option and didn't
+set it, so several existing tests silently stopped generating any CSS
+file the moment the layers were split. Fixed by adding `css="vanilla"`
+to the helper's defaults, matching how every other option already has
+an explicit default there.
+
+**A real bug this caught**: `tests/test_main.py.jinja` — shared by
+`files/`, so shared by every `css` variant — had
+`assert 'class="todo-item done"' in toggle_response.text` to check that
+toggling a todo marks it done. That string is `css-vanilla`-only markup;
+it doesn't exist in `css-tailwind`'s rewritten `todo_item.html`. Every
+static check (`ast.parse()`, `tomllib.loads()`, the leftover-Jinja
+sweep) passed regardless, because the test file itself is syntactically
+fine — the failure only appeared when a generated `css=tailwind`
+project's `uv run pytest` actually ran the assertion against real
+Tailwind markup. Fixed by asserting the checkbox's `checked` attribute
+instead, which is identical markup in both variants — the general
+lesson (documented in both `full-stack` maintainer `README.md`s as a
+standing rule) is that a test file shared across variants of a template
+option must never assert against variant-specific presentation, only
+behavior.
+
 ## 5. Remembered preferences (`prefs.py`)
 
 `~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
@@ -814,12 +950,18 @@ the gate temporarily.
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
   plus a plain `import flint.__main__` to cover the guard's not-taken
   branch.
-- `test_flask_hello_world.py` / `test_flask_rest_api.py` — Flask's
-  mirror of the FastAPI hello-world/rest-api coverage above (rendered
-  combinations, `ast.parse()`/`tomllib.loads()` checks). Kept as
-  standalone files rather than folded into `test_generator.py`, since
-  they exist purely to cover a second framework's content, not the
-  generator engine itself.
+- `test_flask_hello_world.py` / `test_flask_rest_api.py` /
+  `test_flask_full_stack.py` — Flask's mirror of the FastAPI
+  hello-world/rest-api/full-stack coverage above (rendered
+  combinations, `ast.parse()`/`tomllib.loads()` checks, plus a check
+  that `templates/`/`static/` content survives flint's generator with
+  its runtime Jinja2 syntax intact — see §4.7). Kept as standalone
+  files rather than folded into `test_generator.py`, since they exist
+  purely to cover a second framework's content, not the generator
+  engine itself. `full-stack`'s FastAPI-side tests, by contrast, live
+  inline in `test_generator.py` (mirroring `rest-api`'s own placement)
+  since FastAPI is the enabled-by-default framework and needs no
+  monkeypatch fixture.
 - **Live end-to-end verification (manual, done before every template
   change ships — not part of the automated suite or the coverage
   gate)**: actually run generated output through `uv sync && uv run

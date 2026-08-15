@@ -1,0 +1,54 @@
+"""In-memory Todo store — swapped for a real database when one is chosen
+at generation time (see {{ package_name }}/core/db.py)."""
+
+from dataclasses import dataclass
+
+from flask import Blueprint, render_template, request
+
+from {{ package_name }}.core.config import settings
+
+bp = Blueprint("todos", __name__)
+
+
+@dataclass
+class Todo:
+    id: int
+    title: str
+    done: bool = False
+
+
+_todos: dict[int, Todo] = {}
+_next_id = 1
+
+
+@bp.get("/")
+def index():
+    return render_template("index.html", app_name=settings.app_name, todos=list(_todos.values()))
+
+
+@bp.post("/todos")
+def create_todo():
+    global _next_id
+    todo = Todo(id=_next_id, title=request.form["title"], done=False)
+    _todos[_next_id] = todo
+    _next_id += 1
+    return render_template("partials/todo_created.html", todo=todo)
+
+
+@bp.post("/todos/<int:todo_id>/toggle")
+def toggle_todo(todo_id: int):
+    todo = _todos.get(todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    todo.done = not todo.done
+    return render_template("partials/todo_item.html", todo=todo)
+
+
+@bp.delete("/todos/<int:todo_id>")
+def delete_todo(todo_id: int):
+    if todo_id not in _todos:
+        return "Todo not found", 404
+    del _todos[todo_id]
+    if not _todos:
+        return render_template("partials/empty_state.html")
+    return ""

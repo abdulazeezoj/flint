@@ -144,6 +144,7 @@ flint
   ❯ FastAPI
     Flask
 ? Which template? › (Use arrow keys)
+    Full-Stack
     Hello World
   ❯ REST API
 ? Database? › (Use arrow keys)

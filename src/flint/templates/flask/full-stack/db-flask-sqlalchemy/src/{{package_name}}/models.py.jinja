@@ -1,0 +1,9 @@
+from sqlalchemy.orm import Mapped, mapped_column
+
+from {{ package_name }}.core.db import db
+
+
+class Todo(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str]
+    done: Mapped[bool] = mapped_column(default=False)

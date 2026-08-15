@@ -1,0 +1,49 @@
+from flask import Blueprint, render_template, request
+from sqlalchemy import select
+
+from {{ package_name }}.core.config import settings
+from {{ package_name }}.core.db import get_session
+from {{ package_name }}.models import Todo
+
+bp = Blueprint("todos", __name__)
+
+
+@bp.get("/")
+def index():
+    session = get_session()
+    todos = session.execute(select(Todo)).scalars().all()
+    return render_template("index.html", app_name=settings.app_name, todos=todos)
+
+
+@bp.post("/todos")
+def create_todo():
+    session = get_session()
+    todo = Todo(title=request.form["title"])
+    session.add(todo)
+    session.commit()
+    return render_template("partials/todo_created.html", todo=todo)
+
+
+@bp.post("/todos/<int:todo_id>/toggle")
+def toggle_todo(todo_id: int):
+    session = get_session()
+    todo = session.get(Todo, todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    todo.done = not todo.done
+    session.commit()
+    return render_template("partials/todo_item.html", todo=todo)
+
+
+@bp.delete("/todos/<int:todo_id>")
+def delete_todo(todo_id: int):
+    session = get_session()
+    todo = session.get(Todo, todo_id)
+    if todo is None:
+        return "Todo not found", 404
+    session.delete(todo)
+    session.commit()
+    remaining = session.execute(select(Todo)).scalars().first()
+    if remaining is None:
+        return render_template("partials/empty_state.html")
+    return ""
