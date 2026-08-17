@@ -1,13 +1,13 @@
 # FastAPI · Hello World
 
 ```bash
-flint new my-api --framework fastapi --template hello-world --yes
+brupy new my-api --framework fastapi --template hello-world --yes
 ```
 
 A minimal, `uv`-managed FastAPI app: one `GET /` route returning
 `{"message": "Hello, World!"}`, a passing `pytest` test, and everything
-else [every Flint project ships](../getting-started.md#what-you-get-every-time).
-This is the fastest path from `uvx --from flint-kit flint` to a running app — reach for
+else [every Brupy project ships](../getting-started.md#what-you-get-every-time).
+This is the fastest path from `uvx brupy` to a running app — reach for
 [FastAPI · REST API](fastapi-rest-api.md) instead if you need a database,
 migrations, or a background worker from the start.
 
@@ -60,7 +60,7 @@ uv run pytest
 |---|---|---|---|
 | `-o config=<bool>` | `true` / `false` | `false` | Adds `pydantic-settings`-based configuration. |
 
-Turn on `-o config=true` and Flint adds a `core/config.py` module, then
+Turn on `-o config=true` and Brupy adds a `core/config.py` module, then
 swaps in a version of `main.py` that reads from it instead of hardcoding
 values:
 
@@ -116,11 +116,11 @@ lives.
 
 ## Docker
 
-This template supports `--docker`: pass the flag and Flint adds a
+This template supports `--docker`: pass the flag and Brupy adds a
 `Dockerfile` and `.dockerignore`:
 
 ```bash
-flint new my-api --framework fastapi --template hello-world --docker --yes
+brupy new my-api --framework fastapi --template hello-world --docker --yes
 ```
 
 ```dockerfile
@@ -156,7 +156,7 @@ contains and how `AGENTS.md` points at them.
 ## Non-interactive example
 
 ```bash
-flint new my-api \
+brupy new my-api \
   --framework fastapi --template hello-world \
   -o config=true \
   --docker --git --install --yes

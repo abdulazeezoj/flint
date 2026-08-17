@@ -2,7 +2,7 @@
 
 Kept as a standalone file (not appended to `test_generator.py`) for the
 same reason as `test_flask_rest_api.py`: `flask`'s own `template.json`
-ships with `"enabled": false` (see `src/flint/templates/flask/template.json`),
+ships with `"enabled": false` (see `src/brupy/templates/flask/template.json`),
 so every test here uses the `enable_flask` fixture below to monkeypatch
 `generator.get_framework` for the duration of the test, exactly the way
 `test_flask_rest_api.py` already does.
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-import flint.generator as generator_module
-from flint.generator import Answers, get_template, render
+import brupy.generator as generator_module
+from brupy.generator import Answers, get_template, render
 
 
 @pytest.fixture(autouse=True)
@@ -79,7 +79,7 @@ def _skill_ids(created: list[Path]) -> set[str]:
 
 class TestTemplateMetadata:
     def test_flask_full_stack_is_listed(self):
-        from flint.generator import list_templates
+        from brupy.generator import list_templates
 
         ids = {t.id for t in list_templates("flask")}
         assert "full-stack" in ids
@@ -232,7 +232,7 @@ class TestFullStackRender:
     def test_no_leftover_jinja_in_runtime_templates(self, tmp_path: Path):
         # Same rationale as fastapi/full-stack's equivalent test: the
         # templates/ and static/ files carry the *generated app's own*
-        # runtime Jinja2 syntax and must survive flint's generator untouched
+        # runtime Jinja2 syntax and must survive brupy's generator untouched
         # (they have no .jinja suffix specifically so they're copied
         # verbatim — see this template's README.md gotcha #1).
         target = tmp_path / "app"
@@ -248,7 +248,7 @@ class TestFullStackRender:
         # .agents/skills/ is exempt: the jinja2/htmx skills legitimately
         # document literal {{ }}/{% %} syntax as prose (escaped via
         # {% raw %} at generation time), which isn't the same thing as
-        # unrendered flint-level Jinja leaking out.
+        # unrendered brupy-level Jinja leaking out.
         for path in target.rglob("*"):
             if path.is_dir() or "templates" in path.parts or ".agents/skills" in path.as_posix():
                 continue
@@ -274,7 +274,7 @@ class TestFullStackCSS:
         created = render("flask", "full-stack", target, answers)
 
         # input.css (source, tracked) ships; style.css (build output) does
-        # not — it's produced by the Tailwind CLI, not by flint.
+        # not — it's produced by the Tailwind CLI, not by brupy.
         assert Path("src/my_api/static/css/input.css") in created
         assert Path("src/my_api/static/css/style.css") not in created
 

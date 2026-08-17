@@ -1,0 +1,61 @@
+# Gotchas
+
+Real mistakes brupy's own FastAPI templates hit while being built and
+live-verified — not hypothetical, each one broke something concrete
+before it was fixed. Worth knowing before you hit the same wall.
+
+## `fastapi dev`/`fastapi run` needs a top-level `__init__.py`
+
+`src/{{ package_name }}/__init__.py` isn't decorative. Plain Python
+imports and `pytest` both tolerate a missing one via PEP 420 namespace
+packages, so `uv run pytest` staying green tells you nothing here — but
+`fastapi_cli`'s own directory-walk logic (what `fastapi dev`/`fastapi
+run` use to find the app) needs it to correctly locate the `src/` root.
+Without it, the CLI silently computes the *wrong* root and the dev
+server fails to start or watches the wrong directory. If you add a new
+top-level package under `src/` for some reason, give it an
+`__init__.py` even if nothing seems to need it yet.
+
+## The database is *not* auto-created when migrations are on
+
+{% if migrations %}
+This project has `migrations=true`: `main.py` deliberately does **not**
+call `init_db()` at all (it's not even imported) — schema comes solely
+from `alembic upgrade head`. If you're seeing "table does not exist"
+errors, that's why: run the migration first (see the `alembic` skill's
+`guides/first-migration.md`), don't add a `create_all()` call back into
+`main.py`'s startup path to "fix" it.
+{% else %}
+This project has `migrations=false`: `init_db()` calls `create_all()`
+on every startup via the `lifespan` hook, so the schema always matches
+the current models — convenient, but only correct because there's no
+migration history to fall out of sync with. If you later turn
+migrations on, this call goes away entirely (see the `alembic` skill) —
+`create_all()` and a real migration history must never coexist. Running
+both means the tables already exist by the time `alembic revision
+--autogenerate` runs, so it permanently reports "No changes in schema
+detected" instead of capturing the real schema — a project that looks
+like it has migrations but doesn't.
+{% endif %}
+
+## `lifespan` is the only correct place for startup/shutdown work
+
+Don't call `await init_db()` (or start a broker, warm a cache, etc.) at
+module scope in `main.py` — module import must stay side-effect-free,
+since `pytest`, `alembic`, and any tooling that merely imports the
+module would trigger it. The `lifespan` async context manager (wired
+into `FastAPI(..., lifespan=lifespan)`) is the one place this project
+runs startup/shutdown code, and it only runs when the app actually
+boots (`fastapi dev`/`fastapi run`, or a test that explicitly drives
+the ASGI lifespan protocol — see `guides/testing.md`, since the default
+test setup here does *not* trigger it, on purpose).
+
+## Sync database drivers block the event loop
+
+If you ever hand-roll a database call outside the `sqlmodel`/
+`sqlalchemy` skill's async session pattern, make sure the driver is
+actually async (`asyncpg`, `aiosqlite`) — a sync driver call
+(`psycopg2`, plain `sqlite3`) inside an `async def` handler blocks the
+whole event loop for every other in-flight request, not just the one
+that made the call. This is easy to miss locally (low traffic hides
+it) and shows up as mysterious latency spikes under real load.

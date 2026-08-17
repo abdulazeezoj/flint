@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-import flint.generator as generator_module
-from flint.errors import FlintUserError
-from flint.generator import Answers, get_template, render
+import brupy.generator as generator_module
+from brupy.errors import BrupyUserError
+from brupy.generator import Answers, get_template, render
 
 
 @pytest.fixture(autouse=True)
@@ -240,5 +240,5 @@ def test_render_refuses_nonempty_directory_without_force(tmp_path: Path):
     target.mkdir()
     (target / "existing.txt").write_text("hello")
 
-    with pytest.raises(FlintUserError):
+    with pytest.raises(BrupyUserError):
         render("flask", "hello-world", target, make_answers())

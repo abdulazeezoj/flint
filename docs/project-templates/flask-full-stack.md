@@ -94,16 +94,16 @@ straight into `render_template(...)` as the context object.
 ## Why `templates/` and `static/` files have no `.jinja` suffix
 
 Worth understanding before you touch these files — it's the opposite of
-every other file flint ships, and the reasoning is identical to the
+every other file brupy ships, and the reasoning is identical to the
 FastAPI template's (see
 [FastAPI · Full-Stack](fastapi-full-stack.md#why-templates-and-static-files-have-no-jinja-suffix)
 for the full explanation). Short version: `templates/index.html` and
 friends contain Jinja2 syntax meant for **Flask's own** runtime
 `render_template()` call (`{% block %}`, `{% for todo in todos %}`,
-`{{ todo.title }}`), not for flint's generator. If they carried a
-`.jinja` suffix, flint would render them at *generation* time, silently
+`{{ todo.title }}`), not for brupy's generator. If they carried a
+`.jinja` suffix, brupy would render them at *generation* time, silently
 stripping that syntax before the file ever reached the generated
-project. They're copied byte-for-byte instead; the one flint-resolved
+project. They're copied byte-for-byte instead; the one brupy-resolved
 value they need (`app_name`) is passed in from the route handler at
 request time via `render_template("index.html", app_name=settings.app_name,
 ...)`.
@@ -138,7 +138,7 @@ image build.
 ## A full example
 
 ```bash
-flint new my-app \
+brupy new my-app \
   --framework flask --template full-stack \
   -o database=postgres -o orm=flask-sqlalchemy -o migrations=true \
   -o worker=celery -o broker=redis \
@@ -167,7 +167,7 @@ returning a small HTML fragment instead of a full page or JSON.
 
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework flask --template full-stack`, has an interactive
-equivalent if you just run `flint new my-app` and answer the prompts
+equivalent if you just run `brupy new my-app` and answer the prompts
 instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
 instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
 above.
@@ -224,7 +224,7 @@ plus two `full-stack` always adds for the presentation layer:
 
 ## `--docker`
 
-Pass `--docker` and flint adds a `Dockerfile` (`uv`-based) plus
+Pass `--docker` and brupy adds a `Dockerfile` (`uv`-based) plus
 `.dockerignore` — identical to `rest-api`'s, including running under
 **gunicorn** via its factory-call syntax
 (`{package_name}.main:create_app()`), not the Flask dev server. With

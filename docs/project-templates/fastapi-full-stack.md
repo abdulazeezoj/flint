@@ -74,22 +74,22 @@ for it.
 ## Why `templates/` and `static/` files have no `.jinja` suffix
 
 This is the one mechanic worth understanding before you touch these
-files, because it's the opposite of every other file flint ships.
+files, because it's the opposite of every other file brupy ships.
 
-Every `.jinja` file elsewhere in a flint template is rendered through
-**flint's own** Jinja2 environment at generation time — that's how
+Every `.jinja` file elsewhere in a brupy template is rendered through
+**brupy's own** Jinja2 environment at generation time — that's how
 `{{ package_name }}` in a Python file becomes `my_api`. But
 `templates/index.html`, `templates/partials/todo_item.html`, and the
 rest contain Jinja2 syntax meant for the **generated app's own**
 runtime `Jinja2Templates` instance: `{% block %}`, `{% for todo in
 todos %}`, `{{ todo.title }}`. If these files carried a `.jinja` suffix,
-flint's generator would render them **first**, at generation time,
+brupy's generator would render them **first**, at generation time,
 silently evaluating and stripping that syntax — `{% for todo in todos
-%}` would just vanish, since flint's own context has no `todos`
+%}` would just vanish, since brupy's own context has no `todos`
 variable, and the page would ship broken.
 
-So they carry no suffix at all, and flint's generator copies them
-byte-for-byte, untouched. The one flint-level value these templates do
+So they carry no suffix at all, and brupy's generator copies them
+byte-for-byte, untouched. The one brupy-level value these templates do
 need — `app_name`, i.e. `{{ project_name }}` — is passed in from the
 **route handler** instead, at request time:
 
@@ -99,7 +99,7 @@ return templates.TemplateResponse(
 )
 ```
 
-`settings.app_name` was itself resolved by flint at generation time (via
+`settings.app_name` was itself resolved by brupy at generation time (via
 `core/config.py`'s `Settings`), so the value still ultimately traces
 back to what you typed as the project name — it's just threaded through
 at runtime instead of substituted directly into the HTML.
@@ -185,7 +185,7 @@ whether you remembered to build it locally.
 ## A full example
 
 ```bash
-flint new my-app \
+brupy new my-app \
   --framework fastapi --template full-stack \
   -o database=postgres -o orm=sqlmodel -o migrations=true \
   -o worker=taskiq -o broker=redis \
@@ -213,7 +213,7 @@ returning a small HTML fragment instead of a full page or JSON.
 
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework fastapi --template full-stack`, has an interactive
-equivalent if you just run `flint new my-app` and answer the prompts
+equivalent if you just run `brupy new my-app` and answer the prompts
 instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
 instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
 above.
@@ -273,7 +273,7 @@ plus two `full-stack` always adds for the presentation layer:
 
 ## Docker
 
-Pass `--docker` and flint adds a `Dockerfile` (plus a matching
+Pass `--docker` and brupy adds a `Dockerfile` (plus a matching
 `.dockerignore`) to the project root — identical to `rest-api`'s, since
 containerizing an HTML-rendering FastAPI app needs nothing different
 from containerizing a JSON one. The one addition specific to this

@@ -1,11 +1,37 @@
 # Changelog
 
-All notable changes to Flint are documented here.
+All notable changes to Brupy are documented here. (Named Flint through
+`v0.18.0`; entries below from that era keep their original wording
+rather than being rewritten retroactively — see `v0.19.0`.)
 
 Versions follow `v{release}.{feature}.{fixes}` (see
 `docs/_product/PRODUCT_SPEC.md` §11): `release` is the major epoch
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
+
+## v0.19.0 — 2026-08-17
+
+### Changed
+
+- **Renamed the project from Flint to Brupy** — brand, CLI command
+  (`flint` → `brupy`), and PyPI distribution name are now all the same
+  word (`flint-kit`'s brand/distribution split is gone; plain `brupy`
+  came back available on PyPI with no conflict). `uvx brupy` and `uv
+  tool install brupy` both work directly, no `--from` needed. Full
+  sweep: the Python package (`src/flint/` → `src/brupy/`),
+  `FlintError`/`FlintUserError` → `BrupyError`/`BrupyUserError`, the
+  remembered-preferences file (`~/.flint/last.json` →
+  `~/.brupy/last.json`), the portable `.agents/skills/flint/` agent
+  skill (→ `.agents/skills/brupy/`, `.claude/skills/brupy`
+  re-symlinked), every generated template's `AGENTS.md`/`README.md`/
+  `pyproject.toml`, both GitHub Actions workflows, `mkdocs.yml`, and
+  every doc page. See `docs/_product/PRODUCT_SPEC.md` §10/§11 for the
+  full naming history (this is the fourth rename — `Flint` → `Conjure`
+  → `Spindle` → `Flint`/`flint-kit` → `Brupy`) and why no PyPI-name
+  split was needed this time. Entries below this one keep the name that
+  was actually current at each release, not rewritten to say "Brupy."
+- GitHub repository rename (`abdulazeezoj/flint` → `abdulazeezoj/brupy`)
+  is a separate, user-driven action — not part of this change.
 
 ## v0.18.0 — 2026-08-15
 

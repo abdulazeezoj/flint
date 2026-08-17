@@ -1,19 +1,19 @@
-# Flint — Product Spec
+# Brupy — Product Spec
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-15 (v0.18.0: `jinja2`/`htmx`/`tailwind` skills added to the `.agents/skills/` catalog — see §11)
+**Last updated:** 2026-08-15 (v0.19.0: renamed Flint → Brupy — see §10/§11)
 
 ## 1. Vision
 
-Flint is `create-react-app` / `create-next-app` for Python backend frameworks.
+Brupy is `create-react-app` / `create-next-app` for Python backend frameworks.
 
 One command, a short interactive wizard, and you have a running project —
 scaffolded with modern tooling, sane defaults, and zero boilerplate to
 hand-write.
 
 ```
-uvx --from flint-kit flint
+uvx brupy
 ```
 
 ...and 60 seconds later you're looking at `Hello, World!` from a real,
@@ -39,7 +39,7 @@ FastAPI-specific scaffolders) require finding and trusting a third-party
 template repo, are template-authoring frameworks rather than finished
 products, and either stay minimal (bare boilerplate) or go maximal (one
 big configurable mega-template with a wall of flags) rather than letting
-a project grow into what it needs. Flint's answer is a small set of
+a project grow into what it needs. Brupy's answer is a small set of
 distinct, opinionated templates, each of which can offer its own
 follow-up choices — not one template trying to be everything.
 
@@ -53,11 +53,11 @@ Three distinct concepts in the wizard — don't conflate them:
   `hello-world`, `rest-api`, `full-stack`. Selected second, scoped to
   the chosen framework.
 - **Option** — a further, template-specific choice, declared by the
-  template itself (not hardcoded in Flint). E.g. `rest-api` asks for a
+  template itself (not hardcoded in Brupy). E.g. `rest-api` asks for a
   database, ORM, whether to add migrations, a background worker, and
   Redis; `hello-world` asks only whether to add `pydantic-settings`
   config. Different templates can declare entirely different options —
-  Flint's CLI/wizard code has no built-in knowledge of "database" or
+  Brupy's CLI/wizard code has no built-in knowledge of "database" or
   "worker," it just renders whatever a template's `template.json`
   declares (see `PRODUCT_ARCH.md` §4).
 
@@ -69,7 +69,7 @@ template — without any axis blocking the others.
 
 ## 4. Goals — v0
 
-1. Zero-arg interactive wizard: `flint` (or `uvx --from flint-kit flint`) prompts for the
+1. Zero-arg interactive wizard: `brupy` (or `uvx brupy`) prompts for the
    handful of decisions that matter — including a template's own options
    — and generates a project.
 2. The wizard produces a runnable "Hello World" FastAPI app in under 60
@@ -88,7 +88,7 @@ template — without any axis blocking the others.
    no manual edits required to run it, regardless of which options were
    chosen.
 6. Optionally, a generated `Dockerfile`/`.dockerignore` via `--docker`.
-7. Flint ships as an installable, `pipx`/`uv tool`-friendly CLI.
+7. Brupy ships as an installable, `pipx`/`uv tool`-friendly CLI.
 8. Semantic-ish versioning scheme `v{release}.{feature}.{fixes}`, starting
    at `v0.1.0`, with `CHANGELOG.md` updated on every user-facing change.
 
@@ -139,7 +139,7 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   and get a project with all of that already wired and passing tests —
   not a blank slate I have to wire myself.
 - As a developer working in CI/scripts, I run
-  `flint new my-api --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --no-git --no-install --yes`
+  `brupy new my-api --framework fastapi --template rest-api -o database=postgres -o orm=sqlmodel --no-git --no-install --yes`
   and get the identical result with no prompts.
 - As a developer deploying to a container, I pass `--docker` and get a
   working `Dockerfile` alongside the app, no Docker knowledge required.
@@ -148,7 +148,7 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   never have to guess the run command.
 - As a developer, if I mistype something — a bad project name, an
   unknown `--option` key, an invalid option value, a non-empty target
-  directory — Flint tells me clearly instead of silently doing the wrong
+  directory — Brupy tells me clearly instead of silently doing the wrong
   thing or half-generating a project.
 
 ## 8. Functional Requirements
@@ -159,33 +159,32 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
 | FR2 | Validate project name: derive a valid Python package name (snake_case) and a filesystem-safe directory (kebab or snake); refuse to run into a non-empty existing directory without `--force`. In interactive mode, offer a confirmation prompt to overwrite instead of failing outright — declining aborts with no changes made; non-interactive runs are unaffected (`--force` or hard error, no prompt) |
 | FR3 | Every prompt has an equivalent flag: `--framework`, `--template`, `--option key=value` (repeatable, for template-specific choices), `--docker/--no-docker`, `--git/--no-git`, `--install/--no-install`, `--yes` (accept all defaults, skip prompts) |
 | FR4 | After generation: print a summary of the resolved options, what was created, and the exact next-step commands to run the app (run, migrate, start a worker, `docker build`/`docker run` — whichever apply) |
-| FR5 | `flint --version` prints the current version |
+| FR5 | `brupy --version` prints the current version |
 | FR6 | Exit codes: `0` success, `1` user/input error (e.g. bad name, existing dir, disabled framework/template, unknown/invalid `--option`), `2` unexpected/internal error |
 | FR7 | `--docker` adds a `Dockerfile` and `.dockerignore`; if the chosen template doesn't support it yet, warn and continue rather than failing the whole generation |
 | FR8 | Every generated project includes an `AGENTS.md` with run/test commands, layout, and conventions — no flag, always on |
 | FR9 | A template's options can depend on each other (e.g. no ORM prompt when "no database" is chosen); an option whose dependency isn't satisfied resolves to a documented value automatically rather than being asked or left unset |
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
-| FR11 | After a successful generation, Flint remembers the chosen framework, the chosen template per framework, and — per `<framework>/<template>` — the resolved options plus docker/git/install, in `~/.flint/last.json`. The next run uses these as the new default (both for what the wizard preselects and what a flagless non-interactive run falls back to); an explicit flag or `--option` always overrides a remembered value, and a stale remembered value (no longer valid for the current template) is silently ignored in favor of the template's own default. `--remember/--no-remember` (default on) opts a single run out of reading and writing this file |
-| FR12 | `flint list-templates` prints every framework/template pair (label, description, whether it supports `--docker`), including disabled/"coming soon" entries — an introspection command, generates nothing |
+| FR11 | After a successful generation, Brupy remembers the chosen framework, the chosen template per framework, and — per `<framework>/<template>` — the resolved options plus docker/git/install, in `~/.brupy/last.json`. The next run uses these as the new default (both for what the wizard preselects and what a flagless non-interactive run falls back to); an explicit flag or `--option` always overrides a remembered value, and a stale remembered value (no longer valid for the current template) is silently ignored in favor of the template's own default. `--remember/--no-remember` (default on) opts a single run out of reading and writing this file |
+| FR12 | `brupy list-templates` prints every framework/template pair (label, description, whether it supports `--docker`), including disabled/"coming soon" entries — an introspection command, generates nothing |
 
 ## 9. Non-Functional Requirements
 
 - Cross-platform: macOS, Linux, Windows (path handling via `pathlib`, no
   shell-specific assumptions).
-- No network access required by Flint itself; only `uv`'s own dependency
+- No network access required by Brupy itself; only `uv`'s own dependency
   resolution (when the user opts in to "install now") touches the
   network.
 - Rich, colorful terminal output where the terminal supports it, with a
-  graceful non-interactive fallback: when stdin isn't a TTY, Flint
+  graceful non-interactive fallback: when stdin isn't a TTY, Brupy
   requires flags instead of hanging on a prompt.
 
 ## 10. Distribution & Naming
 
-- CLI command: `flint`
-- PyPI distribution name: `flint-kit` (the plain `flint` name is used by
-  an unrelated existing package on PyPI); the installed console script is
-  still `flint`, so end-user usage (`uvx --from flint-kit flint`, `flint new ...`) is
-  unaffected by the distribution name.
+- CLI command: `brupy`
+- PyPI distribution name: `brupy` — same as the command, no split
+  needed this time (see `v0.19.0` below); `uvx brupy` and `uv tool
+  install brupy` both work with no `--from`.
 
 ## 11. Release Process
 
@@ -405,6 +404,29 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   the `fastapi-full-stack`/`flask-full-stack` docs pages, which had
   claimed an "identical skill set" to `rest-api` — no longer true once
   `full-stack` carries its own presentation-layer skills.
+- `v0.19.0` — the project is renamed a fourth time, from **Flint**
+  (`flint-kit` on PyPI) to **Brupy**, unifying brand, CLI command, and
+  PyPI distribution name under one word this time — unlike `v0.14.0`'s
+  `flint`/`flint-kit` split, plain `brupy` came back clean on a direct
+  PyPI availability check (no existing project, no edit-distance
+  squat-guard collision), so no split was needed. Full sweep: the
+  Python package (`src/flint/` → `src/brupy/`), the CLI entrypoint and
+  `FlintError`/`FlintUserError` → `BrupyError`/`BrupyUserError`, the
+  prefs file (`~/.flint/last.json` → `~/.brupy/last.json`), the
+  `.agents/skills/flint/` agent skill (→ `.agents/skills/brupy/`, with
+  `.claude/skills/brupy` re-symlinked) and its own now-obsolete
+  package/command-mismatch caveat (removed — nothing to warn about once
+  they're the same name), every template's `AGENTS.md`/`README.md`/
+  `pyproject.toml`, both GitHub Actions workflows
+  (`cd.yml`'s PyPI project URL), `mkdocs.yml`, and every doc. Historical
+  release notes above (`v0.1.0`–`v0.18.0`) and `CHANGELOG.md` keep their
+  original wording rather than being rewritten to say "Brupy"
+  retroactively — they're an accurate record of what the project was
+  actually called at each point in time, the same reasoning that kept
+  `v0.12.0`–`v0.14.0`'s `Conjure`/`Spindle` mentions as-is through the
+  previous two renames. Repository rename
+  (`abdulazeezoj/flint` → `abdulazeezoj/brupy`) is the user's own
+  action, not part of this commit.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
@@ -419,7 +441,7 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   every template's dependency file and install/run instructions, not a
   small addition. Revisit only if there's real demand, not speculatively.
 - **Template distribution**: closed as of v0.10 — staying bundled-only
-  by design. Templates ship inside the `flint` package itself: simplest
+  by design. Templates ship inside the `brupy` package itself: simplest
   possible model, no network dependency to generate a project, and no
   supply-chain exposure from executing a fetched, unreviewed Jinja
   template against the local filesystem. `PRODUCT_ARCH.md` documents

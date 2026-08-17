@@ -55,7 +55,7 @@ generated `fastapi` skill's `SKILL.md`, for a project named `my-api`:
 ```
 
 And a real gotcha from that same skill's `references/gotchas.md`, folded
-in from a bug flint's own templates hit while being built:
+in from a bug brupy's own templates hit while being built:
 
 > **The database is *not* auto-created when migrations are on.** This
 > project has `migrations=true`: `main.py` deliberately does **not** call
@@ -102,7 +102,7 @@ Here's the (trimmed) list from `fastapi/rest-api`'s `template.json`:
 `flask/rest-api` mirrors this with its own Flask-flavored equivalents —
 `flask-sqlalchemy` and `flask-migrate` instead of `sqlmodel`/`alembic` when
 `orm=flask-sqlalchemy`, or plain `alembic` when `orm=sqlalchemy` — and no
-`taskiq`, since that worker is FastAPI/async-only in Flint today.
+`taskiq`, since that worker is FastAPI/async-only in Brupy today.
 
 `fastapi/full-stack` and `flask/full-stack` take their framework's
 `rest-api` list above and add two more, always: `jinja2` and `htmx` — the
@@ -134,14 +134,14 @@ across `fastapi/rest-api` and `flask/rest-api` — which drifts the moment
 one copy gets a fix the other doesn't — or cross-linking between layer
 trees, which nothing else in the template system does.
 
-Instead, the catalog lives once, flat, at `src/flint/skills/<id>/` —
+Instead, the catalog lives once, flat, at `src/brupy/skills/<id>/` —
 outside `templates/` entirely — and each template references catalog
 entries by `id`. One `sqlalchemy` skill, referenced by both frameworks,
 fixed once.
 
 ## The generated index
 
-After rendering every matched skill, Flint also writes
+After rendering every matched skill, Brupy also writes
 `.agents/skills/README.md` — a plain index of exactly what's present, with
 each skill's one-line description pulled from its `skill.json`. It's
 generated, not authored: a `git status` or directory listing tells you
@@ -177,12 +177,12 @@ you picked.
 Generic library docs and an agent's own training knowledge both drift from
 what a specific generated project actually does — a hallucinated import
 path, an ORM pattern that doesn't match the template's conventions, a
-"fix" that reintroduces a bug flint's own templates already hit once. The
+"fix" that reintroduces a bug brupy's own templates already hit once. The
 skills catalog closes that gap: it's reference material about *this
 project's* actual code, kept in sync with the templates it documents.
 
 The gotchas folded into each skill's `references/gotchas.md` aren't
-speculative either — they're bugs flint's own templates hit while being
+speculative either — they're bugs brupy's own templates hit while being
 built and verified, written down once so the next person (or agent)
 doesn't rediscover them the hard way. A few examples: task-discovery
 mistakes baked into the `taskiq` and `celery` skills, and the
