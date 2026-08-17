@@ -1,11 +1,11 @@
-# Flint — Architecture
+# Brupy — Architecture
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-15 (v0.17.1: repo layout tree updated for `.agents/skills/flint/` + `.claude/skills/flint` symlink — see §3)
+**Last updated:** 2026-08-15 (v0.19.0: renamed Flint → Brupy — see §2/§3)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
-design for the `flint` CLI itself (not the projects it generates).
+design for the `brupy` CLI itself (not the projects it generates).
 
 ## 1. Tech stack
 
@@ -14,8 +14,8 @@ design for the `flint` CLI itself (not the projects it generates).
 | CLI framework | [Typer](https://typer.tiangolo.com/) | Type-hint-driven, generates `--help`, minimal boilerplate, built on Click (battle-tested arg parsing). |
 | Interactive prompts | [questionary](https://github.com/tmbo/questionary) | Arrow-key select lists and confirm prompts that read like `create-next-app`; degrades cleanly, easy to script around in tests. |
 | Terminal output | [rich](https://github.com/Textualize/rich) | Colored summaries, spinners for `uv sync` / `git init`, tables — Typer already depends on it. |
-| Templating | [Jinja2](https://jinja.palletsprojects.com/) | Renders both file contents and file/directory *names* (`{{package_name}}`), industry-standard, no need for a full scaffolding framework (cookiecutter/copier) when Flint owns its own bundled templates. |
-| Packaging / env | [uv](https://docs.astral.sh/uv/) | Both: (a) how Flint itself is built/packaged/tested, and (b) the package manager wired into every generated project. |
+| Templating | [Jinja2](https://jinja.palletsprojects.com/) | Renders both file contents and file/directory *names* (`{{package_name}}`), industry-standard, no need for a full scaffolding framework (cookiecutter/copier) when Brupy owns its own bundled templates. |
+| Packaging / env | [uv](https://docs.astral.sh/uv/) | Both: (a) how Brupy itself is built/packaged/tested, and (b) the package manager wired into every generated project. |
 | Testing | pytest + Typer's `CliRunner` | Standard, integrates with `uv run pytest`. |
 
 No cookiecutter/copier dependency: templates ship bundled in the package.
@@ -26,14 +26,14 @@ is a contained change, not a rewrite.
 
 ## 2. Distribution
 
-- PyPI distribution name: `flint-kit` — plain `flint` is an unrelated,
-  already-published package, so `pyproject.toml`'s `[project] name` and
-  the console script diverge on purpose (see PRODUCT_SPEC §10/§11 for
-  why). `[tool.uv.build-backend] module-name` and every `[project.scripts]`
-  entry stay `flint`; only the PyPI-facing string carries the suffix.
-- Console script entry point: `flint`.
-- Primary usage is via `uvx --from flint-kit flint` (ephemeral run, no install) or
-  `uv tool install flint-kit` (persistent `flint` on PATH) — mirrors how
+- PyPI distribution name: `brupy` — same as `pyproject.toml`'s
+  `[project] name`, `[tool.uv.build-backend] module-name`, and the
+  `[project.scripts]` console script entry; no split needed this time
+  (see PRODUCT_SPEC §10/§11 for why the previous name, `flint-kit`, did
+  need one).
+- Console script entry point: `brupy`.
+- Primary usage is via `uvx brupy` (ephemeral run, no install) or
+  `uv tool install brupy` (persistent `brupy` on PATH) — mirrors how
   `npx create-next-app` is normally invoked.
 - Build backend: `hatchling` via `uv`'s default `uv init --package`
   project shape (src layout).
@@ -41,19 +41,19 @@ is a contained change, not a rewrite.
 ## 3. Repository layout
 
 ```
-flint/
+brupy/
 ├── .agents/
 │   └── skills/
-│       └── flint/                  # portable agent skill teaching an agent how to *use*
-│           │                       # the flint CLI itself — unrelated to SKILLS_DIR (§4.5),
-│           │                       # which flint bundles *into generated projects*
+│       └── brupy/                  # portable agent skill teaching an agent how to *use*
+│           │                       # the brupy CLI itself — unrelated to SKILLS_DIR (§4.5),
+│           │                       # which brupy bundles *into generated projects*
 │           ├── SKILL.md
 │           └── references/
 │               ├── cli-reference.md
 │               └── templates.md
 ├── .claude/
 │   └── skills/
-│       └── flint -> ../../.agents/skills/flint   # symlink, for Claude Code's own
+│       └── brupy -> ../../.agents/skills/brupy   # symlink, for Claude Code's own
 │                                                   # discovery path (repo-relative)
 ├── .github/
 │   └── workflows/
@@ -84,16 +84,16 @@ flint/
 │       ├── flask-rest-api.md
 │       └── flask-full-stack.md
 ├── src/
-│   └── flint/
+│   └── brupy/
 │       ├── __init__.py          # __version__
-│       ├── __main__.py          # `python -m flint`
+│       ├── __main__.py          # `python -m brupy`
 │       ├── cli.py               # Typer app, `new` command, flags incl. --option
 │       ├── prompts.py           # questionary wizard steps + option resolution
 │       ├── naming.py            # project name -> slug/package_name validation
 │       ├── generator.py         # template renderer: options, layers, Jinja2
 │       ├── postgen.py           # git init, uv sync, summary printing
-│       ├── prefs.py             # ~/.flint/last.json — best-effort read/write
-│       ├── errors.py            # FlintError and friends -> exit codes
+│       ├── prefs.py             # ~/.brupy/last.json — best-effort read/write
+│       ├── errors.py            # BrupyError and friends -> exit codes
 │       └── templates/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
@@ -312,7 +312,7 @@ class Answers(BaseModel):
 5. On any exception: remove everything written so far under `target_dir`
    before re-raising, unless `target_dir` already existed before this
    call (e.g. a `--force` run into a directory the user made) — never
-   delete something Flint didn't create. All-or-nothing generation, per
+   delete something Brupy didn't create. All-or-nothing generation, per
    PRODUCT_FLOW §5.
 6. Return the deduplicated, sorted list of created paths (used for the
    CLI summary; `postgen.print_summary` checks for `Path("Dockerfile")`
@@ -389,7 +389,7 @@ a given file makes templates harder to maintain:
   migrations/worker/redis all at once), `README.md`/`AGENTS.md` (one
   coherent narrative document), `.env`/`core/config.py` (all configured
   values in one place). Decomposing these into layers would need a
-  "merge multiple layers' contributions into one file" mechanism Flint
+  "merge multiple layers' contributions into one file" mechanism Brupy
   doesn't have (and isn't worth building for a handful of files) — a
   short, well-organized conditional block is the pragmatic choice here.
   `main.py` is a deliberate, documented exception: worker/database both
@@ -414,7 +414,7 @@ eye.
 
 ### 4.4 The generated *project's* layout is opinionated too — Next.js-style
 
-Everything above is about how flint's *own* code decides what to
+Everything above is about how brupy's *own* code decides what to
 render. This section is about the shape of what gets rendered — the
 layout a developer (or a coding agent extending the scaffold) actually
 sees inside `rest-api`'s `src/{{package_name}}/`.
@@ -426,7 +426,7 @@ convention, not enforcement.** Next doesn't mandate `lib/`/`components/`
 (`app/`/`pages/`) and nothing else competes for that kind of certainty.
 Applied here:
 
-- **Strictly opinionated** (flint always uses this exact name/location,
+- **Strictly opinionated** (brupy always uses this exact name/location,
   and every generated project agrees):
   - `main.py` — the FastAPI entrypoint. Never renamed, never moved.
   - `worker.py` — the worker entrypoint (present only when a worker is
@@ -441,14 +441,14 @@ Applied here:
     hypothetical future `schedules.py` (periodic job registration) would
     live here too — the folder's job is "cross-cutting plumbing," not
     "everything that isn't a route."
-- **A default, not a rule** — flint picks *something* reasonable so the
+- **A default, not a rule** — brupy picks *something* reasonable so the
   project isn't missing a home for these, but doesn't treat it as fixed
   the way the above is: `schemas.py` (Pydantic contracts) and
   `models.py` (ORM models, iff a database is chosen) stay single
   top-level files for now, because rest-api only ships one resource.
   Both are natural candidates to become `schemas/`/`models/` folders —
   mirroring `routes/`/`tasks/` — the moment a generated project grows a
-  second resource, but flint doesn't make that call for the user.
+  second resource, but brupy doesn't make that call for the user.
 
 Why `models.py` (and `db.py`'s session/engine setup) is **not** under
 `core/`, despite both starting life under `db/` before this design: the
@@ -463,7 +463,7 @@ the ambiguity this layout exists to avoid.
 `hello-world`'s optional `config` option follows the same convention for
 consistency (`core/config.py`, not top-level `config.py`) even though a
 one-endpoint template doesn't need the rest of the `core/`/`routes/`/
-`tasks/` structure — a developer who's used one flint template shouldn't
+`tasks/` structure — a developer who's used one brupy template shouldn't
 have to relearn where config lives in another.
 
 ### 4.5 `.agents/skills/` — a shared, opt-in skills catalog
@@ -487,7 +487,7 @@ duplicating that content across `fastapi/rest-api` and `flask/rest-api`
 (drifts the moment one copy gets a fix the other doesn't), or
 cross-linking between layer trees (fragile, nothing else in the
 template system does this). Instead, the catalog lives once, flat, at
-`src/flint/skills/<id>/` — outside `templates/` entirely — and each
+`src/brupy/skills/<id>/` — outside `templates/` entirely — and each
 template's `template.json` references catalog entries by `id`.
 
 **Schema**, `skills` inside a template's `template.json`:
@@ -506,7 +506,7 @@ same `when_matches(when, context)` predicate against the fully resolved
 answers — a skill with an empty/absent `when` is always included; one
 with a `when` is included only when it matches, exactly like a layer.
 
-**Catalog entry shape**, `src/flint/skills/<id>/`:
+**Catalog entry shape**, `src/brupy/skills/<id>/`:
 
 ```
 skill.json              # {id, label, description} — maintainer metadata,
@@ -559,13 +559,13 @@ connection bug for flask).
 Two audiences, two places, deliberately not merged:
 
 - **This document set** (`docs/_product/PRODUCT_SPEC.md`/`PRODUCT_FLOW.md`/
-  `PRODUCT_ARCH.md`) is for whoever is *building* flint — spec-numbered
+  `PRODUCT_ARCH.md`) is for whoever is *building* brupy — spec-numbered
   requirements, worked examples of the `when`/`skip_value` mechanism,
   incident write-ups. It guides development direction and is the
   source of truth this whole file is part of.
 - **The docs site** (`docs/*.md` outside `_product/`, built by
   `mkdocs.yml` with the Material theme, published to GitHub Pages) is
-  for whoever is *using* flint — install instructions, a CLI reference,
+  for whoever is *using* brupy — install instructions, a CLI reference,
   one page per template, `.agents/skills/` explained, remembered
   preferences, a contributing guide. Guide/reference tone, not spec
   tone; content is substantially *derived from* this document set and
@@ -623,13 +623,13 @@ templates whose generated project *itself* renders Jinja2 at runtime —
 `templates/base.html`, `templates/index.html`, and
 `templates/partials/*.html` are FastAPI/Flask templates, rendered by
 the generated app's own `Jinja2Templates`/`render_template()` on every
-request. This collides with flint's existing rule that any `.jinja`-
-suffixed file gets rendered through **flint's own** `generator._env` at
+request. This collides with brupy's existing rule that any `.jinja`-
+suffixed file gets rendered through **brupy's own** `generator._env` at
 *generation* time (§4, top of this section) — a rule every other
 template in the codebase relies on unconditionally.
 
-If `index.html.jinja` existed, flint's generator would render it once,
-at `flint new` time, using flint's context (`project_name`,
+If `index.html.jinja` existed, brupy's generator would render it once,
+at `brupy new` time, using brupy's context (`project_name`,
 `package_name`, the resolved options — no `todos`, no `todo`). Its
 `{% for todo in todos %}` would evaluate against an **undefined**
 `todos` (Jinja's default `Undefined` renders as empty in output, no
@@ -646,12 +646,12 @@ check.
 
 **The fix**: `templates/*.html` and `static/css/style.css` carry **no**
 `.jinja` suffix. `generator._render_content` copies a non-`.jinja` file
-byte-for-byte (see the top of §4) — so these files pass through flint's
+byte-for-byte (see the top of §4) — so these files pass through brupy's
 generator completely untouched, `{% for %}`/`{{ }}` and all, and are
 only ever evaluated by the *generated app's* Jinja2 environment, once
-the project is actually running. The one flint-resolved value these
+the project is actually running. The one brupy-resolved value these
 templates need — `app_name` (ultimately `{{ project_name }}`, resolved
-by flint into `core/config.py`'s `Settings` at generation time) — is
+by brupy into `core/config.py`'s `Settings` at generation time) — is
 threaded through at *request* time instead, passed explicitly into the
 render call from the route handler:
 
@@ -663,7 +663,7 @@ return templates.TemplateResponse(
 
 This is a general rule going forward, not a one-off fix: **any file a
 generated project renders with its own templating engine at runtime
-must never carry flint's `.jinja` suffix**, regardless of framework.
+must never carry brupy's `.jinja` suffix**, regardless of framework.
 `test_generator.py`'s `test_full_stack_no_leftover_jinja_in_runtime_templates`
 (and its `test_flask_full_stack.py` equivalent) encode this as a
 regression test — it asserts runtime Jinja syntax *does* survive inside
@@ -679,17 +679,17 @@ lives and what "shipping" it means**, which differs fundamentally
 between the two values:
 
 - **`css=vanilla`**: `style.css` is hand-written source, checked in,
-  rendered by flint like any other file. What you see generated is
+  rendered by brupy like any other file. What you see generated is
   exactly what serves in production.
 - **`css=tailwind`**: `style.css` is a **build artifact**. The checked-in
   source is `static/css/input.css` (a few lines: `@import "tailwindcss"`
   plus an `@theme` block for custom design tokens — Tailwind v4's
   CSS-first config, no `tailwind.config.js`). `style.css` is produced by
   actually *running* the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
-  against `input.css` — flint never writes it, and it's `.gitignore`d in
+  against `input.css` — brupy never writes it, and it's `.gitignore`d in
   the generated project. This mirrors a pattern already established for
   `migrations=true` (schema comes from running a migration, not from
-  `flint new`) and the worker option (a worker process flint doesn't
+  `brupy new`) and the worker option (a worker process brupy doesn't
   start) — a real "one command you must run before this works" step,
   not something to fake at generation time.
 
@@ -707,7 +707,7 @@ built CSS out, binary managed transparently, `init`/`watch`/`build`-
 shaped commands) is modeled directly on
 [`litestar-tailwind-cli`](https://github.com/Tobi-De/litestar-tailwind-cli),
 the reference implementation of this pattern for a Python web framework
-— flint doesn't reimplement binary-downloading logic itself, just
+— brupy doesn't reimplement binary-downloading logic itself, just
 depends on the already-published wrapper.
 
 **Layer structure**: `static/css/style.css` moved *out* of the base
@@ -753,12 +753,12 @@ behavior.
 
 ## 5. Remembered preferences (`prefs.py`)
 
-`~/.flint/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
+`~/.brupy/last.json` (PRODUCT_FLOW.md §6) is deliberately the simplest
 thing that could work: one flat JSON file, no schema/migration
 machinery, best-effort I/O.
 
 ```python
-PREFS_DIR = Path.home() / ".flint"
+PREFS_DIR = Path.home() / ".brupy"
 PREFS_FILE = PREFS_DIR / "last.json"
 ```
 
@@ -797,7 +797,7 @@ construction rather than by caller-side checking:
   failure (missing file, unreadable, invalid JSON, valid JSON that isn't
   an object); `save_prefs` swallows any `OSError` (read-only home
   directory, out of disk, etc.). Neither ever raises — a broken prefs
-  file must never be the reason `flint new` fails.
+  file must never be the reason `brupy new` fails.
 - `get_last_framework(prefs)`, `get_last_template(prefs, framework_id)`,
   `get_template_prefs(prefs, full_id)` — read accessors that double as
   sanitizers: each validates the type of what it reads (e.g. a
@@ -832,7 +832,7 @@ for the template's own `default`:
   falls back to the existing hardcoded default (`False`/`True`/`True`
   respectively); any actual `bool` is used as-is.
 
-This means a template's schema can change across Flint versions — an
+This means a template's schema can change across Brupy versions — an
 option removed, a select's choices narrowed — and an old `last.json`
 entry just silently stops applying to the parts that no longer make
 sense, without any version field or migration step.
@@ -855,7 +855,7 @@ remembering).
 
 | PRODUCT_FLOW step | Module |
 |---|---|
-| Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `flint` invokes `new` via Typer's default-command pattern) |
+| Entry points, flag parsing | `cli.py` (Typer app; `new` command; bare `brupy` invokes `new` via Typer's default-command pattern) |
 | Interactive prompts | `prompts.py` — one function per step, each accepting a pre-supplied flag value and skipping its own prompt if set or if `--yes`/non-TTY. `prompt_framework`/`prompt_template` share a `_select_enabled` helper. |
 | Template option resolution | `prompts.prompt_template_options(template, provided, interactive, last)` — walks `template.options` in order, honoring an explicit `--option`/`-o key=value` override first (validated against the option's `type`/`choices`), else `when`-gating (§4), else a remembered value (§5) if still valid, else prompting or defaulting. `cli.py` parses the repeatable `--option` flag into a `dict[str, str]` via `prompts.parse_option_flags` and rejects unknown keys before resolution. |
 | Remembered preferences | `prefs.py` (§5) — `cli.py` loads once per run and passes slices into each `prompts.*` call; records once, after a successful render. |
@@ -864,7 +864,7 @@ remembering).
 | File generation | `generator.py` |
 | git init / uv sync | `postgen.py` — each step wrapped so a missing `git`/`uv` binary warns and continues rather than raising |
 | Summary / next steps | `postgen.py` (`print_summary`), using `rich`; prints a leading `Options: k=v, ...` line when the template declared any |
-| Exit codes | `errors.py` defines `FlintUserError` (→1) and lets anything else bubble to Typer's default handler (→2); the top-level command wraps generation in a `try/except FlintUserError` |
+| Exit codes | `errors.py` defines `BrupyUserError` (→1) and lets anything else bubble to Typer's default handler (→2); the top-level command wraps generation in a `try/except BrupyUserError` |
 
 TTY detection for non-interactive mode: `sys.stdin.isatty()`, overridable
 by explicit `--yes`.
@@ -876,7 +876,7 @@ downgrades to `docker=False` with a warning *before* calling
 `generator.render`, so the render context (`Answers.docker`) always
 matches what was actually generated.
 
-`flint list-templates` (since v0.10) is a separate, standalone `@app.
+`brupy list-templates` (since v0.10) is a separate, standalone `@app.
 command`, deliberately outside `_run_new`'s flow entirely — it's pure
 introspection (`generator.list_frameworks()` × `generator.
 list_templates()`, rendered as a `rich.table.Table`), generates
@@ -889,11 +889,11 @@ roadmap rather than just what's usable today.
 
 ## 7. Testing strategy
 
-`pytest` runs with `--cov=flint --cov-report=term-missing
+`pytest` runs with `--cov=brupy --cov-report=term-missing
 --cov-fail-under=100` by default (`[tool.pytest.ini_options]` in
 `pyproject.toml`), with branch coverage on
 (`[tool.coverage.run] branch = true`) — the suite fails the moment any
-line *or* branch in `src/flint/` goes uncovered, not just when a whole
+line *or* branch in `src/brupy/` goes uncovered, not just when a whole
 function is untested. `uv run pytest` is enough to check both tests and
 coverage locally; use `uv run pytest --no-cov` while iterating to skip
 the gate temporarily.
@@ -906,7 +906,7 @@ the gate temporarily.
   render with/without `docker`/`config`; the non-empty-directory guard,
   disabled-framework/-template rejection (synthesized via a
   `TEMPLATES_DIR` monkeypatch, since both real templates are enabled
-  now), rollback-on-failure (including that a `FlintError` mid-render
+  now), rollback-on-failure (including that a `BrupyError` mid-render
   still rolls back, and that a pre-existing `--force` directory is never
   deleted); the verbatim-copy path for non-`.jinja` files;
   `list_frameworks`/`list_templates` skipping entries without
@@ -955,21 +955,21 @@ the gate temporarily.
   `isolated_prefs_dir` autouse fixture monkeypatches `prefs.PREFS_DIR`/
   `prefs.PREFS_FILE` to a per-test `tmp_path` subdirectory — this is what
   keeps every test in the suite (not just `test_prefs.py`) from ever
-  touching the real `~/.flint`, and from leaking remembered state between
+  touching the real `~/.brupy`, and from leaking remembered state between
   tests. `test_cli.py` layers end-to-end coverage on top: a full
   remember → next-run-uses-it round trip through `CliRunner`,
   `--no-remember` skipping both the read and the write, an explicit flag
   still winning over a remembered value, and a stale remembered option
   value falling back to the template's own default.
-- `test_main.py` — covers the `python -m flint` / `python -m flint.cli`
+- `test_main.py` — covers the `python -m brupy` / `python -m brupy.cli`
   entry-point guards via `runpy.run_module(..., run_name="__main__")`,
-  plus a plain `import flint.__main__` to cover the guard's not-taken
+  plus a plain `import brupy.__main__` to cover the guard's not-taken
   branch.
 - `test_flask_hello_world.py` / `test_flask_rest_api.py` /
   `test_flask_full_stack.py` — Flask's mirror of the FastAPI
   hello-world/rest-api/full-stack coverage above (rendered
   combinations, `ast.parse()`/`tomllib.loads()` checks, plus a check
-  that `templates/`/`static/` content survives flint's generator with
+  that `templates/`/`static/` content survives brupy's generator with
   its runtime Jinja2 syntax intact — see §4.7). Kept as standalone
   files rather than folded into `test_generator.py`, since they exist
   purely to cover a second framework's content, not the generator
@@ -1088,7 +1088,7 @@ surfaced by actually running the generated tooling:
 
 ## 8. Versioning & release mechanics
 
-- `src/flint/__init__.py` holds `__version__`, single source of truth;
+- `src/brupy/__init__.py` holds `__version__`, single source of truth;
   `pyproject.toml`'s `version` is kept in sync manually for v0 (a
   version-sync script/tool is a reasonable v0.x addition, not needed for
   one release).
@@ -1099,8 +1099,8 @@ surfaced by actually running the generated tooling:
   `main` and every PR — `uv sync --locked` (fails if `uv.lock` drifted
   from `pyproject.toml`), `uv run pytest` (the same 100%-coverage-gated
   suite documented in §7), and a smoke check that the installed console
-  script actually runs (`uv run flint --version`). Single Python
-  version (3.11, the floor in `requires-python`) — flint's own code has
+  script actually runs (`uv run brupy --version`). Single Python
+  version (3.11, the floor in `requires-python`) — brupy's own code has
   no version-specific branches, so a matrix would mostly re-run the
   same thing.
 - **CD** (`.github/workflows/cd.yml`, since v0.10.1): fires on pushing a
@@ -1169,7 +1169,7 @@ surfaced by actually running the generated tooling:
 
 Nothing is currently deferred — as of v0.10.0 every item previously
 tracked here is resolved (see PRODUCT_SPEC.md §12 and CHANGELOG.md):
-`--force` overwrite confirmation and `flint list-templates` shipped;
+`--force` overwrite confirmation and `brupy list-templates` shipped;
 package-manager choice and template distribution were closed as
 deliberate design decisions (uv-only, bundled-only) rather than left
 open. This section exists so a *new* non-goal has a documented home —

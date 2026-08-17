@@ -1,8 +1,8 @@
-# flint
+# brupy
 
-[![CI](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/flint/actions/workflows/ci.yml)
-[![Docs](https://github.com/abdulazeezoj/flint/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/flint/)
-[![PyPI](https://img.shields.io/pypi/v/flint-kit)](https://pypi.org/project/flint-kit/)
+[![CI](https://github.com/abdulazeezoj/brupy/actions/workflows/ci.yml/badge.svg)](https://github.com/abdulazeezoj/brupy/actions/workflows/ci.yml)
+[![Docs](https://github.com/abdulazeezoj/brupy/actions/workflows/docs.yml/badge.svg)](https://abdulazeezoj.github.io/brupy/)
+[![PyPI](https://img.shields.io/pypi/v/brupy)](https://pypi.org/project/brupy/)
 
 Strike a spark, get a running project. Instant scaffolding for popular
 unopinionated Python web frameworks (FastAPI, Flask, and friends). One
@@ -12,7 +12,7 @@ wizard wires up a real database, migrations, and a background worker
 too.
 
 ```
-uvx --from flint-kit flint
+uvx brupy
 ```
 
 ```
@@ -43,53 +43,53 @@ Next steps:
   uv run taskiq worker my_api.worker:broker --app-dir src   # separate process
 ```
 
-**📖 Full documentation: [abdulazeezoj.github.io/flint](https://abdulazeezoj.github.io/flint/)**.
+**📖 Full documentation: [abdulazeezoj.github.io/brupy](https://abdulazeezoj.github.io/brupy/)**.
 Getting started, a full CLI reference, one page per template (options,
 generated layout, gotchas), the `.agents/skills/` catalog, remembered
 preferences, and how to contribute.
 
 ## Install
 
-Persistent `flint` on PATH:
+Persistent `brupy` on PATH:
 
 ```
-uv tool install flint-kit
+uv tool install brupy
 ```
 
 Or run it ephemerally, no install:
 
 ```
-uvx --from flint-kit flint
+uvx brupy
 ```
 
 ## Usage
 
 ```
-flint                                     # interactive wizard
-flint new my-api                           # interactive, name pre-filled
-flint new my-api \
+brupy                                     # interactive wizard
+brupy new my-api                           # interactive, name pre-filled
+brupy new my-api \
   --framework fastapi --template rest-api \
   -o database=sqlite -o orm=sqlmodel \
   --docker --git --install --yes            # fully non-interactive, for scripts/CI
-flint list-templates                       # what's available, without generating anything
-flint --version
-flint --help
+brupy list-templates                       # what's available, without generating anything
+brupy --version
+brupy --help
 ```
 
-Every prompt has a matching flag, and Flint remembers your last
-choices in `~/.flint/last.json` as the new default next time. See the
-[CLI Reference](https://abdulazeezoj.github.io/flint/cli-reference/)
-and [Remembered Preferences](https://abdulazeezoj.github.io/flint/preferences/)
+Every prompt has a matching flag, and Brupy remembers your last
+choices in `~/.brupy/last.json` as the new default next time. See the
+[CLI Reference](https://abdulazeezoj.github.io/brupy/cli-reference/)
+and [Remembered Preferences](https://abdulazeezoj.github.io/brupy/preferences/)
 docs for the full details.
 
-Driving flint from an AI coding agent? [`.agents/skills/flint/`](.agents/skills/flint/)
+Driving brupy from an AI coding agent? [`.agents/skills/brupy/`](.agents/skills/brupy/)
 is a portable agent skill that teaches an agent how to invoke the CLI
-to scaffold a project. It's symlinked at `.claude/skills/flint/` for
+to scaffold a project. It's symlinked at `.claude/skills/brupy/` for
 Claude Code's own discovery path. Separate from the `.agents/skills/`
 catalog described below, which covers using the *generated* project's
 own stack.
 
-## What flint ships
+## What brupy ships
 
 A project is always generated from a `<framework>/<template>` pair:
 **FastAPI** and **Flask**, each with a **Hello World** starter, a fuller
@@ -99,8 +99,8 @@ with the same choices rendered server-side with Jinja2 and HTMX instead
 of JSON (optionally styled with Tailwind CSS). Every generated project
 also gets `.agents/skills/`: deeper, library-specific reference
 material for exactly the stack it uses. See the
-[Templates](https://abdulazeezoj.github.io/flint/project-templates/)
-and [Agent Skills](https://abdulazeezoj.github.io/flint/agent-skills/)
+[Templates](https://abdulazeezoj.github.io/brupy/project-templates/)
+and [Agent Skills](https://abdulazeezoj.github.io/brupy/agent-skills/)
 docs for what each one actually generates.
 
 ## Project structure
@@ -135,7 +135,7 @@ my-api/
 `hello-world` is the same shape, minus the extras. `full-stack` swaps
 `routes/` + `schemas.py` for `routes/` returning HTML fragments plus
 `templates/` + `static/` (Jinja2 + HTMX, optionally Tailwind CSS). See
-[Templates](https://abdulazeezoj.github.io/flint/project-templates/)
+[Templates](https://abdulazeezoj.github.io/brupy/project-templates/)
 for the exact generated layout of every framework and template
 combination.
 
@@ -144,11 +144,11 @@ combination.
 ```
 uv sync
 uv run pytest       # also runs coverage; the suite fails under 100%
-uv run flint --help
+uv run brupy --help
 ```
 
 Adding a framework, template, or skill is a content-only change. No
 code edits needed. See the
-[Contributing](https://abdulazeezoj.github.io/flint/contributing/)
+[Contributing](https://abdulazeezoj.github.io/brupy/contributing/)
 docs for the full local-setup, template/skill-authoring, and release
 process, or [`CHANGELOG.md`](CHANGELOG.md) for release history.

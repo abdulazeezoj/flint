@@ -1,8 +1,8 @@
 import pytest
 
-import flint.naming as naming_module
-from flint.errors import FlintUserError
-from flint.naming import validate_project_name
+import brupy.naming as naming_module
+from brupy.errors import BrupyUserError
+from brupy.naming import validate_project_name
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ def test_validate_project_name_ok(raw, expected_slug, expected_package):
     ],
 )
 def test_validate_project_name_rejects(raw):
-    with pytest.raises(FlintUserError):
+    with pytest.raises(BrupyUserError):
         validate_project_name(raw)
 
 
@@ -47,5 +47,5 @@ def test_validate_project_name_rejects_non_identifier_defensively(monkeypatch):
     # it directly by forcing package_name_from_slug to misbehave.
     monkeypatch.setattr(naming_module, "package_name_from_slug", lambda slug: "1-not-ok")
 
-    with pytest.raises(FlintUserError, match="cannot be turned into a valid Python package name"):
+    with pytest.raises(BrupyUserError, match="cannot be turned into a valid Python package name"):
         validate_project_name("whatever")
