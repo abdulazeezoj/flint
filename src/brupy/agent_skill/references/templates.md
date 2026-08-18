@@ -79,17 +79,21 @@ presentation, not the backend stack:
 
 | Option | Choices | Default |
 |---|---|---|
-| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI — no Node.js/npm) | `vanilla` |
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 + daisyUI, built via Bun) | `vanilla` |
 
-Reach for `-o css=tailwind` whenever the user mentions Tailwind, wants a
-more polished/production-ready look than a plain stylesheet, or is
-already a Tailwind user — it's still zero extra tooling to install
-beyond what `uv sync` already pulls in (`pytailwindcss` downloads the
-platform binary itself). One thing to flag: a freshly generated
-`css=tailwind` project has **no styling until the CSS is built once** —
-`uv run tailwindcss -i src/<package>/static/css/input.css -o
-src/<package>/static/css/style.css` (add `--watch` while iterating). If
-`--docker` was also passed, the Dockerfile runs this automatically as
+Reach for `-o css=tailwind` whenever the user mentions Tailwind,
+daisyUI, wants a more polished/component-driven look than a plain
+stylesheet, or is already a Tailwind user. Unlike every other option
+this CLI offers, this one has a real extra prerequisite: [Bun](https://bun.sh)
+must be installed — frontend deps (`tailwindcss`, `@tailwindcss/cli`,
+`daisyui`) live in a new `package.json`, installed via `bun install`,
+fully separate from `pyproject.toml`/`uv sync`. Flag this to the user
+if they haven't mentioned Bun already. One thing to flag: a freshly
+generated `css=tailwind` project has **no styling until the CSS is
+built once** — `bun install && bun run build:css` (or `bun run
+watch:css` while iterating; `uv run dev.py` runs the dev server and
+this watcher together, one command). If `--docker` was also passed,
+the Dockerfile runs the Bun build automatically in its own stage as
 part of the image build, so that combination needs no extra step.
 
 ## Example commands
@@ -122,7 +126,7 @@ brupy new my-app --framework fastapi --template full-stack \
   -o database=sqlite -o orm=sqlmodel --yes
 ```
 
-Flask, server-rendered with Tailwind CSS instead of the vanilla stylesheet:
+Flask, server-rendered with Tailwind CSS + daisyUI instead of the vanilla stylesheet (needs Bun installed):
 
 ```bash
 brupy new my-app --framework flask --template full-stack \

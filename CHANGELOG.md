@@ -9,6 +9,17 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.21.1 — 2026-08-18
+
+### Fixed
+
+- **The `brupy` agent skill itself (`src/brupy/agent_skill/`) still described `css=tailwind` as the old standalone-CLI/no-Node.js approach** — a leftover from v0.21.0's pivot to Bun + daisyUI that only touched the generated-project-facing docs, not the CLI-usage skill an agent relies on to scaffold correctly. `SKILL.md` and `references/templates.md` now describe the real prerequisite (Bun) and the real build commands.
+- **`fastapi/full-stack` and `flask/full-stack`'s `template.json` still labeled the `css=tailwind` choice "Tailwind CSS (standalone CLI, no Node.js)"** in the interactive wizard and `list-templates` output — updated to "Tailwind CSS + daisyUI (via Bun)".
+
+### Added
+
+- **`references/daisyui-components.md`** in every generated project's `.agents/skills/tailwind/` (only with `css=tailwind`): the full daisyUI component catalog (80+ components by category), a discovery protocol for picking the right one before hand-composing utilities, and gotchas for specific components (accordion radio grouping, drawer toggle IDs, modal `<dialog>`, hover-3d's nine-child requirement, text-rotate's six-line limit). Previously the skill only documented the ~4 components this project's own templates happen to use; this adds the wider vocabulary needed to build anything beyond that. Adapted from daisyUI's own [official skill](https://daisyui.com/docs/skill/) into this project's SKILL.md + `references/` shape.
+
 ## v0.21.0 — 2026-08-18
 
 ### Changed

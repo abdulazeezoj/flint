@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-18 (v0.21.0: `full-stack`'s `css=tailwind` moves from the standalone Tailwind CLI to a Bun + daisyUI toolchain — see §4.8)
+**Last updated:** 2026-08-18 (v0.21.1: fixes stale standalone-CLI wording left over from v0.21.0 in the `brupy` skill/`template.json`, adds a daisyUI component-catalog reference to the generated `tailwind` skill — see §4.8/§4.5)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `brupy` CLI itself (not the projects it generates).

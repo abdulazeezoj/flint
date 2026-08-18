@@ -57,9 +57,12 @@ plus whatever options that template declares:
    don't — Taskiq is async-first and doesn't fit Flask's sync/WSGI
    model). `full-stack` takes the same database/ORM/migrations/worker
    options as `rest-api`, plus one it alone has: `-o css=tailwind` swaps
-   the plain stylesheet for Tailwind CSS v4 (via the standalone CLI — no
-   Node.js/npm needed). Reach for it whenever the user mentions Tailwind
-   or wants a more polished look than a bare stylesheet.
+   the plain stylesheet for Tailwind CSS v4 + daisyUI, built via
+   [Bun](https://bun.sh) (frontend deps live in a separate `package.json`,
+   never touching `pyproject.toml`/`uv sync`). Reach for it whenever the
+   user mentions Tailwind, daisyUI, or wants a more polished/component-
+   driven look than a bare stylesheet — it does mean Bun becomes a real
+   prerequisite (not just `uv`), unlike every other option this CLI offers.
 
 Always generate **non-interactively** (`--yes` plus explicit flags/`-o`
 values for anything the user specified) rather than trying to drive the

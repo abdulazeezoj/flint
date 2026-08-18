@@ -44,7 +44,7 @@ wheels = [
 
 [[package]]
 name = "brupy"
-version = "0.21.0"
+version = "0.21.1"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },

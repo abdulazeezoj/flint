@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-18 (v0.21.0: `full-stack`'s `css=tailwind` moves to Bun + daisyUI, replacing the standalone Tailwind CLI — see §11)
+**Last updated:** 2026-08-18 (v0.21.1: fixes stale standalone-CLI wording left over from v0.21.0 in the `brupy` skill/`template.json`, adds a full daisyUI component-catalog reference to the generated `tailwind` skill — see §11)
 
 ## 1. Vision
 
@@ -473,6 +473,17 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   image. `css=vanilla` remains the default — this is an opt-in
   presentation choice, not a new baseline dependency for every generated
   project. See PRODUCT_ARCH.md §4.8 for the full design.
+- `v0.21.1` — fixes two leftovers from `v0.21.0`'s pivot that only
+  touched the generated-project-facing docs: the `brupy` agent skill
+  itself (`src/brupy/agent_skill/`) still described `css=tailwind` as
+  the old standalone-CLI/no-Node.js approach, and both `full-stack`
+  templates' `template.json` still labeled the choice "standalone CLI,
+  no Node.js" in the wizard/`list-templates` output. Also adds
+  `references/daisyui-components.md` to the generated `tailwind` skill
+  (only with `css=tailwind`): the full daisyUI component catalog beyond
+  the ~4 components this project's own templates use, a discovery
+  protocol, and component-specific gotchas — adapted from daisyUI's own
+  official skill into this project's shape.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 
