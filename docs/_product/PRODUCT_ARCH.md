@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-15 (v0.19.0: renamed Flint → Brupy — see §2/§3)
+**Last updated:** 2026-08-18 (v0.20.0: CLAUDE.md/.claude/skills for generated projects, `install-skill`, update-check — see §2/§3/§4.5/§5.1/§5.2)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `brupy` CLI itself (not the projects it generates).
@@ -37,6 +37,15 @@ is a contained change, not a rewrite.
   `npx create-next-app` is normally invoked.
 - Build backend: `hatchling` via `uv`'s default `uv init --package`
   project shape (src layout).
+- Everything the installed package needs to *do its job standalone* —
+  `templates/`, the `skills/<id>/` catalog, and (since v0.20.0)
+  `agent_skill/`, the content behind `brupy install-skill` — lives
+  inside `src/brupy/`, not just the `.py` modules. `uv`'s default
+  packaging already includes non-Python files under the package
+  directory (this predates v0.20.0 — `templates/`/`skills/` have always
+  relied on it); `agent_skill/` follows the same convention rather than
+  needing new packaging config. See §5.2 for why this repo's own
+  `.agents/skills/brupy/` is a symlink into it, not a second copy.
 
 ## 3. Repository layout
 
@@ -44,13 +53,12 @@ is a contained change, not a rewrite.
 brupy/
 ├── .agents/
 │   └── skills/
-│       └── brupy/                  # portable agent skill teaching an agent how to *use*
-│           │                       # the brupy CLI itself — unrelated to SKILLS_DIR (§4.5),
-│           │                       # which brupy bundles *into generated projects*
-│           ├── SKILL.md
-│           └── references/
-│               ├── cli-reference.md
-│               └── templates.md
+│       └── brupy -> ../../src/brupy/agent_skill   # symlink (since v0.20.0) — the real
+│                                                    # content ships inside the package
+│                                                    # itself, see src/brupy/agent_skill/
+│                                                    # below and §5.2; unrelated to
+│                                                    # SKILLS_DIR (§4.5), which brupy
+│                                                    # bundles *into generated projects*
 ├── .claude/
 │   └── skills/
 │       └── brupy -> ../../.agents/skills/brupy   # symlink, for Claude Code's own
@@ -93,7 +101,16 @@ brupy/
 │       ├── generator.py         # template renderer: options, layers, Jinja2
 │       ├── postgen.py           # git init, uv sync, summary printing
 │       ├── prefs.py             # ~/.brupy/last.json — best-effort read/write
+│       ├── updatecheck.py       # best-effort "newer version on PyPI" notice — see §5.1
+│       ├── skillinstall.py      # `brupy install-skill` — see §5.2
 │       ├── errors.py            # BrupyError and friends -> exit codes
+│       ├── agent_skill/         # the `brupy` skill's REAL content (since v0.20.0) —
+│       │   │                    # .agents/skills/brupy/ above symlinks here, so this
+│       │   │                    # ships inside the installed package too — see §5.2
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── cli-reference.md
+│       │       └── templates.md
 │       └── templates/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
@@ -138,7 +155,9 @@ brupy/
 │           │   flask-sqlalchemy/ alembic/ flask-migrate/ taskiq/
 │           │   celery/ redis/ pytest/                # same shape as fastapi/ above
 ├── tests/
-│   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
+│   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE and
+│   │                              # updatecheck.CACHE_FILE per test, disables the
+│   │                              # update check's network path entirely (BRUPY_NO_UPDATE_CHECK)
 │   ├── test_naming.py
 │   ├── test_generator.py
 │   ├── test_flask_hello_world.py
@@ -148,6 +167,8 @@ brupy/
 │   ├── test_cli.py
 │   ├── test_postgen.py
 │   ├── test_prefs.py
+│   ├── test_updatecheck.py       # mocks urllib.request.urlopen — never a real network call
+│   ├── test_skillinstall.py
 │   └── test_main.py
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -542,6 +563,20 @@ authored content, just an index over what actually got included, since
 `git status`/directory-listing is a worse way to discover "what skills
 does this project have."
 
+**`.claude/skills/` and `CLAUDE.md` (since v0.20.0).** Two more things
+`render()` writes unconditionally, after the skills/index step:
+`_write_claude_skill_symlinks` symlinks `.claude/skills/<id>` to
+`../../.agents/skills/<id>` for every matched skill (only if there are
+any — same guard as the README index), and `_write_claude_md` writes a
+one-line `CLAUDE.md` (`@AGENTS.md`) unconditionally (every template's
+base layer ships `AGENTS.md`, so this always has something to point
+at). Both mirror the `.agents/`-is-canonical/`.claude/`-symlinks-to-it
+pattern this repo's own `flint`/`brupy` skill has used since v0.17.1 —
+generated projects now get the identical structure, not just this repo.
+The symlink step is best-effort (`except OSError: continue` per skill,
+same rationale as `skillinstall.py`'s — see §5.2 above); `CLAUDE.md`
+itself is a plain file write and can't fail the same way.
+
 **Bootstrapping**: the `fastapi` skill was hand-built first and used to
 validate the whole mechanism end-to-end (rendering, substitution,
 when-gating, the generated index) before the remaining ten
@@ -850,6 +885,63 @@ after rendering (so a failed/rolled-back generation never gets
 remembered) but before the git-init/install steps (whose success/failure
 doesn't change what was actually *requested*, which is what's worth
 remembering).
+
+### 5.1 Update check (`updatecheck.py`)
+
+Same "best-effort home-directory file, never allowed to break the
+primary thing" philosophy as `prefs.py` above, applied to a single
+question: is a newer brupy on PyPI? `~/.brupy/update_check.json` caches
+the answer for `_CHECK_INTERVAL_SECONDS` (24h) so an interactive run
+doesn't hit the network every single time — `check_for_update(*,
+interactive)` reads the cache, and only calls
+`urllib.request.urlopen("https://pypi.org/pypi/brupy/json", timeout=1.5)`
+when it's missing or stale. Every failure mode (offline, timeout,
+malformed JSON, missing `info.version` key, a corrupt cache file, a
+read-only home directory on the write side) is caught and treated as
+"nothing to report" — `check_for_update` never raises. Version
+comparison (`_parse_version`) is deliberately not full PEP 440: split on
+`.`, take each segment's leading digit run, pad to three — good enough
+for "is there something newer," and tolerant of a pre-release suffix
+like `1.2.3rc1` without choking on it.
+
+Called once, at the very end of `cli.py._run_new`, only after
+`postgen.print_summary` — a courtesy notice, never a blocker, and
+skipped outright (no network attempt at all) when `interactive=False`,
+`BRUPY_NO_UPDATE_CHECK` or `CI` is set. Stdlib `urllib.request` only —
+no new HTTP client dependency for one small, infrequent GET.
+
+### 5.2 Skill installer (`skillinstall.py`) and where the `brupy` skill lives
+
+`brupy install-skill` needs the *same* skill content
+`.agents/skills/flint/`/`.agents/skills/brupy/` has always held (how to
+invoke this CLI) to be reachable from an **installed** `brupy` — a
+`pip install`/`uv tool install` never clones this repo, so anything
+outside `src/brupy/` doesn't ship in the wheel. As of v0.20.0 the real
+content lives at `src/brupy/agent_skill/` (packaged exactly like
+`templates/` and `skills/` already are), and this repo's own
+`.agents/skills/brupy/` is a **symlink** to it
+(`.agents/skills/brupy -> ../../src/brupy/agent_skill`) — one copy,
+whether you're reading brupy's own source tree or a wheel someone
+installed from PyPI. `.claude/skills/brupy` still symlinks to
+`.agents/skills/brupy` as before; it just resolves through one extra
+hop now.
+
+`skillinstall.install(scope, force=False)` copies `AGENT_SKILL_DIR`
+(`src/brupy/agent_skill/`) into `<root>/.agents/skills/brupy/` via
+`shutil.copytree` (a plain copy — this content has no per-project
+Jinja context, unlike `generator.py`'s templates) and symlinks
+`<root>/.claude/skills/brupy` to it, where `<root>` is `Path.cwd()` for
+`scope="project"` or `Path.home()` for `scope="user"` — resolved at
+call time, not cached at import time, so both are actually
+monkeypatchable in tests (an earlier draft cached them in a
+module-level dict and silently ignored test patches — see the
+`_VALID_SCOPES` comment in the source). Refuses to overwrite either
+target without `force`, matching `generator.render()`'s non-empty-
+directory refusal. The `.claude/skills/` symlink is best-effort, same
+`except OSError: continue` shape as `generator.py`'s per-skill
+symlinks (§4.5) — `AGENT_SKILL_DIR` itself never fails to copy, so
+`install-skill` always leaves *something* behind even on a platform
+that can't symlink.
 
 ## 6. CLI flow → code mapping
 

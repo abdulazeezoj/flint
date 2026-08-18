@@ -160,6 +160,43 @@ def test_render_includes_expected_skills(tmp_path: Path):
     assert not (target / ".agents/skills/pydantic-settings").exists()
 
 
+def test_render_writes_claude_md_pointing_at_agents_md(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert Path("CLAUDE.md") in created
+    assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+
+
+def test_render_symlinks_claude_skills_to_agents_skills(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert Path(".claude/skills/fastapi") in created
+    assert Path(".claude/skills/pytest") in created
+    link = target / ".claude/skills/fastapi"
+    assert link.is_symlink()
+    assert link.resolve() == (target / ".agents/skills/fastapi").resolve()
+
+
+def test_render_skips_claude_skill_symlinks_it_cannot_create(tmp_path: Path, monkeypatch):
+    # Mirrors prefs.py's best-effort philosophy: a platform that refuses
+    # symlink creation without elevated privileges (Windows without
+    # Developer Mode, some restricted filesystems) must not break
+    # generation — it just doesn't get the .claude/skills/ mirror, and the
+    # real .agents/skills/ catalog is unaffected either way.
+    monkeypatch.setattr(
+        generator_module.os,
+        "symlink",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("no symlink permission")),
+    )
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert not any(p.parts[:2] == (".claude", "skills") for p in created)
+    assert (target / ".agents/skills/fastapi/SKILL.md").is_file()
+
+
 def test_render_with_docker_adds_dockerfile(tmp_path: Path):
     target = tmp_path / "my-api"
     created = render("fastapi", "hello-world", target, make_answers(docker=True))
@@ -242,7 +279,7 @@ def test_render_force_overwrites_nonempty_directory(tmp_path: Path):
 
     created = render("fastapi", "hello-world", target, make_answers(), force=True)
     assert (target / "pyproject.toml").is_file()
-    assert len(created) == 18  # 7 project files + 11 fastapi/pytest skill files
+    assert len(created) == 21  # 7 project files + 11 fastapi/pytest skill files + CLAUDE.md + 2 .claude/skills symlinks
 
 
 def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
@@ -929,7 +966,7 @@ def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monk
         "widget", "basic", target, make_answers(framework="widget", template="basic", docker=True)
     )
 
-    assert created == [Path("README.md")]
+    assert created == [Path("CLAUDE.md"), Path("README.md")]
 
 
 def _write_skill(skills_root: Path, skill_id: str, label: str = "Widget Skill") -> None:

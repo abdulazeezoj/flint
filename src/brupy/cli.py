@@ -17,7 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from brupy import __version__
-from brupy import generator, postgen, prefs, prompts
+from brupy import generator, postgen, prefs, prompts, skillinstall, updatecheck
 from brupy.errors import BrupyUserError
 
 app = typer.Typer(add_completion=False, no_args_is_help=False)
@@ -159,6 +159,40 @@ def list_templates_cmd() -> None:
     )
 
 
+@app.command("install-skill")
+def install_skill_cmd(
+    scope: Annotated[
+        str,
+        typer.Option(
+            "--scope",
+            help=(
+                "'project' installs into the current directory "
+                "(.agents/skills/brupy/, .claude/skills/brupy symlinked to it); "
+                "'user' installs into your home directory instead, so every "
+                "project picks it up without a per-project install."
+            ),
+        ),
+    ] = "project",
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite an existing install at that scope."),
+    ] = False,
+) -> None:
+    """Install the `brupy` agent skill (teaches a coding agent how to
+    invoke this CLI) at project or user scope — useful when the agent
+    working in a repo never scaffolded it with brupy in the first place."""
+    try:
+        root = Path.cwd() if scope == "project" else Path.home()
+        written = skillinstall.install(scope, force=force)
+    except BrupyUserError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[bold green]Installed[/bold green] the brupy skill at {scope} scope:")
+    for path in written:
+        console.print(f"  [green]✔[/green] {(root / path).as_posix()}")
+
+
 def _run_new(
     *,
     name: Optional[str],
@@ -271,6 +305,15 @@ def _run_new(
             run_command=chosen_framework.run_command.format(package_name=package_name),
             options=resolved_options,
         )
+
+        newer_version = updatecheck.check_for_update(interactive=interactive)
+        if newer_version:
+            console.print()
+            console.print(
+                f"[yellow]A newer brupy is available: {newer_version} "
+                f"(you have {__version__}).[/yellow] Run [bold]uv tool install "
+                "--upgrade brupy[/bold] to update."
+            )
     except BrupyUserError as exc:
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from None

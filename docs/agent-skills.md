@@ -11,6 +11,13 @@ it next — human or AI coding agent:
   Not a replacement for `AGENTS.md` — the complementary layer you reach for
   when you're actually touching that library, not before.
 
+Both are tool-neutral (no `.agents/` prefix is Claude-specific), so every
+project also gets a one-line `CLAUDE.md` — literally just `@AGENTS.md`,
+Claude Code's own file-import syntax — and a `.claude/skills/<id>/`
+symlinked to each matched `.agents/skills/<id>/`. Claude Code finds the
+exact same content through its own discovery paths with nothing
+Claude-specific to author or keep in sync by hand.
+
 Skills are the layer worth unpacking: what's actually inside one, how a
 project ends up with exactly the set it has, and the full catalog on offer.
 
@@ -171,6 +178,23 @@ you picked.
 | `jinja2` | FastAPI + Flask, `full-stack` | Template inheritance, includes, autoescaping, and whitespace control — how this project's server-rendered pages use Jinja2. |
 | `htmx` | FastAPI + Flask, `full-stack` | hx-post/hx-target/hx-swap/hx-trigger, out-of-band swaps, and the fragment-response contract — how this project's Todo list updates in place without a client-side JS framework. |
 | `tailwind` | FastAPI + Flask, `full-stack` with `css=tailwind` | The `@theme` directive, utility classes, and the standalone-CLI build step — how this project's `css=tailwind` option styles pages without Node.js. |
+
+## Retrofitting the `brupy` skill into an existing project
+
+Everything above is the catalog *generated projects* get — reference
+material about the libraries they use. There's one more skill, `brupy`
+itself (how to invoke this CLI), that every generated project also gets
+for free but which an existing repo — brupy-generated or not — never
+picked up if it wasn't scaffolded with brupy in the first place. Add it
+with:
+
+```bash
+brupy install-skill                # into the current project
+brupy install-skill --scope user   # once, into every project
+```
+
+See [CLI Reference → `brupy install-skill`](cli-reference.md#brupy-install-skill)
+for the flags.
 
 ## Why this exists
 

@@ -39,6 +39,7 @@ matter of editing `template.json`/adding files — no changes here.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -356,6 +357,8 @@ def render(
             created.extend(_render_skill(skill, target_dir, context))
         if matched_skills:
             created.append(_write_skills_index(target_dir, matched_skills))
+            created.extend(_write_claude_skill_symlinks(target_dir, matched_skills))
+        created.append(_write_claude_md(target_dir))
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
             shutil.rmtree(target_dir, ignore_errors=True)
@@ -428,6 +431,48 @@ def _write_skills_index(target_dir: Path, skills: list[SkillMeta]) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return _SKILLS_INDEX_PATH
+
+
+_CLAUDE_SKILLS_DIR = Path(".claude", "skills")
+
+
+def _write_claude_skill_symlinks(target_dir: Path, skills: list[SkillMeta]) -> list[Path]:
+    """Symlink `.claude/skills/<id>` -> `../../.agents/skills/<id>` for every
+    matched skill, mirroring exactly how this repo's own `flint`/`brupy`
+    skill is set up (`.agents/skills/` as the real, tool-neutral content,
+    `.claude/skills/` as Claude Code's own discovery path pointing at it) —
+    so Claude Code finds the same skills without a second, easily-drifting
+    copy. Best-effort: a platform that can't create symlinks without
+    elevated privileges (notably Windows without Developer Mode) just
+    doesn't get this dir, exactly like `prefs.py`'s best-effort writes —
+    the `.agents/skills/` catalog itself is unaffected either way.
+    """
+    created: list[Path] = []
+    claude_skills_dir = target_dir / _CLAUDE_SKILLS_DIR
+    for skill in skills:
+        link_path = claude_skills_dir / skill.id
+        link_target = Path("..", "..", ".agents", "skills", skill.id)
+        try:
+            claude_skills_dir.mkdir(parents=True, exist_ok=True)
+            os.symlink(link_target, link_path, target_is_directory=True)
+        except OSError:
+            continue
+        created.append(_CLAUDE_SKILLS_DIR / skill.id)
+    return created
+
+
+_CLAUDE_MD_PATH = Path("CLAUDE.md")
+
+
+def _write_claude_md(target_dir: Path) -> Path:
+    """`CLAUDE.md` is a one-line pointer at `AGENTS.md`
+    (`@AGENTS.md`, Claude Code's own file-import syntax), not a second
+    copy of it — every template's base layer already ships `AGENTS.md`,
+    so this makes Claude Code load the exact same content instead of
+    requiring a separately-maintained Claude-specific file."""
+    dest = target_dir / _CLAUDE_MD_PATH
+    dest.write_text("@AGENTS.md\n", encoding="utf-8")
+    return _CLAUDE_MD_PATH
 
 
 def _render_relative_path(rel_source: Path, context: dict) -> Path:

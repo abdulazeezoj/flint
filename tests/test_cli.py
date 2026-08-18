@@ -623,3 +623,65 @@ def test_list_templates_cmd_marks_disabled_entries(tmp_path: Path, monkeypatch):
     assert result.exit_code == 0, result.stdout
     assert "Widget (coming soon)" in result.stdout
     assert "Basic (coming soon)" in result.stdout
+
+
+def test_new_prints_update_notice_when_newer_version_available(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.updatecheck, "check_for_update", lambda *, interactive: "99.0.0")
+    result = runner.invoke(
+        app,
+        ["new", "my-api", "--framework", "fastapi", "--template", "hello-world", "--yes",
+         "--no-git", "--no-install"],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "A newer brupy is available: 99.0.0" in result.stdout
+
+
+def test_new_no_update_notice_when_already_current(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.updatecheck, "check_for_update", lambda *, interactive: None)
+    result = runner.invoke(
+        app,
+        ["new", "my-api", "--framework", "fastapi", "--template", "hello-world", "--yes",
+         "--no-git", "--no-install"],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "newer brupy" not in result.stdout
+
+
+def test_install_skill_cmd_project_scope(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["install-skill"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Installed" in result.stdout
+    assert (tmp_path / ".agents/skills/brupy/SKILL.md").is_file()
+    assert (tmp_path / ".claude/skills/brupy").is_symlink()
+
+
+def test_install_skill_cmd_user_scope(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(cli.Path, "home", lambda: tmp_path)
+    result = runner.invoke(app, ["install-skill", "--scope", "user"])
+
+    assert result.exit_code == 0, result.stdout
+    assert (tmp_path / ".agents/skills/brupy/SKILL.md").is_file()
+
+
+def test_install_skill_cmd_refuses_existing_without_force(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["install-skill"])
+    result = runner.invoke(app, ["install-skill"])
+
+    assert result.exit_code == 1
+    assert "already exists" in result.stdout
+
+
+def test_install_skill_cmd_force_overwrites(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["install-skill"])
+    result = runner.invoke(app, ["install-skill", "--force"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Installed" in result.stdout

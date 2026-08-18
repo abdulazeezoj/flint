@@ -88,7 +88,10 @@ brupy/
 │   ├── generator.py             # template renderer: options, layers, Jinja2
 │   ├── postgen.py                 # git init, uv sync, summary printing
 │   ├── prefs.py                     # ~/.brupy/last.json — best-effort read/write
-│   ├── errors.py                     # BrupyError and friends -> exit codes
+│   ├── updatecheck.py                 # best-effort "newer version on PyPI" notice
+│   ├── skillinstall.py                 # `brupy install-skill`
+│   ├── errors.py                         # BrupyError and friends -> exit codes
+│   ├── agent_skill/                       # the `brupy` skill's real content (see .agents/skills/brupy/)
 │   ├── templates/
 │   │   ├── fastapi/
 │   │   │   ├── template.json          # framework metadata

@@ -9,6 +9,43 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.20.0 — 2026-08-18
+
+### Added
+
+- **Every generated project now gets `CLAUDE.md` (a one-line
+  `@AGENTS.md`, Claude Code's own file-import syntax) and
+  `.claude/skills/<id>/` symlinked to each matched
+  `.agents/skills/<id>/`** — the same `.agents/`-is-canonical,
+  `.claude/`-symlinks-to-it pattern this repo's own `brupy` skill has
+  used since v0.17.1, now applied to every project brupy scaffolds too.
+  No flag, always on; the `.claude/skills/` symlink is best-effort
+  (skipped, not fatal, on a platform that refuses symlink creation
+  without elevated privileges).
+- **`brupy install-skill [--scope project|user] [--force]`** — installs
+  the portable `brupy` agent skill (how to invoke this CLI) into an
+  arbitrary directory, for a repo that wasn't scaffolded with brupy in
+  the first place. `--scope project` (default) targets the current
+  directory; `--scope user` targets your home directory, so it applies
+  to every project at once. Required moving the skill's real content
+  into the installed package itself (`src/brupy/agent_skill/`) so it
+  ships with `pip install`/`uv tool install`, not just a repo clone —
+  this repo's own `.agents/skills/brupy/` is now a symlink into that
+  same directory, one copy either way.
+- **Update notice**: an interactive `brupy new` checks once a day
+  (cached, best-effort, silently skipped on any failure) whether a
+  newer version is on PyPI and prints a one-line notice if so. Skipped
+  entirely for non-interactive/CI runs or with `BRUPY_NO_UPDATE_CHECK=1`
+  — the one deliberate exception to brupy needing no network access of
+  its own.
+
+### Confirmed (no change)
+
+- `full-stack`'s `css=tailwind` already uses the standalone Tailwind CLI
+  (`pytailwindcss`) with a real `input.css` → `style.css` build step —
+  never the Tailwind Play CDN `<script>` tag. No code changed; this
+  came up as a question and the answer was "already the case."
+
 ## v0.19.0 — 2026-08-17
 
 ### Changed

@@ -82,11 +82,15 @@ def _assert_valid_toml(path: Path) -> dict:
 
 
 def _paths(created: list[Path]) -> set[str]:
-    # Excludes .agents/skills/** — every combo below also always pulls in
-    # a resolved set of skills (see TestRestApiSkills), which would
-    # otherwise need repeating in each of these project-file-focused
-    # assertions.
-    return {str(p) for p in created if p.parts[:2] != (".agents", "skills")}
+    # Excludes .agents/skills/** and .claude/skills/** — every combo below
+    # also always pulls in a resolved set of skills (see TestRestApiSkills),
+    # which would otherwise need repeating in each of these
+    # project-file-focused assertions.
+    return {
+        str(p)
+        for p in created
+        if p.parts[:2] != (".agents", "skills") and p.parts[:2] != (".claude", "skills")
+    }
 
 
 class TestTemplateMetadata:
@@ -148,6 +152,7 @@ class TestRestApiRender:
             ".env.example",
             ".gitignore",
             "AGENTS.md",
+            "CLAUDE.md",
             "README.md",
             "pyproject.toml",
             "src/my_api/__init__.py",
@@ -190,6 +195,7 @@ class TestRestApiRender:
             ".env.example",
             ".gitignore",
             "AGENTS.md",
+            "CLAUDE.md",
             "README.md",
             "migrations/README",
             "migrations/alembic.ini",
@@ -235,6 +241,7 @@ class TestRestApiRender:
             ".env.example",
             ".gitignore",
             "AGENTS.md",
+            "CLAUDE.md",
             "README.md",
             "pyproject.toml",
             "src/my_api/__init__.py",
@@ -285,6 +292,7 @@ class TestRestApiRender:
             ".env.example",
             ".gitignore",
             "AGENTS.md",
+            "CLAUDE.md",
             "README.md",
             "pyproject.toml",
             "src/my_api/__init__.py",
