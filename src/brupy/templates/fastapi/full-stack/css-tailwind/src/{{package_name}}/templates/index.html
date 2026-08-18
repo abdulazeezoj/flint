@@ -1,32 +1,27 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700
-            rounded-xl shadow-sm p-8">
-  <h1 class="text-2xl font-semibold tracking-tight mb-1">{{ app_name }}</h1>
-  <p class="text-sm text-neutral-500 dark:text-neutral-400 mb-7">
-    A Todo list, server-rendered with HTMX.
-  </p>
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h1 class="card-title">{{ app_name }}</h1>
+    <p class="text-sm text-base-content/60 -mt-2 mb-2">
+      A Todo list, server-rendered with HTMX.
+    </p>
 
-  <form class="flex gap-2 mb-6" hx-post="/todos" hx-target="#todo-list" hx-swap="beforeend"
-        hx-on::after-request="if (event.detail.successful) this.reset()">
-    <input type="text" name="title" placeholder="What needs doing?" required autocomplete="off"
-           class="flex-1 min-w-0 px-3.5 py-2.5 rounded-lg border border-neutral-200
-                  dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 text-sm
-                  focus:outline focus:outline-2 focus:outline-accent focus:outline-offset-1" />
-    <button type="submit"
-            class="px-4.5 py-2.5 rounded-lg bg-accent dark:bg-accent-dark text-white text-sm
-                   font-semibold hover:opacity-90 transition-opacity">
-      Add
-    </button>
-  </form>
+    <form class="flex gap-2" hx-post="/todos" hx-target="#todo-list" hx-swap="beforeend"
+          hx-on::after-request="if (event.detail.successful) this.reset()">
+      <input type="text" name="title" placeholder="What needs doing?" required autocomplete="off"
+             class="input input-bordered flex-1" />
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
 
-  <ul id="todo-list" class="list-none m-0 p-0 flex flex-col gap-2">
-    {% for todo in todos %}
-      {% include "partials/todo_item.html" %}
-    {% else %}
-      {% include "partials/empty_state.html" %}
-    {% endfor %}
-  </ul>
+    <ul id="todo-list" class="list-none m-0 p-0 flex flex-col gap-2 mt-2">
+      {% for todo in todos %}
+        {% include "partials/todo_item.html" %}
+      {% else %}
+        {% include "partials/empty_state.html" %}
+      {% endfor %}
+    </ul>
+  </div>
 </div>
 {% endblock %}

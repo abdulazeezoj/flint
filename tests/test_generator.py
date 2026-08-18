@@ -160,6 +160,97 @@ def test_render_includes_expected_skills(tmp_path: Path):
     assert not (target / ".agents/skills/pydantic-settings").exists()
 
 
+def test_render_writes_claude_md_pointing_at_agents_md(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert Path("CLAUDE.md") in created
+    assert (target / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+
+
+def test_render_symlinks_claude_skills_to_agents_skills(tmp_path: Path):
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert Path(".claude/skills/fastapi") in created
+    assert Path(".claude/skills/pytest") in created
+    link = target / ".claude/skills/fastapi"
+    assert link.is_symlink()
+    assert link.resolve() == (target / ".agents/skills/fastapi").resolve()
+
+
+def test_render_force_leaves_unrelated_claude_skills_content_alone(tmp_path: Path):
+    # Regression test: render(..., force=True) regenerating into an
+    # existing project directory must not silently delete real content
+    # a user happens to have at .claude/skills/<id> for an id that also
+    # matches one of this template's skills.
+    target = tmp_path / "my-api"
+    real_dir = target / ".claude" / "skills" / "fastapi"
+    real_dir.mkdir(parents=True)
+    (real_dir / "my_real_notes.md").write_text("not brupy's to delete")
+
+    render("fastapi", "hello-world", target, make_answers(), force=True)
+
+    assert (real_dir / "my_real_notes.md").read_text() == "not brupy's to delete"
+
+
+def test_render_skips_claude_skill_symlinks_it_cannot_create(tmp_path: Path, monkeypatch):
+    # Mirrors prefs.py's best-effort philosophy: a platform that refuses
+    # symlink creation without elevated privileges (Windows without
+    # Developer Mode, some restricted filesystems) must not break
+    # generation — it just doesn't get the .claude/skills/ mirror, and the
+    # real .agents/skills/ catalog is unaffected either way.
+    monkeypatch.setattr(
+        generator_module.os,
+        "symlink",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("no symlink permission")),
+    )
+    target = tmp_path / "my-api"
+    created = render("fastapi", "hello-world", target, make_answers())
+
+    assert not any(p.parts[:2] == (".claude", "skills") for p in created)
+    assert (target / ".agents/skills/fastapi/SKILL.md").is_file()
+
+
+def test_write_claude_skill_symlink_default_leaves_existing_content_alone(tmp_path: Path):
+    # Per-project generation (_write_claude_skill_symlinks) calls this
+    # without replace_existing, and relies on the resulting OSError to
+    # skip the symlink rather than clobber whatever's already there —
+    # render(..., force=True) only overwrites files it's actually
+    # rendering, never arbitrary pre-existing content under
+    # .claude/skills/. Regression test: this used to unconditionally
+    # rmtree a real directory before creating the symlink.
+    claude_skills_dir = tmp_path / ".claude" / "skills"
+    real_dir = claude_skills_dir / "fastapi"
+    real_dir.mkdir(parents=True)
+    (real_dir / "my_real_notes.md").write_text("not brupy's to delete")
+
+    with pytest.raises(OSError):
+        generator_module.write_claude_skill_symlink(claude_skills_dir, "fastapi")
+
+    assert (real_dir / "my_real_notes.md").read_text() == "not brupy's to delete"
+
+
+def test_write_claude_skill_symlink_replace_existing_replaces_real_directory(tmp_path: Path):
+    # write_claude_skill_symlink is shared with skillinstall.install() —
+    # with replace_existing=True (what skillinstall.install() passes,
+    # after its own explicit --force/exists checks), it must replace
+    # whatever's already at link_path, including a real directory left
+    # over from something else, not just a stale symlink.
+    claude_skills_dir = tmp_path / ".claude" / "skills"
+    stale_dir = claude_skills_dir / "fastapi"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / "leftover.md").write_text("stale")
+
+    generator_module.write_claude_skill_symlink(
+        claude_skills_dir, "fastapi", replace_existing=True
+    )
+
+    link = claude_skills_dir / "fastapi"
+    assert link.is_symlink()
+    assert link.resolve() == (tmp_path / ".agents" / "skills" / "fastapi").resolve()
+
+
 def test_render_with_docker_adds_dockerfile(tmp_path: Path):
     target = tmp_path / "my-api"
     created = render("fastapi", "hello-world", target, make_answers(docker=True))
@@ -242,7 +333,7 @@ def test_render_force_overwrites_nonempty_directory(tmp_path: Path):
 
     created = render("fastapi", "hello-world", target, make_answers(), force=True)
     assert (target / "pyproject.toml").is_file()
-    assert len(created) == 18  # 7 project files + 11 fastapi/pytest skill files
+    assert len(created) == 21  # 7 project files + 11 fastapi/pytest skill files + CLAUDE.md + 2 .claude/skills symlinks
 
 
 def test_render_disabled_template_raises(tmp_path: Path, monkeypatch):
@@ -836,16 +927,26 @@ def test_full_stack_css_tailwind(tmp_path: Path):
 
     input_css = (target / "src/my_api/static/css/input.css").read_text()
     assert '@import "tailwindcss"' in input_css
-    assert "--color-accent" in input_css
+    assert '@plugin "daisyui"' in input_css
 
     index_html = (target / "src/my_api/templates/index.html").read_text()
-    assert "bg-accent" in index_html  # Tailwind utility classes, not vanilla CSS
+    assert "btn-primary" in index_html  # daisyUI component classes, not vanilla CSS
 
     config = _assert_valid_toml(target / "pyproject.toml")
-    assert any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+    assert not any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+    package_json = json.loads((target / "package.json").read_text())
+    assert "tailwindcss" in package_json["devDependencies"]
+    assert "daisyui" in package_json["devDependencies"]
+
+    assert Path("dev.py") in created
+    dev_py = (target / "dev.py").read_text()
+    assert "fastapi" in dev_py
+    assert "bun" in dev_py
 
     gitignore = (target / ".gitignore").read_text()
     assert "static/css/style.css" in gitignore
+    assert "node_modules/" in gitignore
 
     _assert_all_python_files_parse(target)
 
@@ -857,8 +958,9 @@ def test_full_stack_css_tailwind_docker_build_step(tmp_path: Path):
 
     assert Path("Dockerfile") in created
     dockerfile = (target / "Dockerfile").read_text()
-    assert "uv run tailwindcss" in dockerfile
-    assert "--minify" in dockerfile
+    assert "FROM oven/bun:1 AS css-builder" in dockerfile
+    assert "bun run build:css" in dockerfile
+    assert "COPY --from=css-builder" in dockerfile
 
 
 class TestFastapiFullStackSkills:
@@ -929,6 +1031,10 @@ def test_render_skips_declared_layer_with_missing_directory(tmp_path: Path, monk
         "widget", "basic", target, make_answers(framework="widget", template="basic", docker=True)
     )
 
+    # AGENTS.md was never generated by this fixture template (only
+    # README.md), so CLAUDE.md — a one-line pointer at AGENTS.md — must
+    # not be written either; a dangling @AGENTS.md import would be worse
+    # than no CLAUDE.md at all.
     assert created == [Path("README.md")]
 
 

@@ -1,3 +1,16 @@
+{% if css == "tailwind" %}
+FROM oven/bun:1 AS css-builder
+
+WORKDIR /app
+
+COPY package.json bun.lock* ./
+RUN bun install
+
+COPY src/{{ package_name }}/templates src/{{ package_name }}/templates
+COPY src/{{ package_name }}/static src/{{ package_name }}/static
+RUN bun run build:css
+
+{% endif %}
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 WORKDIR /app
@@ -11,13 +24,10 @@ COPY pyproject.toml uv.lock* ./
 RUN uv sync --no-install-project --no-dev
 
 COPY . .
-RUN uv sync --no-dev
 {% if css == "tailwind" %}
-RUN uv run tailwindcss \
-    -i src/{{ package_name }}/static/css/input.css \
-    -o src/{{ package_name }}/static/css/style.css \
-    --minify
+COPY --from=css-builder /app/src/{{ package_name }}/static/css/style.css src/{{ package_name }}/static/css/style.css
 {% endif %}
+RUN uv sync --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 

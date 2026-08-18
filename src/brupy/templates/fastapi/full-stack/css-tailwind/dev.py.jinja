@@ -1,0 +1,53 @@
+"""Runs the FastAPI dev server and the Tailwind CSS watcher together, so
+you don't need two terminals.
+
+    uv run dev.py
+
+Both subprocesses share this process's stdout/stderr; Ctrl-C stops
+both. Requires `bun install` to have been run at least once (the
+Tailwind watcher is `bun run watch:css`, from package.json).
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import time
+
+_COMMANDS = [
+    ["fastapi", "dev", "src/{{ package_name }}/main.py"],
+    ["bun", "run", "watch:css"],
+]
+
+
+def main() -> None:
+    processes: list[subprocess.Popen] = []
+    try:
+        for cmd in _COMMANDS:
+            processes.append(subprocess.Popen(cmd))
+        while True:
+            for process in processes:
+                if process.poll() is not None:
+                    _stop(processes)
+                    sys.exit(process.returncode)
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        _stop(processes)
+    except Exception:
+        _stop(processes)
+        raise
+
+
+def _stop(processes: list[subprocess.Popen]) -> None:
+    for process in processes:
+        if process.poll() is None:
+            process.terminate()
+    for process in processes:
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+
+if __name__ == "__main__":
+    main()

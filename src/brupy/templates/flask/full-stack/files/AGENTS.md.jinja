@@ -18,9 +18,21 @@ uv sync
 
 ## Run
 
+{% if css == "tailwind" %}
+`bun install` once (frontend deps — `pyproject.toml`/`uv sync` only
+cover Python), then `uv run dev.py` runs the Flask dev server and the
+Tailwind watcher together — the page has no styling until the first
+build, and this covers that too. Equivalent to running these two
+separately:
+```
+uv run flask --app src/{{ package_name }}/main.py run --debug
+bun run watch:css
+```
+{% else %}
 ```
 uv run flask --app src/{{ package_name }}/main.py run
 ```
+{% endif %}
 {% if migrations and orm == "flask-sqlalchemy" %}
 Apply migrations first: `uv run flask --app src/{{ package_name }}/main.py db upgrade`.
 {% elif migrations and orm == "sqlalchemy" %}
@@ -28,12 +40,6 @@ Apply migrations first: `uv run alembic upgrade head`.
 {% endif %}
 {% if worker == "celery" %}
 Run the worker (separate process): `PYTHONPATH=src uv run celery -A {{ package_name }}.worker.celery_app worker --loglevel=info`.
-{% endif %}
-{% if css == "tailwind" %}
-Build the CSS first, or the page has no styling: `uv run tailwindcss -i
-src/{{ package_name }}/static/css/input.css -o
-src/{{ package_name }}/static/css/style.css` (add `--watch` while iterating
-on templates).
 {% endif %}
 
 ## Test
@@ -63,9 +69,12 @@ Next.js only enforces structure for routing, nothing else):
   HTMX swaps (`todo_item.html`, `empty_state.html`, `todo_created.html`).
 - `src/{{ package_name }}/static/` — served at `/static` automatically,
   same default-layout story.{% if css == "tailwind" %} `css/input.css` is the
-  Tailwind source (edit this, plus template class names); `css/style.css`
-  is the **built, git-ignored** output — rebuild it after any change (see
-  "Run" above) or edits won't show up.{% else %} `css/style.css` is the whole
+  Tailwind + daisyUI source (edit this, plus template class names);
+  `css/style.css` is the **built, git-ignored** output — rebuild it
+  after any change (see "Run" above) or edits won't show up. Frontend
+  tooling (`tailwindcss`, `@tailwindcss/cli`, `daisyui`) lives in
+  `package.json`/`bun install`, separate from Python's
+  `pyproject.toml`.{% else %} `css/style.css` is the whole
   UI — no build step, no framework, edit it directly.{% endif %}
 {% if worker != "none" %}
 - `src/{{ package_name }}/worker.py` — **the** {{ worker }} entrypoint:
@@ -135,6 +144,14 @@ project ships:
   `Settings`.
 - `.agents/skills/pytest/SKILL.md` — this project's testing
   conventions (isolated database).
+- `.agents/skills/jinja2/SKILL.md` — template inheritance, includes,
+  autoescaping, whitespace control.
+- `.agents/skills/htmx/SKILL.md` — hx-target/hx-swap/hx-trigger,
+  out-of-band swaps, the fragment-response contract.
+{% if css == "tailwind" %}
+- `.agents/skills/tailwind/SKILL.md` — the `@theme`/`@plugin` config,
+  daisyUI component classes, the Bun build step.
+{% endif %}
 {% if orm == "flask-sqlalchemy" %}
 - `.agents/skills/flask-sqlalchemy/SKILL.md` — the `db`/`Migrate`
   extension wiring, model definition, query patterns.

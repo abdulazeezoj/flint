@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-15 (v0.19.0: renamed Flint → Brupy — see §10/§11)
+**Last updated:** 2026-08-18 (v0.21.3: fixes a v0.21.2 regression where `--force` regeneration could silently delete real content at `.claude/skills/<id>` — see §11)
 
 ## 1. Vision
 
@@ -167,14 +167,27 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
 | FR10 | Regardless of which database a project is configured for, its test suite runs against an isolated, ephemeral database and never touches whatever `DATABASE_URL` points at — "just works" out of the box takes priority over exercising the real backend in tests |
 | FR11 | After a successful generation, Brupy remembers the chosen framework, the chosen template per framework, and — per `<framework>/<template>` — the resolved options plus docker/git/install, in `~/.brupy/last.json`. The next run uses these as the new default (both for what the wizard preselects and what a flagless non-interactive run falls back to); an explicit flag or `--option` always overrides a remembered value, and a stale remembered value (no longer valid for the current template) is silently ignored in favor of the template's own default. `--remember/--no-remember` (default on) opts a single run out of reading and writing this file |
 | FR12 | `brupy list-templates` prints every framework/template pair (label, description, whether it supports `--docker`), including disabled/"coming soon" entries — an introspection command, generates nothing |
+| FR13 | Every generated project gets a one-line `CLAUDE.md` (`@AGENTS.md`, Claude Code's own file-import syntax) alongside `AGENTS.md`, and a `.claude/skills/<id>/` symlinked to each matched `.agents/skills/<id>/` — no flag, always on, best-effort for the symlink specifically (see NFR below) |
+| FR14 | `brupy install-skill [--scope project\|user] [--force]` installs the portable `brupy` agent skill (how to invoke this CLI) into an arbitrary directory — the current one by default, or the user's home directory with `--scope user` — for a repo that wasn't scaffolded with brupy in the first place. Refuses to overwrite an existing install without `--force` |
 
 ## 9. Non-Functional Requirements
 
 - Cross-platform: macOS, Linux, Windows (path handling via `pathlib`, no
-  shell-specific assumptions).
-- No network access required by Brupy itself; only `uv`'s own dependency
-  resolution (when the user opts in to "install now") touches the
-  network.
+  shell-specific assumptions). Symlink creation (the `.claude/skills/`
+  mirror, both in generated projects and `install-skill`) is
+  best-effort: a platform that refuses it without elevated privileges
+  (Windows without Developer Mode) still gets the real
+  `.agents/skills/` content, just not the Claude-specific alias —
+  matches `~/.brupy/last.json`'s existing "never let a convenience
+  feature break the primary one" precedent.
+- No network access required by Brupy itself for generation; only
+  `uv`'s own dependency resolution (when the user opts in to "install
+  now") touches the network. One deliberate exception: an interactive
+  run does a short, cached (once/day), silently-skipped-on-failure PyPI
+  version check and prints a one-line "newer version available" notice
+  if relevant — never blocks, never fails generation, skipped entirely
+  for non-interactive/CI runs or with `BRUPY_NO_UPDATE_CHECK=1`. See
+  PRODUCT_ARCH.md §5.1 for the mechanism.
 - Rich, colorful terminal output where the terminal supports it, with a
   graceful non-interactive fallback: when stdin isn't a TTY, Brupy
   requires flags instead of hanging on a prompt.
@@ -427,6 +440,84 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   previous two renames. Repository rename
   (`abdulazeezoj/flint` → `abdulazeezoj/brupy`) is the user's own
   action, not part of this commit.
+- `v0.20.0` — three related additions, all closing the same gap (an
+  agent working in a repo not scaffolded by brupy has nothing to go on):
+  (1) every generated project gets `CLAUDE.md` (`@AGENTS.md`) and
+  `.claude/skills/<id>/` symlinked to each `.agents/skills/<id>/`, so
+  Claude Code needs no Claude-specific authoring anywhere (FR13);
+  (2) `brupy install-skill` retrofits the portable `brupy` skill itself
+  into an existing repo at project or user scope (FR14) — its content
+  now ships inside the installed package (`src/brupy/agent_skill/`),
+  with this repo's own `.agents/skills/brupy/` a symlink to that same
+  directory so there's exactly one copy whether you're reading brupy's
+  source or a `pip`/`uv`-installed wheel (see PRODUCT_ARCH.md §2);
+  (3) an interactive run prints a one-line "newer version available"
+  notice via a best-effort, cached PyPI check (new NFR carve-out, §9).
+  Also confirms (no code change, `full-stack` already did this): `css=
+  tailwind` uses the standalone Tailwind CLI via `pytailwindcss`, never
+  the Tailwind Play CDN `<script>` tag — see §4.8 in PRODUCT_ARCH.md.
+- `v0.21.0` — `full-stack`'s `css=tailwind` option (both frameworks)
+  reverses v0.17's standalone-CLI decision: the frontend stack is now
+  FastAPI/Flask + Jinja2 + HTMX + Tailwind CSS v4 + **daisyUI**, built
+  via **Bun** rather than `pytailwindcss`. `pytailwindcss` was dropped
+  because the standalone Tailwind binary it wraps cannot load
+  third-party plugins, and daisyUI — the whole reason for the switch —
+  is one; frontend dependencies (`tailwindcss`, `@tailwindcss/cli`,
+  `daisyui`) now live in a new `package.json`, installed with `bun
+  install`, fully separate from `pyproject.toml`/`uv sync`. A new
+  project-root `dev.py` (`uv run dev.py`) runs the framework's dev
+  server and the Tailwind watcher together — the practical equivalent
+  of a bare `uv run dev`, which isn't reachable without changing every
+  template's `[tool.uv] package = false`. `--docker` gains a whole extra
+  `oven/bun` build stage; only the compiled CSS crosses into the final
+  image. `css=vanilla` remains the default — this is an opt-in
+  presentation choice, not a new baseline dependency for every generated
+  project. See PRODUCT_ARCH.md §4.8 for the full design.
+- `v0.21.1` — fixes two leftovers from `v0.21.0`'s pivot that only
+  touched the generated-project-facing docs: the `brupy` agent skill
+  itself (`src/brupy/agent_skill/`) still described `css=tailwind` as
+  the old standalone-CLI/no-Node.js approach, and both `full-stack`
+  templates' `template.json` still labeled the choice "standalone CLI,
+  no Node.js" in the wizard/`list-templates` output. Also adds
+  `references/daisyui-components.md` to the generated `tailwind` skill
+  (only with `css=tailwind`): the full daisyUI component catalog beyond
+  the ~4 components this project's own templates use, a discovery
+  protocol, and component-specific gotchas — adapted from daisyUI's own
+  official skill into this project's shape.
+- `v0.21.2` — fixes six issues found by a `/code-review` pass across the
+  v0.21.0/v0.21.1 diff: `install-skill --force` could crash with a raw
+  traceback if `.claude/skills/brupy` pre-existed as a real directory
+  (`Path.unlink()` can't remove one); its "already exists" error always
+  blamed `.agents/skills/brupy` even when only the `.claude/` side
+  conflicted; `install-skill` had no catch-all exception handler unlike
+  `brupy new`; `uv run dev.py` could orphan an already-started dev
+  server if `bun` wasn't on `PATH`; the `tailwind` skill's `skill.json`
+  and `docs/agent-skills.md` still described the pre-pivot standalone-
+  CLI approach; and `CLAUDE.md` was written even for a template that
+  doesn't ship `AGENTS.md`. Also extracts shared helpers that had been
+  duplicated (`generator.write_claude_skill_symlink()`, now used by both
+  `install-skill` and per-project generation; `postgen._run_install()`,
+  shared by `uv sync`/`bun install`). Two duplication findings from the
+  same review (`package.json.jinja`/`dev.py.jinja` byte-for-byte
+  duplicated across `fastapi`/`flask` full-stack) were deliberately left
+  unfixed — brupy's template system has no mechanism for sharing a
+  literal project-root file across two separate framework template
+  trees, so a real fix is generator-level work, not a minimal patch.
+- `v0.21.3` — fixes a regression from v0.21.2's own fix: `brupy new
+  --force` regenerating into an existing project could silently
+  `shutil.rmtree` real content a user had at `.claude/skills/<id>`,
+  because the new shared symlink helper unconditionally cleared
+  whatever was at that path first, unlike the old code's "attempt the
+  symlink, skip on any conflict" behavior. Fixed with a
+  `replace_existing` flag on the helper, defaulting to the safe
+  original behavior; only `skillinstall.install()` opts into the
+  destructive path, since it's already confirmed via its own
+  `--force`/exists checks that overwriting is intended. Found by a
+  follow-up `/code-review` pass on the v0.21.2 diff itself, verified
+  with a local repro before and after the fix. Also makes the
+  `CLAUDE.md`/`AGENTS.md` guard check the filesystem directly instead
+  of list membership, and extracts a shared `_with_error_handling`
+  decorator for `cli.py`'s two command bodies.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

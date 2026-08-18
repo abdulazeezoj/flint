@@ -10,6 +10,7 @@ so every test here uses the `enable_flask` fixture below to monkeypatch
 
 import ast
 import dataclasses
+import json
 import tomllib
 from pathlib import Path
 
@@ -280,16 +281,26 @@ class TestFullStackCSS:
 
         input_css = (target / "src/my_api/static/css/input.css").read_text()
         assert '@import "tailwindcss"' in input_css
-        assert "--color-accent" in input_css
+        assert '@plugin "daisyui"' in input_css
 
         index_html = (target / "src/my_api/templates/index.html").read_text()
-        assert "bg-accent" in index_html  # Tailwind utility classes
+        assert "btn-primary" in index_html  # daisyUI component classes
 
         config = _assert_valid_toml(target / "pyproject.toml")
-        assert any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+        assert not any("pytailwindcss" in dep for dep in config["project"]["dependencies"])
+
+        package_json = json.loads((target / "package.json").read_text())
+        assert "tailwindcss" in package_json["devDependencies"]
+        assert "daisyui" in package_json["devDependencies"]
+
+        assert Path("dev.py") in created
+        dev_py = (target / "dev.py").read_text()
+        assert "flask" in dev_py
+        assert "bun" in dev_py
 
         gitignore = (target / ".gitignore").read_text()
         assert "static/css/style.css" in gitignore
+        assert "node_modules/" in gitignore
 
         _assert_all_python_files_parse(target)
 
@@ -300,8 +311,9 @@ class TestFullStackCSS:
 
         assert Path("Dockerfile") in created
         dockerfile = (target / "Dockerfile").read_text()
-        assert "uv run tailwindcss" in dockerfile
-        assert "--minify" in dockerfile
+        assert "FROM oven/bun:1 AS css-builder" in dockerfile
+        assert "bun run build:css" in dockerfile
+        assert "COPY --from=css-builder" in dockerfile
 
 
 class TestFullStackSkills:

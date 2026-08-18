@@ -1,0 +1,55 @@
+# daisyUI component catalog
+
+`references/theming-and-components.md` covers the handful of components
+this project's own templates actually use (`card`, `btn`, `input`,
+`checkbox`). This file is the wider map — daisyUI ships **80+**
+components, and reaching for one of them beats hand-composing the same
+look from raw Tailwind utilities almost every time. Adapted from
+daisyUI's own [official skill](https://daisyui.com/docs/skill/) into
+this project's shape.
+
+## Discovery protocol — before writing a single utility class
+
+1. Name the actual UI element/behavior you need (not just a rough
+   description) — "a dismissible message strip" is an `alert`, "a
+   floating action trigger" is a `fab`.
+2. Scan the category list below for a plausible match.
+3. Check that component's exact classes at
+   [daisyui.com/components](https://daisyui.com/components/) — part
+   names, modifiers, and required markup structure vary per component
+   and are worth confirming rather than guessing.
+4. Only fall back to raw Tailwind utilities once you've confirmed no
+   component fits — a `card`/`btn`/`alert`/`modal`-shaped need almost
+   always has a matching component already.
+
+## Component categories
+
+| Category | Components |
+|---|---|
+| Navigation & layout | navbar, drawer, dock, menu, breadcrumbs, pagination, steps, timeline |
+| Forms & input | input, select, checkbox, radio, toggle, textarea, file-input, range, rating, otp |
+| Feedback | alert, badge, progress, loading, toast, tooltip, modal |
+| Content display | card, table, carousel, avatar, chat, diff, divider, list, stat |
+| Interactive | button, dropdown, collapse, accordion, tabs, swap, fab |
+| Specialized | hero, footer, calendar, countdown, skeleton, status, validator, kbd |
+| Visual effects | aura, mask, hover-3d, hover-gallery, text-rotate, stack |
+| Mockups | browser, code, phone, window |
+
+## Usage rules
+
+- Apply component classes directly to elements (`class="btn"`, `class="card"`) — no extra wrapper markup required beyond what each component's docs show.
+- Combine **component + part + style + behavior** classes as needed, e.g. `btn btn-primary btn-outline btn-sm` (component: `btn`; style: `btn-primary`/`btn-outline`; size/behavior: `btn-sm`) — daisyUI classes are designed to stack, not to be chosen one-at-a-time.
+- Reach for the semantic color tokens (`primary`, `base-200`, `error`, ...) documented in `references/theming-and-components.md` rather than hardcoded Tailwind colors like `text-gray-800` — hardcoded colors don't adapt when the active theme changes, silently breaking dark mode or any custom theme added later.
+- Use plain Tailwind utilities for anything a daisyUI component doesn't cover (spacing, one-off layout tweaks) — daisyUI classes and Tailwind utilities are meant to be mixed on the same element, not treated as separate systems.
+- Avoid `!` (important) modifiers unless resolving a genuine specificity conflict — reaching for `!` habitually usually means the wrong daisyUI modifier was picked, not that Tailwind needs overriding.
+- Use responsive prefixes (`md:`, `lg:`, ...) for flexbox/grid layout changes across breakpoints, same as anywhere else in Tailwind — daisyUI components don't have their own separate responsive system.
+
+## Component-specific gotchas worth knowing before you reach for these
+
+- **Accordion**: radio inputs used to drive an accordion's open/close state must share the same `name` attribute across the group, or only the first one will ever behave like part of a group.
+- **Drawer**: the toggle `<input>` needs a unique `id`, and its `<label>` must reference that same `id` — a copy-pasted drawer with a stale `id`/`for` pair silently stops toggling.
+- **Modal**: prefer the native HTML `<dialog>` element (`daisyui.com/components/modal`) over the older div-based modal pattern where possible — it gets focus-trapping and Escape-to-close for free from the browser.
+- **hover-3d**: requires exactly nine children (one real content element plus eight invisible hover zones) — adding or removing a child breaks the effect rather than degrading gracefully.
+- **text-rotate**: limited to a maximum of six lines per rotation cycle.
+
+For exact per-component markup, part names, and every modifier, check the live docs at [daisyui.com/components](https://daisyui.com/components/) — this file is a map for deciding *which* component to reach for, not a substitute for its actual class reference.

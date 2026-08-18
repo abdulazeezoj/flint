@@ -39,6 +39,7 @@ matter of editing `template.json`/adding files — no changes here.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -356,6 +357,9 @@ def render(
             created.extend(_render_skill(skill, target_dir, context))
         if matched_skills:
             created.append(_write_skills_index(target_dir, matched_skills))
+            created.extend(_write_claude_skill_symlinks(target_dir, matched_skills))
+        if (target_dir / "AGENTS.md").is_file():
+            created.append(_write_claude_md(target_dir))
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
             shutil.rmtree(target_dir, ignore_errors=True)
@@ -428,6 +432,78 @@ def _write_skills_index(target_dir: Path, skills: list[SkillMeta]) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return _SKILLS_INDEX_PATH
+
+
+_CLAUDE_SKILLS_DIR = Path(".claude", "skills")
+
+
+def write_claude_skill_symlink(
+    claude_skills_dir: Path, skill_id: str, *, replace_existing: bool = False
+) -> None:
+    """Create `<claude_skills_dir>/<skill_id>` as a symlink to
+    `../../.agents/skills/<skill_id>` — the one place this "`.agents/`
+    is canonical, `.claude/` symlinks to it" logic lives, shared by both
+    per-project generation (`_write_claude_skill_symlinks` below) and
+    `skillinstall.install()`. Raises `OSError` if `link_path` already
+    exists in any form and `replace_existing` isn't set, or on a
+    platform that refuses symlink creation either way.
+
+    `replace_existing=False` (the default) is what per-project
+    generation wants: leave real, unrelated content at that path alone
+    and just skip the symlink (its caller already wraps this in
+    `except OSError: continue`) — `render(..., force=True)` only
+    overwrites files it's actually rendering, never arbitrary existing
+    directories under `.claude/skills/`. Pass `replace_existing=True`
+    only when the caller has already confirmed it's safe to overwrite
+    whatever's there (a stale symlink, a leftover real directory, or a
+    plain file) — `skillinstall.install()` does, via its own explicit
+    `--force`/exists checks before ever reaching this call.
+    """
+    link_path = claude_skills_dir / skill_id
+    link_target = Path("..", "..", ".agents", "skills", skill_id)
+    if replace_existing:
+        if link_path.is_symlink() or link_path.is_file():
+            link_path.unlink()
+        elif link_path.is_dir():
+            shutil.rmtree(link_path)
+    claude_skills_dir.mkdir(parents=True, exist_ok=True)
+    os.symlink(link_target, link_path, target_is_directory=True)
+
+
+def _write_claude_skill_symlinks(target_dir: Path, skills: list[SkillMeta]) -> list[Path]:
+    """Symlink `.claude/skills/<id>` -> `../../.agents/skills/<id>` for every
+    matched skill, mirroring exactly how this repo's own `flint`/`brupy`
+    skill is set up (`.agents/skills/` as the real, tool-neutral content,
+    `.claude/skills/` as Claude Code's own discovery path pointing at it) —
+    so Claude Code finds the same skills without a second, easily-drifting
+    copy. Best-effort: a platform that can't create symlinks without
+    elevated privileges (notably Windows without Developer Mode) just
+    doesn't get this dir, exactly like `prefs.py`'s best-effort writes —
+    the `.agents/skills/` catalog itself is unaffected either way.
+    """
+    created: list[Path] = []
+    claude_skills_dir = target_dir / _CLAUDE_SKILLS_DIR
+    for skill in skills:
+        try:
+            write_claude_skill_symlink(claude_skills_dir, skill.id)
+        except OSError:
+            continue
+        created.append(_CLAUDE_SKILLS_DIR / skill.id)
+    return created
+
+
+_CLAUDE_MD_PATH = Path("CLAUDE.md")
+
+
+def _write_claude_md(target_dir: Path) -> Path:
+    """`CLAUDE.md` is a one-line pointer at `AGENTS.md`
+    (`@AGENTS.md`, Claude Code's own file-import syntax), not a second
+    copy of it. Only called once `render()` has confirmed `AGENTS.md`
+    is actually among the files this template produced, so Claude Code
+    always loads real content instead of a dangling import."""
+    dest = target_dir / _CLAUDE_MD_PATH
+    dest.write_text("@AGENTS.md\n", encoding="utf-8")
+    return _CLAUDE_MD_PATH
 
 
 def _render_relative_path(rel_source: Path, context: dict) -> Path:

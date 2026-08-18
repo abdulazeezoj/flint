@@ -1,0 +1,46 @@
+# Theming and components
+
+## daisyUI theme configuration
+
+Themes are configured inside the `@plugin "daisyui"` block in `input.css`, not a separate file:
+
+```css
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
+}
+```
+
+- `--default` marks which theme applies when nothing else decides (first page load, no stored preference).
+- `--prefersdark` marks which theme applies when the OS/browser reports `prefers-color-scheme: dark`.
+
+This project ships with exactly `light` and `dark` — daisyUI's two built-in themes — matching the `css=vanilla` variant's own light/dark split via `@media (prefers-color-scheme: dark)`. daisyUI ships dozens of other built-in themes (`cupcake`, `synthwave`, `corporate`, ...); add one to the list to make it available, e.g. `themes: light --default, dark --prefersdark, cupcake;` — the new theme's classes and CSS variables are generated automatically, nothing else to configure.
+
+To force a specific theme regardless of OS preference (skip the light/dark auto-switching entirely), set `data-theme="<name>"` on the `<html>` tag in `templates/base.html` instead of relying on `--prefersdark`.
+
+## Semantic color tokens
+
+daisyUI defines a fixed set of semantic color names, each with a matching `-content` counterpart (a readable text/icon color *for that background*) — this is what makes `btn-primary`'s text always readable regardless of which theme is active, without ever hand-picking a text color:
+
+| Token | Typical use | Utility examples |
+|---|---|---|
+| `primary` | Main call-to-action color | `bg-primary`, `text-primary`, `btn-primary` |
+| `secondary` | Secondary actions | `bg-secondary`, `btn-secondary` |
+| `accent` | An extra highlight color, distinct from primary | `bg-accent`, `btn-accent` |
+| `neutral` | Neutral surfaces/text | `bg-neutral`, `text-neutral` |
+| `base-100` / `base-200` / `base-300` | Page/card background, progressively darker/more recessed | `bg-base-100`, `bg-base-200` |
+| `info` / `success` / `warning` / `error` | Status colors | `alert-info`, `alert-success`, `text-error` |
+
+`base-content` is the default readable text color on `base-100`/`base-200`/`base-300` backgrounds — this project's `base.html` uses `bg-base-200` for the page background and `templates/index.html`'s card uses `bg-base-100`, so text on either reads correctly via `text-base-content` (often with an opacity modifier for de-emphasized text, e.g. `text-base-content/60`).
+
+This project doesn't define any custom `--color-*` tokens of its own (the `css=vanilla` variant's hand-picked accent color doesn't carry over) — daisyUI's palette covers it. If you do need a genuinely new brand color beyond daisyUI's semantic set, a plain Tailwind v4 `@theme` block still works alongside `@plugin "daisyui"` in `input.css`; that's unrelated to daisyUI's own theme system, though, so prefer reaching for the semantic tokens above first.
+
+## Components this project uses
+
+| Component | Classes used | Where |
+|---|---|---|
+| Card | `card`, `card-body`, `card-title` | `templates/index.html` — the whole Todo panel |
+| Button | `btn`, `btn-primary` (submit), `btn-ghost btn-circle btn-xs` (delete) | `templates/index.html`, `templates/partials/todo_item.html` |
+| Text input | `input`, `input-bordered` | `templates/index.html`'s new-todo field |
+| Checkbox | `checkbox`, `checkbox-primary` | `templates/partials/todo_item.html` |
+
+daisyUI ships far more than this — alerts, badges, modals, dropdowns, navbars, and so on. Browse [daisyui.com/components](https://daisyui.com/components/) for the full catalog and exact class names before hand-rolling something with raw utilities; a `card`/`btn`/`alert`-shaped need almost always has a matching component already.

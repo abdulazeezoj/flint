@@ -90,6 +90,74 @@ def test_install_dependencies_failure(tmp_path: Path, monkeypatch, capsys):
     assert "uv sync failed" in capsys.readouterr().out
 
 
+def test_install_frontend_dependencies_no_package_json(tmp_path: Path):
+    # No package.json at all (the common case — most templates don't
+    # have a frontend toolchain) is a silent no-op, not a warning.
+    assert postgen.install_frontend_dependencies(tmp_path) is False
+
+
+def test_install_frontend_dependencies_bun_not_found(tmp_path: Path, monkeypatch, capsys):
+    (tmp_path / "package.json").write_text("{}")
+    monkeypatch.setattr(postgen.shutil, "which", lambda name: None)
+    assert postgen.install_frontend_dependencies(tmp_path) is False
+    assert "bun not found" in capsys.readouterr().out
+
+
+def test_install_frontend_dependencies_success(tmp_path: Path, monkeypatch):
+    (tmp_path / "package.json").write_text("{}")
+    monkeypatch.setattr(postgen.shutil, "which", lambda name: "/usr/bin/bun")
+    monkeypatch.setattr(
+        postgen.subprocess, "run", lambda cmd, **kwargs: _FakeCompletedProcess(cmd)
+    )
+    assert postgen.install_frontend_dependencies(tmp_path) is True
+
+
+def test_install_frontend_dependencies_failure(tmp_path: Path, monkeypatch, capsys):
+    (tmp_path / "package.json").write_text("{}")
+
+    def fake_run(cmd, **kwargs):
+        raise subprocess.CalledProcessError(1, cmd, stderr=b"error: boom")
+
+    monkeypatch.setattr(postgen.shutil, "which", lambda name: "/usr/bin/bun")
+    monkeypatch.setattr(postgen.subprocess, "run", fake_run)
+
+    assert postgen.install_frontend_dependencies(tmp_path) is False
+    assert "bun install failed" in capsys.readouterr().out
+
+
+def test_print_summary_frontend_installed_shows_checkmark(capsys):
+    postgen.print_summary(
+        **_summary_kwargs(
+            installed_requested=True,
+            created=[Path("package.json")],
+            frontend_installed_ok=True,
+        )
+    )
+    out = capsys.readouterr().out
+    assert "Installed frontend dependencies (bun install)" in out
+    assert "bun install" not in out.split("Next steps:")[1]
+
+
+def test_print_summary_frontend_not_installed_suggests_bun_install(capsys):
+    postgen.print_summary(
+        **_summary_kwargs(
+            installed_requested=True,
+            created=[Path("package.json")],
+            frontend_installed_ok=False,
+        )
+    )
+    out = capsys.readouterr().out
+    assert "Installed frontend dependencies" not in out
+    assert "  bun install" in out
+
+
+def test_print_summary_dev_py_suggested_as_run_command(capsys):
+    postgen.print_summary(**_summary_kwargs(created=[Path("dev.py")]))
+    out = capsys.readouterr().out
+    assert "uv run dev.py" in out
+    assert "uv run fastapi dev" not in out
+
+
 def test_print_summary_omits_options_line_when_none(capsys):
     postgen.print_summary(**_summary_kwargs(options=None))
     assert "Options:" not in capsys.readouterr().out

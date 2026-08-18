@@ -1,12 +1,9 @@
-<li class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-neutral-200
-           dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900" id="todo-{{ todo.id }}">
+<li class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-base-200" id="todo-{{ todo.id }}">
   <input type="checkbox" {% if todo.done %}checked{% endif %}
          hx-post="/todos/{{ todo.id }}/toggle" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML"
-         class="w-[1.1rem] h-[1.1rem] shrink-0 cursor-pointer accent-accent dark:accent-accent-dark" />
-  <span class="flex-1 text-sm break-words{{ ' text-neutral-500 dark:text-neutral-400 line-through' if todo.done else '' }}">{{ todo.title }}</span>
+         class="checkbox checkbox-primary shrink-0" />
+  <span class="flex-1 text-sm break-words{{ ' line-through text-base-content/50' if todo.done else '' }}">{{ todo.title }}</span>
   <button type="button" aria-label="Delete todo"
           hx-delete="/todos/{{ todo.id }}" hx-target="#todo-{{ todo.id }}" hx-swap="outerHTML"
-          class="shrink-0 p-1 rounded-md border-none bg-transparent text-neutral-500
-                 dark:text-neutral-400 text-base leading-none cursor-pointer
-                 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10">&#x2715;</button>
+          class="btn btn-ghost btn-circle btn-xs text-base-content/50 hover:text-error">&#x2715;</button>
 </li>

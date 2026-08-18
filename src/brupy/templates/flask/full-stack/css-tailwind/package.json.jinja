@@ -1,0 +1,14 @@
+{
+  "name": "{{ slug }}",
+  "private": true,
+  "devDependencies": {
+    "tailwindcss": "^4",
+    "@tailwindcss/cli": "^4",
+    "daisyui": "^5"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i src/{{ package_name }}/static/css/input.css -o src/{{ package_name }}/static/css/style.css --minify",
+    "watch:css": "tailwindcss -i src/{{ package_name }}/static/css/input.css -o src/{{ package_name }}/static/css/style.css --watch",
+    "dev": "uv run dev.py"
+  }
+}

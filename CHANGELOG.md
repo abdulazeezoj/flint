@@ -9,6 +9,125 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.21.3 — 2026-08-18
+
+### Fixed
+
+- **`brupy new --force`, regenerating into an existing project directory, could silently delete real content a user had at `.claude/skills/<id>`** — a regression from v0.21.2's shared `write_claude_skill_symlink()` helper, which unconditionally removed whatever was at that path before creating the symlink. The old code only ever *attempted* the symlink and skipped it on any conflict (`except OSError: continue`), leaving unrelated existing content untouched; `--force` on `render()` only overwrites files it's actually rendering, never arbitrary pre-existing directories under `.claude/skills/`. Fixed by giving the helper a `replace_existing` flag, defaulting to `False` (the safe, original per-project-generation behavior) — only `skillinstall.install()` (which has already done its own `--force`/exists checks) passes `replace_existing=True`. Found by a follow-up `/code-review` pass on the v0.21.2 fix itself, with a local repro confirming real data loss before the fix.
+- **`CLAUDE.md`'s AGENTS.md-presence check used fragile list membership** (`Path("AGENTS.md") in created`) instead of checking the filesystem directly — now `(target_dir / "AGENTS.md").is_file()`, decoupled from the exact shape of the `created` bookkeeping list.
+- **`install_skill_cmd`'s error-handling block was a near-verbatim copy of `_run_new`'s**, introduced by v0.21.2's own fix for the same class of duplication elsewhere. Extracted a shared `_with_error_handling` decorator (`BrupyUserError` → red error + exit 1, anything else → red "Unexpected error" + exit 2) now applied to both command bodies instead of hand-copied.
+
+`docs/_product/PRODUCT_ARCH.md` updated to match (§4.5, §5.2).
+
+## v0.21.2 — 2026-08-18
+
+### Fixed
+
+- **`brupy install-skill --force` crashed with a raw traceback if `.claude/skills/brupy` already existed as a real directory** instead of a symlink — `Path.unlink()` can't remove a directory. Fixed by extracting a shared `generator.write_claude_skill_symlink()` helper (now used by both `install-skill` and per-project generation) that replaces whatever's at that path first, symlink, directory, or plain file.
+- **`brupy install-skill`'s "already exists" error always blamed `.agents/skills/brupy`**, even when only `.claude/skills/brupy` was actually in the way — the message now names whichever path really conflicts.
+- **`install-skill` had no catch-all exception handler**, unlike `brupy new` — an unexpected `OSError` (permission denied, disk full) surfaced as a raw traceback instead of this CLI's normal `[red]Error:[/red]` messaging. Fixed with the same top-level safety net `_run_new` already has.
+- **`uv run dev.py` (the `css=tailwind` dev-server + Tailwind-watcher runner) could orphan an already-started dev server** if `bun` wasn't on `PATH` — the second process's `Popen()` call sat outside the cleanup `try/except`, so a `FileNotFoundError` left the first process running, bound to the port, with nothing to stop it. Fixed in both `fastapi/full-stack` and `flask/full-stack`'s `dev.py.jinja`.
+- **The `tailwind` skill's `skill.json` and `docs/agent-skills.md` still described the pre-pivot standalone-CLI/no-Node.js approach** — missed by the v0.21.1 sweep that specifically targeted this. `skill.json`'s description (which `generator.py` writes verbatim into every generated project's `.agents/skills/README.md`) now correctly describes the Bun + daisyUI stack.
+- **`CLAUDE.md` was written even for a template that doesn't ship `AGENTS.md`**, producing a dangling `@AGENTS.md` import — `render()` now only writes it once `AGENTS.md` is confirmed among that generation's output.
+
+### Changed
+
+- `skillinstall.install()` now returns `(root, written)` instead of just `written`, so `cli.py` no longer re-derives `root` itself — one function owns what a scope resolves to.
+- `postgen.py`'s `install_dependencies` (`uv sync`) and `install_frontend_dependencies` (`bun install`) now share one `_run_install()` helper instead of two copy-pasted implementations.
+- Removed a redundant, behaviorally-dead `isinstance` check in `updatecheck.check_for_update`.
+
+Found via a `/code-review` pass across the v0.21.0/v0.21.1 diff (8 independent reviewer angles); `package.json.jinja` and `dev.py.jinja`'s cross-framework duplication were also flagged but intentionally left as-is — brupy's template system has no mechanism for sharing a literal project-root file across two separate framework template trees (the shared-skills catalog only covers `.agents/skills/` content), so a real fix there is generator-level work, not a minimal patch.
+
+## v0.21.1 — 2026-08-18
+
+### Fixed
+
+- **The `brupy` agent skill itself (`src/brupy/agent_skill/`) still described `css=tailwind` as the old standalone-CLI/no-Node.js approach** — a leftover from v0.21.0's pivot to Bun + daisyUI that only touched the generated-project-facing docs, not the CLI-usage skill an agent relies on to scaffold correctly. `SKILL.md` and `references/templates.md` now describe the real prerequisite (Bun) and the real build commands.
+- **`fastapi/full-stack` and `flask/full-stack`'s `template.json` still labeled the `css=tailwind` choice "Tailwind CSS (standalone CLI, no Node.js)"** in the interactive wizard and `list-templates` output — updated to "Tailwind CSS + daisyUI (via Bun)".
+
+### Added
+
+- **`references/daisyui-components.md`** in every generated project's `.agents/skills/tailwind/` (only with `css=tailwind`): the full daisyUI component catalog (80+ components by category), a discovery protocol for picking the right one before hand-composing utilities, and gotchas for specific components (accordion radio grouping, drawer toggle IDs, modal `<dialog>`, hover-3d's nine-child requirement, text-rotate's six-line limit). Previously the skill only documented the ~4 components this project's own templates happen to use; this adds the wider vocabulary needed to build anything beyond that. Adapted from daisyUI's own [official skill](https://daisyui.com/docs/skill/) into this project's SKILL.md + `references/` shape.
+
+## v0.21.0 — 2026-08-18
+
+### Changed
+
+- **`full-stack`'s `css=tailwind` option (both frameworks) moves from
+  the standalone Tailwind CLI to a Bun + daisyUI toolchain.** v0.17
+  chose the standalone CLI (via `pytailwindcss`) specifically to avoid
+  a Node.js dependency — but the standalone binary can't load
+  third-party Tailwind plugins, and [daisyUI](https://daisyui.com) (the
+  reason for this change) is one. The new stack: FastAPI/Flask + Jinja2
+  + HTMX + Tailwind CSS v4 + daisyUI, built with
+  [Bun](https://bun.sh). Frontend dependencies (`tailwindcss`,
+  `@tailwindcss/cli`, `daisyui`) now live in a new `package.json`,
+  installed via `bun install` — fully separate from `pyproject.toml`/
+  `uv sync`; Python tooling is untouched. `templates/index.html` and
+  its partials are restyled with daisyUI component classes (`btn
+  btn-primary`, `input input-bordered`, `card`/`card-body`, `checkbox
+  checkbox-primary`) instead of hand-composed utilities.
+- **New `dev.py` (project root) — `uv run dev.py` runs the dev server
+  and the Tailwind watcher together.** Every `css=tailwind` project
+  gets this one-command dev flow. It's deliberately `uv run dev.py`,
+  not `uv run dev`: every generated project sets `[tool.uv] package =
+  false`, so `[project.scripts]` entry points never register and a bare
+  `uv run dev` has nothing to resolve to — `uv run <file>.py` is the
+  practical equivalent. `package.json` also gets a `"dev": "uv run
+  dev.py"` script, so `bun run dev` works as a one-word alias.
+- **`--docker` gains a whole extra build stage for `css=tailwind`.** A
+  `FROM oven/bun:1 AS css-builder` stage runs `bun install` + `bun run
+  build:css` against the real `templates/`/`static/` source (Tailwind
+  v4's CLI scans actual class usage); only the compiled `style.css` is
+  copied into the final image — Bun and `node_modules` never ship.
+- **`brupy new --install` now also runs `bun install`** when the
+  generated project has a `package.json` — the same best-effort pattern
+  as `uv sync` (skipped with a warning if `bun` isn't installed or the
+  install fails, never fatal). The "Next steps" summary suggests `bun
+  install` manually when it wasn't run automatically.
+- `css=vanilla` remains the default — this is still an opt-in
+  presentation choice, not a new baseline dependency for every
+  generated project.
+
+See `docs/_product/PRODUCT_ARCH.md` §4.8 for the full design rationale.
+
+## v0.20.0 — 2026-08-18
+
+### Added
+
+- **Every generated project now gets `CLAUDE.md` (a one-line
+  `@AGENTS.md`, Claude Code's own file-import syntax) and
+  `.claude/skills/<id>/` symlinked to each matched
+  `.agents/skills/<id>/`** — the same `.agents/`-is-canonical,
+  `.claude/`-symlinks-to-it pattern this repo's own `brupy` skill has
+  used since v0.17.1, now applied to every project brupy scaffolds too.
+  No flag, always on; the `.claude/skills/` symlink is best-effort
+  (skipped, not fatal, on a platform that refuses symlink creation
+  without elevated privileges).
+- **`brupy install-skill [--scope project|user] [--force]`** — installs
+  the portable `brupy` agent skill (how to invoke this CLI) into an
+  arbitrary directory, for a repo that wasn't scaffolded with brupy in
+  the first place. `--scope project` (default) targets the current
+  directory; `--scope user` targets your home directory, so it applies
+  to every project at once. Required moving the skill's real content
+  into the installed package itself (`src/brupy/agent_skill/`) so it
+  ships with `pip install`/`uv tool install`, not just a repo clone —
+  this repo's own `.agents/skills/brupy/` is now a symlink into that
+  same directory, one copy either way.
+- **Update notice**: an interactive `brupy new` checks once a day
+  (cached, best-effort, silently skipped on any failure) whether a
+  newer version is on PyPI and prints a one-line notice if so. Skipped
+  entirely for non-interactive/CI runs or with `BRUPY_NO_UPDATE_CHECK=1`
+  — the one deliberate exception to brupy needing no network access of
+  its own.
+
+### Confirmed (no change)
+
+- `full-stack`'s `css=tailwind` already uses the standalone Tailwind CLI
+  (`pytailwindcss`) with a real `input.css` → `style.css` build step —
+  never the Tailwind Play CDN `<script>` tag. No code changed; this
+  came up as a question and the answer was "already the case."
+
 ## v0.19.0 — 2026-08-17
 
 ### Changed

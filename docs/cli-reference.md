@@ -11,6 +11,7 @@ reference to flip back to.
 | `brupy` | Alias for `brupy new` with no name — full interactive wizard. |
 | `brupy new [NAME]` | Generate a new project. `NAME` pre-fills the project-name prompt (or is used directly with `--yes`/non-interactive). |
 | `brupy list-templates` | Print every framework/template pair. Generates nothing. |
+| `brupy install-skill [--scope project\|user]` | Install the `brupy` agent skill (how to invoke this CLI) into the current directory or your home directory. |
 | `brupy --version` | Print the installed version and exit. |
 | `brupy --help` / `brupy new --help` | Print usage and exit. |
 
@@ -180,6 +181,33 @@ full. See [Templates](project-templates/index.md) for the complete text.)
 
 This is pure introspection — it generates nothing, no matter what.
 
+## `brupy install-skill`
+
+```bash
+brupy install-skill                  # project scope (default): ./.agents/skills/brupy/
+brupy install-skill --scope user     # user scope: ~/.agents/skills/brupy/
+brupy install-skill --force          # overwrite an existing install at that scope
+```
+
+Installs the same portable `brupy` skill every generated project already
+gets — the one teaching a coding agent how to invoke this CLI — into an
+arbitrary directory, not just a freshly-scaffolded one. Useful for an
+existing repo (brupy-generated or not) that never went through `brupy
+new`, or for a machine-wide install so every project picks it up without
+a per-project step.
+
+Writes `.agents/skills/brupy/` (the real content) and symlinks
+`.claude/skills/brupy` to it — the exact same `.agents/`-is-canonical,
+`.claude/`-symlinks-to-it pattern used everywhere else in brupy (see
+[Agent Skills](agent-skills.md)). `--scope project` writes into the
+current directory; `--scope user` writes into your home directory
+instead, so it applies across every project without repeating the
+command. Refuses to overwrite an existing install unless `--force` is
+passed. The `.claude/skills/` symlink is best-effort — a platform that
+refuses symlink creation without elevated privileges (Windows without
+Developer Mode) still gets the real `.agents/skills/brupy/` content,
+just not the Claude-specific alias.
+
 ## `brupy --version`
 
 Prints the installed version and exits, e.g.:
@@ -229,6 +257,18 @@ Brupy quietly ignores anything stale or invalid. Pass
 `--remember`/`--no-remember` to control whether a given run reads or
 writes this file at all (default: on). See
 [Remembered Preferences](preferences.md) for the full mechanism.
+
+## Update notice
+
+An interactive `brupy new` (or bare `brupy`) checks once a day whether a
+newer version is available on PyPI, and prints a one-line notice at the
+end of the summary if so — never more than that: no prompt, nothing
+that blocks or fails generation. The check itself is best-effort (a
+short, cached lookup; silently skipped on any network failure) and is
+the one deliberate exception to brupy needing no network access of its
+own. It's skipped entirely for non-interactive runs (`--yes`, piped
+stdin) and CI, and can be disabled outright with
+`BRUPY_NO_UPDATE_CHECK=1`.
 
 ## Full non-interactive examples
 

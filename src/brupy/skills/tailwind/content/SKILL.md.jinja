@@ -1,39 +1,42 @@
 ---
 name: tailwind
-description: The @theme directive (CSS-first config, no tailwind.config.js), utility classes, and the standalone-CLI build step (pytailwindcss, no Node.js) — how this project's css=tailwind option styles pages. Use when adding or changing styling, adding a new design token (color/spacing/font), or the page has no styling at all after a fresh clone.
+description: Tailwind CSS v4 (CSS-first config, no tailwind.config.js) + daisyUI component classes, via a Bun-based frontend toolchain (package.json, separate from pyproject.toml) — how this project's css=tailwind option styles pages, and how `uv run dev.py` runs the dev server and the CSS watcher together. Use when adding or changing styling, adding a daisyUI component, adding a new design token, or the page has no styling at all after a fresh generate/clone.
 ---
 
-# Tailwind CSS
+# Tailwind CSS + daisyUI
 
-This project was generated with `css=tailwind`: pages are styled with Tailwind utility classes instead of the hand-written stylesheet the `css=vanilla` option would have used. This skill covers how *this project's* Tailwind setup works — the CSS-first `@theme` config and the no-Node build step — not the whole utility-class reference (there are hundreds; reach for the class names as you need them, same as you'd search any CSS framework's docs).
+This project was generated with `css=tailwind`: pages are styled with Tailwind utility classes and [daisyUI](https://daisyui.com) component classes instead of the hand-written stylesheet the `css=vanilla` option would have used. This skill covers how *this project's* setup works — the Bun-based build, the daisyUI theme config, which classes this project actually reaches for — not the whole Tailwind/daisyUI reference (there are hundreds of utilities and dozens of components; reach for them as you need them, same as you'd search any CSS framework's docs).
 
 ## When to reach for this
 
-- Styling a new page or partial.
-- Adding a new design token — a brand color, a spacing value, a font — that should be reusable as a utility class, not a one-off inline style.
+- Styling a new page or partial, or reaching for a daisyUI component (`btn`, `card`, `input`, `alert`, ...) instead of hand-composing utility classes.
+- Adding a new design token, or changing the light/dark theme.
 - A freshly generated (or freshly cloned) project has **no styling at all** — this is expected, see Quick reference below, not a bug.
-- Debugging a utility class that doesn't seem to do anything.
+- A daisyUI class doesn't seem to do anything, or doesn't look like daisyUI at all.
+- Deciding whether a dependency belongs in `pyproject.toml` or `package.json`.
 
 ## Quick reference
 
-- **No Node.js, no `tailwind.config.js`**: this project uses Tailwind's standalone CLI via the `pytailwindcss` PyPI package (an ordinary dependency in `pyproject.toml`) — it downloads the platform binary on first use and wraps it as `uv run tailwindcss`. There's no `npm install`, no `package.json`, and — because this is Tailwind v4 — no `tailwind.config.js` either.
-- **Config lives in CSS, not JS**: `src/{{ package_name }}/static/css/input.css` starts with `@import "tailwindcss";` followed by an `@theme` block defining this project's design tokens as CSS custom properties:
+- **Two toolchains, two dependency files**: Python dependencies stay in `pyproject.toml` (`uv sync`); frontend dependencies (`tailwindcss`, `@tailwindcss/cli`, `daisyui`) live in `package.json`, installed with [Bun](https://bun.sh) (`bun install`) — `uv add`/`uv sync` never touch `package.json`, and `bun add`/`bun install` never touch `pyproject.toml`. This project uses Bun specifically (not plain `npm`/`node`) — it's the JS runtime *and* the package manager, one tool instead of two.
+- **One command runs everything while developing**: `uv run dev.py` starts the {% if framework == "fastapi" %}FastAPI{% else %}Flask{% endif %} dev server and the Tailwind watcher together (`bun run watch:css` under the hood) — see the {% if framework == "fastapi" %}`fastapi`{% else %}`flask`{% endif %} skill for what the dev server itself does; this skill covers the CSS half. Requires `bun install` to have been run at least once first.
+- **Config lives in CSS, not JS — for both Tailwind and daisyUI**: `src/{{ package_name }}/static/css/input.css` is just:
   ```css
-  @theme {
-    --color-accent: #e8622c;
-    --color-accent-dark: #f27a44;
+  @import "tailwindcss";
+  @plugin "daisyui" {
+    themes: light --default, dark --prefersdark;
   }
   ```
-  Each entry both defines a real CSS variable (usable as `var(--color-accent)`) *and* generates matching utility classes automatically — `bg-accent`, `text-accent`, `border-accent`, `accent-accent` (used on the todo checkbox), etc. That's `@theme`'s whole point, and what makes it different from a plain `:root { --color-accent: ...; }` block, which would only give you the variable, not the utilities.
-- **You have to build it — nothing watches automatically**: `input.css` is the source; `static/css/style.css` (the file `base.html` actually links) is generated output, gitignored, and **does not exist until you build it once**:
+  No `tailwind.config.js` (Tailwind v4 is CSS-first) and no separate daisyUI config file — `themes: light --default, dark --prefersdark` picks daisyUI's built-in `light` theme by default and switches to `dark` automatically based on the OS/browser's `prefers-color-scheme`, matching how the `css=vanilla` variant's plain CSS already behaves. See `references/theming-and-components.md` for adding more themes or custom colors.
+- **You have to build it — nothing watches automatically outside `dev.py`**: `input.css` is the source; `static/css/style.css` (the file `base.html` actually links) is generated output, gitignored, and **does not exist until you build it once**:
   ```
-  uv run tailwindcss -i src/{{ package_name }}/static/css/input.css -o src/{{ package_name }}/static/css/style.css --minify
+  bun run build:css
   ```
-  Add `--watch` while iterating on styles so it rebuilds on save. If `--docker` was also chosen, the Dockerfile runs this build automatically as part of the image build — that combination needs no manual step.
-- **No content config needed**: Tailwind v4's standalone CLI scans the project directory for class names automatically (no `content: [...]` array to keep in sync, unlike Tailwind v3) — a class typed in any `.html` file under this project is picked up the next time you build, with nothing extra to configure.
-- **Everything else is plain utility classes**: `templates/index.html` and `templates/partials/*.html` compose Tailwind's existing utilities directly in `class="..."` (e.g. `bg-white dark:bg-neutral-800 border rounded-xl shadow-sm p-8`) rather than named CSS classes — there's no separate stylesheet rule to go find for "what does this look like", the class list on the element *is* the styling.
+  `bun run watch:css` rebuilds on every save (this is what `uv run dev.py` already runs for you). If `--docker` was also chosen, the Dockerfile builds the CSS automatically in a separate `oven/bun` build stage — that combination needs no manual step, and the final image never contains `node_modules` or the Bun toolchain itself.
+- **No content config needed**: Tailwind v4's CLI scans the project directory for class names automatically (no `content: [...]` array to keep in sync, unlike Tailwind v3) — a class typed in any `.html` file under this project is picked up the next time you build, with nothing extra to configure.
+- **Prefer daisyUI component classes over hand-composed utilities**: `templates/index.html` and `templates/partials/*.html` use `btn btn-primary`, `input input-bordered`, `card`/`card-body`/`card-title`, `checkbox checkbox-primary` rather than assembling the same look from raw utilities — see `references/theming-and-components.md` for the classes this project actually uses, and `references/daisyui-components.md` for the other 80+ components daisyUI ships (alerts, modals, dropdowns, navbars, ...) before adding any new UI.
 
 ## Go deeper
 
-- `references/theme-and-utilities.md` — the `@theme` namespaces this project could use beyond `--color-*` (spacing, fonts, radius, shadows...), and how a new token turns into new utility classes automatically.
-- `references/gotchas.md` — the no-styling-until-built trap, editing the wrong CSS file, and why deleting `style.css` isn't a mistake worth panicking over.
+- `references/theming-and-components.md` — the daisyUI theme config in depth (adding themes, custom colors), the semantic color tokens (`primary`/`base-100`/...) and their `-content` counterparts, and the component classes this project's templates use.
+- `references/daisyui-components.md` — the full daisyUI component catalog by category, a discovery protocol for picking the right one, and gotchas for specific components (accordion, drawer, modal, hover-3d, text-rotate). Check this before building any new UI beyond what's already here.
+- `references/gotchas.md` — the no-styling-until-built trap, `bun install` vs `uv sync` (two separate dependency worlds), editing the wrong CSS file, and a daisyUI class that doesn't look like daisyUI.

@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-15 (v0.19.0: renamed Flint → Brupy — see §2/§3)
+**Last updated:** 2026-08-18 (v0.21.1: fixes stale standalone-CLI wording left over from v0.21.0 in the `brupy` skill/`template.json`, adds a daisyUI component-catalog reference to the generated `tailwind` skill — see §4.8/§4.5)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `brupy` CLI itself (not the projects it generates).
@@ -37,6 +37,15 @@ is a contained change, not a rewrite.
   `npx create-next-app` is normally invoked.
 - Build backend: `hatchling` via `uv`'s default `uv init --package`
   project shape (src layout).
+- Everything the installed package needs to *do its job standalone* —
+  `templates/`, the `skills/<id>/` catalog, and (since v0.20.0)
+  `agent_skill/`, the content behind `brupy install-skill` — lives
+  inside `src/brupy/`, not just the `.py` modules. `uv`'s default
+  packaging already includes non-Python files under the package
+  directory (this predates v0.20.0 — `templates/`/`skills/` have always
+  relied on it); `agent_skill/` follows the same convention rather than
+  needing new packaging config. See §5.2 for why this repo's own
+  `.agents/skills/brupy/` is a symlink into it, not a second copy.
 
 ## 3. Repository layout
 
@@ -44,13 +53,12 @@ is a contained change, not a rewrite.
 brupy/
 ├── .agents/
 │   └── skills/
-│       └── brupy/                  # portable agent skill teaching an agent how to *use*
-│           │                       # the brupy CLI itself — unrelated to SKILLS_DIR (§4.5),
-│           │                       # which brupy bundles *into generated projects*
-│           ├── SKILL.md
-│           └── references/
-│               ├── cli-reference.md
-│               └── templates.md
+│       └── brupy -> ../../src/brupy/agent_skill   # symlink (since v0.20.0) — the real
+│                                                    # content ships inside the package
+│                                                    # itself, see src/brupy/agent_skill/
+│                                                    # below and §5.2; unrelated to
+│                                                    # SKILLS_DIR (§4.5), which brupy
+│                                                    # bundles *into generated projects*
 ├── .claude/
 │   └── skills/
 │       └── brupy -> ../../.agents/skills/brupy   # symlink, for Claude Code's own
@@ -93,7 +101,16 @@ brupy/
 │       ├── generator.py         # template renderer: options, layers, Jinja2
 │       ├── postgen.py           # git init, uv sync, summary printing
 │       ├── prefs.py             # ~/.brupy/last.json — best-effort read/write
+│       ├── updatecheck.py       # best-effort "newer version on PyPI" notice — see §5.1
+│       ├── skillinstall.py      # `brupy install-skill` — see §5.2
 │       ├── errors.py            # BrupyError and friends -> exit codes
+│       ├── agent_skill/         # the `brupy` skill's REAL content (since v0.20.0) —
+│       │   │                    # .agents/skills/brupy/ above symlinks here, so this
+│       │   │                    # ships inside the installed package too — see §5.2
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── cli-reference.md
+│       │       └── templates.md
 │       └── templates/
 │           ├── fastapi/
 │           │   ├── template.json                  # framework metadata
@@ -138,7 +155,9 @@ brupy/
 │           │   flask-sqlalchemy/ alembic/ flask-migrate/ taskiq/
 │           │   celery/ redis/ pytest/                # same shape as fastapi/ above
 ├── tests/
-│   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE per test
+│   ├── conftest.py               # autouse fixture: isolates prefs.PREFS_DIR/FILE and
+│   │                              # updatecheck.CACHE_FILE per test, disables the
+│   │                              # update check's network path entirely (BRUPY_NO_UPDATE_CHECK)
 │   ├── test_naming.py
 │   ├── test_generator.py
 │   ├── test_flask_hello_world.py
@@ -148,6 +167,8 @@ brupy/
 │   ├── test_cli.py
 │   ├── test_postgen.py
 │   ├── test_prefs.py
+│   ├── test_updatecheck.py       # mocks urllib.request.urlopen — never a real network call
+│   ├── test_skillinstall.py
 │   └── test_main.py
 ├── pyproject.toml
 ├── CHANGELOG.md
@@ -542,6 +563,25 @@ authored content, just an index over what actually got included, since
 `git status`/directory-listing is a worse way to discover "what skills
 does this project have."
 
+**`.claude/skills/` and `CLAUDE.md` (since v0.20.0).** Two more things
+`render()` writes after the skills/index step: `_write_claude_skill_symlinks`
+symlinks `.claude/skills/<id>` to `../../.agents/skills/<id>` for every
+matched skill (only if there are any — same guard as the README index),
+via the shared `generator.write_claude_skill_symlink()` helper (also
+used by `skillinstall.install()`, see §5.2) called with its conservative
+default (`replace_existing=False`) — real, unrelated content a user
+happens to have at that path (e.g. regenerating with `--force` into a
+directory that already has something under `.claude/skills/<id>`) is
+left alone rather than deleted; the resulting `OSError` is caught by
+the existing `except OSError: continue` per skill. `_write_claude_md`
+writes a one-line `CLAUDE.md` (`@AGENTS.md`) only once `AGENTS.md` is
+confirmed present in `target_dir` — every currently-shipped template's
+base layer does ship it, so this is a no-op guard today, but it means a
+future minimal/stub template without `AGENTS.md` doesn't get a dangling
+import. Both mirror the `.agents/`-is-canonical/`.claude/`-symlinks-to-it
+pattern this repo's own `flint`/`brupy` skill has used since v0.17.1 —
+generated projects now get the identical structure, not just this repo.
+
 **Bootstrapping**: the `fastapi` skill was hand-built first and used to
 validate the whole mechanism end-to-end (rendering, substitution,
 when-gating, the generated index) before the remaining ten
@@ -683,73 +723,113 @@ between the two values:
   exactly what serves in production.
 - **`css=tailwind`**: `style.css` is a **build artifact**. The checked-in
   source is `static/css/input.css` (a few lines: `@import "tailwindcss"`
-  plus an `@theme` block for custom design tokens — Tailwind v4's
-  CSS-first config, no `tailwind.config.js`). `style.css` is produced by
-  actually *running* the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
-  against `input.css` — brupy never writes it, and it's `.gitignore`d in
-  the generated project. This mirrors a pattern already established for
+  plus an `@plugin "daisyui" { ... }` block — Tailwind v4's CSS-first
+  config, no `tailwind.config.js`, and no separate daisyUI config file
+  either). `style.css` is produced by actually *running* a build against
+  `input.css` — brupy never writes it, and it's `.gitignore`d in the
+  generated project. This mirrors a pattern already established for
   `migrations=true` (schema comes from running a migration, not from
   `brupy new`) and the worker option (a worker process brupy doesn't
   start) — a real "one command you must run before this works" step,
   not something to fake at generation time.
 
-**Why the standalone CLI, not a Node.js build pipeline**: every other
-tool this project depends on installs through `uv`. A `package.json` +
-`npm install` + Tailwind's PostCSS plugin would introduce Node.js as a
-second toolchain into an otherwise Python-only generated project — a
-real cost for a CSS framework. Tailwind v4's standalone CLI removes
-that tradeoff entirely: it's a self-contained platform binary with no
-Node runtime dependency. [`pytailwindcss`](https://pypi.org/project/pytailwindcss/)
-wraps it as an ordinary `pyproject.toml` dependency — `uv sync` installs
-the wrapper, and the wrapper downloads/caches the actual binary the
-first time `uv run tailwindcss ...` executes. The design (source CSS in,
-built CSS out, binary managed transparently, `init`/`watch`/`build`-
-shaped commands) is modeled directly on
-[`litestar-tailwind-cli`](https://github.com/Tobi-De/litestar-tailwind-cli),
-the reference implementation of this pattern for a Python web framework
-— brupy doesn't reimplement binary-downloading logic itself, just
-depends on the already-published wrapper.
+**v0.21 pivot: from the standalone CLI to Bun + daisyUI.** v0.17
+deliberately chose the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
+via [`pytailwindcss`](https://pypi.org/project/pytailwindcss/) *to avoid
+Node.js entirely* — every other tool this project depends on installs
+through `uv`, and a `package.json` + `npm install` pipeline would have
+been a second toolchain for a CSS framework alone. That tradeoff held
+right up until the shape of the components this template needed to
+render (buttons, inputs, cards, alerts — genuine UI, not just utility
+classes) made a component library the obvious next step, and
+[daisyUI](https://daisyui.com) is a Tailwind *plugin*: it hooks into
+Tailwind's own build via `@plugin "daisyui"`, not a bundled binary. The
+standalone CLI can run Tailwind itself but **cannot load third-party
+plugins** — there is no supported way to get daisyUI working through
+`pytailwindcss`. Rather than keep reaching for that at the cost of
+never having real components, v0.21 reverses the v0.17 decision: the
+frontend build now runs through [Bun](https://bun.sh) — a single binary
+that's both a JS runtime and a package manager, not `npm`/`node`
+separately — with `tailwindcss`, `@tailwindcss/cli`, and `daisyui` as
+ordinary `package.json` devDependencies. Python dependencies stay
+exactly where they were, in `pyproject.toml`, installed by `uv sync`;
+the two dependency worlds never touch each other, and `uv`/`uv sync`
+remain the *only* thing required for every template that isn't
+`css=tailwind` — this is still an opt-in cost, not a new default
+dependency on every generated project.
 
-**Layer structure**: `static/css/style.css` moved *out* of the base
-`files/` layer entirely and into two new peer layers, `css-vanilla/`
-(the pre-existing hand-written CSS, relocated unchanged) and
-`css-tailwind/` (`input.css` + Tailwind-utility-class rewrites of
-`templates/index.html` and `templates/partials/{todo_item,empty_state}.html`),
-gated the same `when`-mechanism as `db-*`/`worker-*`. This is the
-"layer, not inline `{% if %}`" choice from §4.2 applied to CSS: the two
-variants' `templates/index.html` are genuinely different files (custom
-class names vs. Tailwind utility classes), not one file with a
-conditional class-name mapping, and forcing that into `{% if %}`
-branches would make an already-verbose runtime-Jinja template (§4.7)
-far harder to read. One consequence worth flagging for future template
-authors: because neither `css-vanilla` nor `css-tailwind` has a
-fallback, **`render()` called with `css` absent from `options` ships no
-`static/css/style.css` and no `static/css/input.css` at all** — neither
-layer's `when` matches a missing key. This is consistent with every
-other option (`render()` never applies `template.json`'s declared
-defaults; that's `prompts.py`'s job — see §4), but it was a real gap
-caught during this release: `test_generator.py`'s
-`make_full_stack_answers()` helper predates the `css` option and didn't
-set it, so several existing tests silently stopped generating any CSS
-file the moment the layers were split. Fixed by adding `css="vanilla"`
-to the helper's defaults, matching how every other option already has
-an explicit default there.
+**The generated project gains two new project-root files, only with
+`css=tailwind`:**
+- `package.json` — the three frontend devDependencies above, plus a
+  `scripts` block (`build:css`, `watch:css`, and `dev` as a `bun run
+  dev` alias for `uv run dev.py` below).
+- `dev.py` — a small, dependency-free stdlib script (`subprocess.Popen`
+  × 2, a poll loop, `KeyboardInterrupt` → terminate-then-kill cleanup)
+  that starts the framework's dev server and `bun run watch:css`
+  together, so `uv run dev.py` is the one command a developer needs
+  while working. It lives at the **project root**, not under
+  `src/{package_name}/`, and is invoked as `uv run dev.py`, not `uv run
+  dev` — every generated project sets `[tool.uv] package = false`
+  (deliberately: none of these apps need to be an installable package),
+  so `[project.scripts]` entry points never register, and a bare `uv
+  run dev` has nothing to resolve to. `uv run <file>.py` runs a script
+  file directly with no packaging involved, which is the practical
+  equivalent and the one actually documented — flipping `package =
+  true` just to get a bare-word command would be a much bigger, riskier
+  change than this dev-convenience script is worth.
 
-**A real bug this caught**: `tests/test_main.py.jinja` — shared by
-`files/`, so shared by every `css` variant — had
-`assert 'class="todo-item done"' in toggle_response.text` to check that
-toggling a todo marks it done. That string is `css-vanilla`-only markup;
-it doesn't exist in `css-tailwind`'s rewritten `todo_item.html`. Every
-static check (`ast.parse()`, `tomllib.loads()`, the leftover-Jinja
-sweep) passed regardless, because the test file itself is syntactically
-fine — the failure only appeared when a generated `css=tailwind`
-project's `uv run pytest` actually ran the assertion against real
-Tailwind markup. Fixed by asserting the checkbox's `checked` attribute
-instead, which is identical markup in both variants — the general
-lesson (documented in both `full-stack` maintainer `README.md`s as a
-standing rule) is that a test file shared across variants of a template
-option must never assert against variant-specific presentation, only
-behavior.
+**Layer structure, mostly unchanged from v0.17**: `static/css/style.css`
+still lives in two peer layers, `css-vanilla/` (untouched) and
+`css-tailwind/` — but `css-tailwind/` now also owns `package.json.jinja`
+and `dev.py.jinja` at the layer root (project-root files, not under
+`src/{package_name}/`), and overrides `templates/base.html` (via the
+same later-layer-wins overlay mechanism as §4.2, adding daisyUI-specific
+body/main wrapper classes) in addition to the pre-existing
+`templates/index.html` and `templates/partials/{todo_item,empty_state}.html`
+overrides. The "no fallback, so `css` absent from `options` ships no
+CSS files at all" gap flagged in v0.17 is unchanged and still applies.
+
+**Docker changed shape entirely.** v0.17's Dockerfile ran one `RUN uv
+run tailwindcss ... --minify` line inline, since the standalone binary
+needed nothing else. Bun does need something else — `bun install` has
+to resolve against `package.json`, and the CLI has to scan the actual
+`templates/`/`static/` source trees for class usage — so `css=tailwind`
+now adds a whole extra build stage:
+
+```dockerfile
+FROM oven/bun:1 AS css-builder
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install
+COPY src/{package_name}/templates src/{package_name}/templates
+COPY src/{package_name}/static src/{package_name}/static
+RUN bun run build:css
+```
+
+The final stage (still `ghcr.io/astral-sh/uv:...`) only ever `COPY
+--from=css-builder`'s the single compiled `style.css` file — Bun,
+`node_modules`, and the frontend source never cross into the production
+image. `.dockerignore` and `.gitignore` both gained a `node_modules/`
+entry alongside the pre-existing `static/css/style.css` ignore.
+
+**`postgen.py` gained a matching best-effort step.** Just as `uv sync`
+already ran automatically after generation when `--install` was passed,
+`install_frontend_dependencies()` now runs `bun install` under the same
+conditions — but only when the generated project actually has a
+`package.json` (a no-op for `css=vanilla`), and following the
+established best-effort pattern for external tools: `shutil.which("bun")
+is None` → warn and skip, `subprocess.CalledProcessError` → warn and
+continue, never raises, never blocks the rest of generation. The "Next
+steps" summary suggests `bun install` when it wasn't run automatically,
+same as it already did for `uv sync`.
+
+**A real bug this caught, still true after the pivot**:
+`tests/test_main.py.jinja` — shared by `files/`, so shared by every
+`css` variant — must never assert against a CSS class name (see v0.17's
+note below); the fix (asserting the checkbox's `checked` attribute
+instead of a `css-vanilla`-only class string) still holds unchanged
+under the new daisyUI markup, since `checked` is present in both
+variants regardless of what styles the class names carry.
 
 ## 5. Remembered preferences (`prefs.py`)
 
@@ -850,6 +930,76 @@ after rendering (so a failed/rolled-back generation never gets
 remembered) but before the git-init/install steps (whose success/failure
 doesn't change what was actually *requested*, which is what's worth
 remembering).
+
+### 5.1 Update check (`updatecheck.py`)
+
+Same "best-effort home-directory file, never allowed to break the
+primary thing" philosophy as `prefs.py` above, applied to a single
+question: is a newer brupy on PyPI? `~/.brupy/update_check.json` caches
+the answer for `_CHECK_INTERVAL_SECONDS` (24h) so an interactive run
+doesn't hit the network every single time — `check_for_update(*,
+interactive)` reads the cache, and only calls
+`urllib.request.urlopen("https://pypi.org/pypi/brupy/json", timeout=1.5)`
+when it's missing or stale. Every failure mode (offline, timeout,
+malformed JSON, missing `info.version` key, a corrupt cache file, a
+read-only home directory on the write side) is caught and treated as
+"nothing to report" — `check_for_update` never raises. Version
+comparison (`_parse_version`) is deliberately not full PEP 440: split on
+`.`, take each segment's leading digit run, pad to three — good enough
+for "is there something newer," and tolerant of a pre-release suffix
+like `1.2.3rc1` without choking on it.
+
+Called once, at the very end of `cli.py._run_new`, only after
+`postgen.print_summary` — a courtesy notice, never a blocker, and
+skipped outright (no network attempt at all) when `interactive=False`,
+`BRUPY_NO_UPDATE_CHECK` or `CI` is set. Stdlib `urllib.request` only —
+no new HTTP client dependency for one small, infrequent GET.
+
+### 5.2 Skill installer (`skillinstall.py`) and where the `brupy` skill lives
+
+`brupy install-skill` needs the *same* skill content
+`.agents/skills/flint/`/`.agents/skills/brupy/` has always held (how to
+invoke this CLI) to be reachable from an **installed** `brupy` — a
+`pip install`/`uv tool install` never clones this repo, so anything
+outside `src/brupy/` doesn't ship in the wheel. As of v0.20.0 the real
+content lives at `src/brupy/agent_skill/` (packaged exactly like
+`templates/` and `skills/` already are), and this repo's own
+`.agents/skills/brupy/` is a **symlink** to it
+(`.agents/skills/brupy -> ../../src/brupy/agent_skill`) — one copy,
+whether you're reading brupy's own source tree or a wheel someone
+installed from PyPI. `.claude/skills/brupy` still symlinks to
+`.agents/skills/brupy` as before; it just resolves through one extra
+hop now.
+
+`skillinstall.install(scope, force=False) -> (root, written)` copies
+`AGENT_SKILL_DIR` (`src/brupy/agent_skill/`) into
+`<root>/.agents/skills/brupy/` via `shutil.copytree` (a plain copy —
+this content has no per-project Jinja context, unlike `generator.py`'s
+templates) and symlinks `<root>/.claude/skills/brupy` to it, where
+`<root>` is `Path.cwd()` for `scope="project"` or `Path.home()` for
+`scope="user"` — resolved at call time, not cached at import time, so
+both are actually monkeypatchable in tests (an earlier draft cached
+them in a module-level dict and silently ignored test patches — see
+the `_VALID_SCOPES` comment in the source). `install()` returns `root`
+alongside `written` so `cli.py` never has to re-derive it itself — one
+function owns what a scope resolves to. Refuses to overwrite either
+target without `force`, matching `generator.render()`'s non-empty-
+directory refusal — checked as two separate conditions (`.agents/`
+target, then `.claude/` link) so the error names whichever path
+actually conflicts, not always `.agents/skills/brupy` regardless. The
+symlink step itself goes through `generator.write_claude_skill_symlink()`
+— the same helper `generator.py`'s per-project generation uses (§4.5)
+— but with `replace_existing=True`, since `install()` has already done
+its own `--force`/exists checks by the time it's called; per-project
+generation calls it with the conservative default (`replace_existing=
+False`) instead, so a real, unrelated directory a user happens to have
+at `.claude/skills/<id>` is left alone rather than deleted. Best-effort
+either way — `except OSError: continue`/`pass` around the symlink call
+— `AGENT_SKILL_DIR` itself never fails to copy, so `install-skill`
+always leaves *something* behind even on a platform that can't
+symlink. `cli.install_skill_cmd` also has a top-level `except Exception`
+safety net, matching `_run_new`'s, so an unexpected `OSError` (e.g.
+disk full mid-copy) fails gracefully instead of with a raw traceback.
 
 ## 6. CLI flow → code mapping
 

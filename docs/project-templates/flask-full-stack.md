@@ -31,7 +31,7 @@ the backend stack:
 
 | Option | Choices | Default |
 |---|---|---|
-| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI) | `vanilla` |
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 + daisyUI, via Bun) | `vanilla` |
 
 See [Styling](#styling-cssvanilla-vs-csstailwind) below.
 
@@ -57,32 +57,35 @@ StaticFiles(...))`; this template needs neither.
 ## What gets generated
 
 ```text
-src/{package_name}/
-  main.py              Flask entrypoint — create_app() factory, no module-level app
-  worker.py            Celery entrypoint (iff worker == celery)
-  routes/               one module per HTTP resource — Flask Blueprints
-    todos.py              returns HTML/fragments, not JSON
-  templates/             Jinja2 templates — found automatically, no setup needed
-    base.html              shell — HTMX script tag, stylesheet link
-    index.html              the Todo page
-    partials/               HTMX-swapped fragments
-      todo_item.html          one <li>
-      empty_state.html         the "nothing to do yet" message
-      todo_created.html        todo_item.html + an out-of-band delete of empty_state
-  static/               served at /static, same automatic resolution
-    css/style.css          the whole UI (css=vanilla), or...
-    css/input.css          ...the Tailwind source, style.css built + git-ignored (css=tailwind)
-  core/                  shared infrastructure
-    config.py              Settings (pydantic-settings, always)
-    db.py                  engine/session setup (iff database != none)
-    redis.py                Redis client (iff redis resolves true)
-  tasks/                 one module per background job (iff worker == celery)
-    example.py             the /tasks/add demo task
-  models.py               {orm} models (iff database != none)
-migrations/ or alembic/  iff migrations — directory name depends on orm, see rest-api's docs
-tests/
-AGENTS.md
-Dockerfile                iff --docker
+{package_name-project-root}/
+  package.json           frontend deps: tailwindcss, @tailwindcss/cli, daisyui (iff css=tailwind)
+  dev.py                  uv run dev.py — runs the dev server + Tailwind watcher together (iff css=tailwind)
+  src/{package_name}/
+    main.py              Flask entrypoint — create_app() factory, no module-level app
+    worker.py            Celery entrypoint (iff worker == celery)
+    routes/               one module per HTTP resource — Flask Blueprints
+      todos.py              returns HTML/fragments, not JSON
+    templates/             Jinja2 templates — found automatically, no setup needed
+      base.html              shell — HTMX script tag, stylesheet link
+      index.html              the Todo page
+      partials/               HTMX-swapped fragments
+        todo_item.html          one <li>
+        empty_state.html         the "nothing to do yet" message
+        todo_created.html        todo_item.html + an out-of-band delete of empty_state
+    static/               served at /static, same automatic resolution
+      css/style.css          the whole UI (css=vanilla), or...
+      css/input.css          ...the Tailwind + daisyUI source, style.css built + git-ignored (css=tailwind)
+    core/                  shared infrastructure
+      config.py              Settings (pydantic-settings, always)
+      db.py                  engine/session setup (iff database != none)
+      redis.py                Redis client (iff redis resolves true)
+    tasks/                 one module per background job (iff worker == celery)
+      example.py             the /tasks/add demo task
+    models.py               {orm} models (iff database != none)
+  migrations/ or alembic/  iff migrations — directory name depends on orm, see rest-api's docs
+  tests/
+  AGENTS.md
+  Dockerfile                iff --docker
 ```
 
 No `schemas.py`: unlike `rest-api`, there's no request/response contract
@@ -119,21 +122,26 @@ for the full explanation of the `hx-swap-oob="delete"` trick and how
 ## Styling: `css=vanilla` vs `css=tailwind`
 
 Identical mechanism to the FastAPI template's — same `css=tailwind`
-option, same [standalone-CLI](https://tailwindcss.com/blog/standalone-cli)
-approach (no Node.js/npm), same `input.css`/`style.css` split, same
-`@theme`-based accent color, and the exact same `templates/index.html`/
-`partials/todo_item.html` Tailwind markup, copied byte-for-byte from
-`fastapi/full-stack`. See
+option, same Bun-based toolchain (`package.json`, separate from
+`pyproject.toml`), same Tailwind v4 + [daisyUI](https://daisyui.com)
+combination, same `input.css`/`style.css` split, and the exact same
+`templates/index.html`/`partials/todo_item.html` daisyUI markup, copied
+byte-for-byte from `fastapi/full-stack`. See
 [FastAPI · Full-Stack → Styling](fastapi-full-stack.md#styling-cssvanilla-vs-csstailwind)
 for the full explanation, including why a freshly generated
-`css=tailwind` project has no styling until you build once:
+`css=tailwind` project has no styling until `bun install` + a build
+have run once:
 
 ```bash
-uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css
+bun install
+bun run build:css
 ```
 
-`--docker` runs this automatically (with `--minify`) as part of the
-image build.
+`--docker` runs this automatically, in a separate `oven/bun` build
+stage, as part of the image build — only the compiled `style.css`
+crosses into the final image. For day-to-day development, `uv run
+dev.py` starts the Flask dev server and the Tailwind watcher together —
+see [A full example](#a-full-example) below.
 
 ## A full example
 
@@ -168,9 +176,18 @@ returning a small HTML fragment instead of a full page or JSON.
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework flask --template full-stack`, has an interactive
 equivalent if you just run `brupy new my-app` and answer the prompts
-instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
-instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
-above.
+instead. Add `-o css=tailwind` to any of these to get Tailwind CSS +
+daisyUI instead of the vanilla stylesheet — see
+[Styling](#styling-cssvanilla-vs-csstailwind) above. With `css=tailwind`,
+there's one extra one-time step (`bun install`, alongside `uv sync`),
+and `uv run dev.py` replaces `uv run flask --app ... run` as the run
+command — it starts the dev server and the Tailwind watcher together:
+
+```bash
+uv sync
+bun install
+uv run dev.py
+```
 
 ## Gotchas worth knowing before you edit the generated code
 
@@ -220,7 +237,7 @@ plus two `full-stack` always adds for the presentation layer:
 |---|---|
 | `jinja2` | Always — template inheritance, includes, autoescaping. |
 | `htmx` | Always — hx-swap/hx-target/hx-trigger, out-of-band swaps. |
-| `tailwind` | Only with `css=tailwind` — the `@theme` directive and the standalone-CLI build step. |
+| `tailwind` | Only with `css=tailwind` — the Bun toolchain, the `@plugin "daisyui"` config, and the component classes this project uses. |
 
 ## `--docker`
 
@@ -228,8 +245,10 @@ Pass `--docker` and brupy adds a `Dockerfile` (`uv`-based) plus
 `.dockerignore` — identical to `rest-api`'s, including running under
 **gunicorn** via its factory-call syntax
 (`{package_name}.main:create_app()`), not the Flask dev server. With
-`css=tailwind`, the Dockerfile has one extra `RUN uv run tailwindcss
-... --minify` step so the built image always has current CSS (see
+`css=tailwind`, the Dockerfile gains a whole extra build stage (`FROM
+oven/bun:1 AS css-builder`) that runs `bun install` + `bun run
+build:css`, and only the compiled `style.css` is copied into the final
+image — Bun and `node_modules` never end up in it (see
 [Styling](#styling-cssvanilla-vs-csstailwind) above):
 
 ```bash

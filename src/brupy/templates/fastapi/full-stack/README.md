@@ -29,7 +29,7 @@ since it's about presentation, not the backend stack:
 
 | key | type | default | choices |
 |---|---|---|---|
-| `css` | select | `vanilla` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 via the standalone CLI) |
+| `css` | select | `vanilla` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 + daisyUI, via Bun) |
 
 No `when`/`skip_value` — it's independent of every other option.
 
@@ -56,10 +56,12 @@ worker-celery/            iff worker == celery — same shape, Celery; same
 redis/                    iff redis resolves true — core/redis.py client
 css-vanilla/              iff css == vanilla (the default) — static/css/style.css,
                           the hand-written CSS `files/`'s templates are styled for
-css-tailwind/             iff css == tailwind — static/css/input.css (Tailwind
-                          source) + overrides templates/index.html and
-                          templates/partials/{todo_item,empty_state}.html with
-                          Tailwind utility classes instead
+css-tailwind/             iff css == tailwind — static/css/input.css (Tailwind +
+                          daisyUI source), package.json.jinja + dev.py.jinja at
+                          this layer's root (project-root files, not under
+                          src/{package_name}/), and overrides templates/base.html
+                          + index.html + templates/partials/{todo_item,empty_state}.html
+                          with daisyUI component classes instead
 ```
 
 `docker/`, `worker-taskiq/`, `worker-celery/`, `redis/`, and both
@@ -68,25 +70,30 @@ css-tailwind/             iff css == tailwind — static/css/input.css (Tailwind
 infrastructure with no dependency on what the app actually renders.
 `db-sqlmodel`/`db-sqlalchemy`'s `core/db.py` and `tests/conftest.py` are
 also unchanged from `rest-api` — fully generic, no `Item`/`Todo`
-reference in either. `docker/`'s `Dockerfile.jinja` has exactly one
-`css`-aware line: a `RUN uv run tailwindcss ... --minify` build step,
-gated `{% if css == "tailwind" %}`, so a container always ships current
-CSS regardless of which variant was chosen.
+reference in either. `docker/`'s `Dockerfile.jinja` gets a whole extra
+build stage when `css == "tailwind"`: an `oven/bun:1` stage runs `bun
+install` + `bun run build:css`, and only the compiled `style.css` gets
+`COPY --from=css-builder`'d into the real image — Bun/`node_modules`
+never end up in the final image.
 
 The **generated project's** layout (what a developer actually sees) is:
 
 ```
-src/{package_name}/
-  main.py              FastAPI entrypoint — fixed name/location, mounts /static
-  worker.py            {worker} entrypoint — fixed name/location (iff a worker is chosen)
-  routes/               one module per HTTP resource — returns HTML, not JSON
-  templates/             Jinja2 templates: base.html, index.html, partials/
-  static/css/            served at /static — style.css (iff css == vanilla),
-                          or input.css (tracked) + style.css (git-ignored build
-                          output, iff css == tailwind)
-  tasks/                 one module per background job (iff a worker is chosen)
-  core/                   shared infrastructure: config.py, templates.py, db.py, redis.py
-  models.py                {orm} models — iff a database is chosen
+{package_name-project-root}/
+  package.json          frontend deps: tailwindcss, @tailwindcss/cli, daisyui (iff css == tailwind)
+  dev.py                 uv run dev.py — runs the FastAPI dev server + Tailwind
+                          watcher together (iff css == tailwind)
+  src/{package_name}/
+    main.py              FastAPI entrypoint — fixed name/location, mounts /static
+    worker.py            {worker} entrypoint — fixed name/location (iff a worker is chosen)
+    routes/               one module per HTTP resource — returns HTML, not JSON
+    templates/             Jinja2 templates: base.html, index.html, partials/
+    static/css/            served at /static — style.css (iff css == vanilla),
+                            or input.css (tracked) + style.css (git-ignored build
+                            output, iff css == tailwind)
+    tasks/                 one module per background job (iff a worker is chosen)
+    core/                   shared infrastructure: config.py, templates.py, db.py, redis.py
+    models.py                {orm} models — iff a database is chosen
 ```
 
 No `schemas.py`: unlike `rest-api`, there's no separate request/response
@@ -140,6 +147,20 @@ here unchanged). Specific to `full-stack`:
    checkbox's `checked` attribute is present in both variants' markup,
    so the test verifies the actual behavior (toggling `done`) without
    depending on how that state happens to be styled.
+4. **`dev.py` lives at the project root, not under `src/{package_name}/`,
+   and is invoked as `uv run dev.py`, not `uv run dev`.** This is
+   deliberate, not an oversight: `pyproject.toml.jinja` sets `[tool.uv]
+   package = false` (every template does — the generated app doesn't
+   need to be an installable package), so `[project.scripts]` entry
+   points are never registered and a bare `uv run dev` has nothing to
+   resolve to. `uv run <file>.py` runs a script file directly with no
+   packaging involved, which is why `dev.py` is a plain, dependency-free
+   stdlib script (only spawns subprocesses, never imports
+   `{package_name}`) rather than a package module. Don't "fix" this by
+   moving it into `src/{package_name}/` and adding a `[project.scripts]`
+   entry — that requires `package = true` plus real build-target config,
+   a much bigger change than this template needs for one dev-convenience
+   script.
 
 ## Testing this template
 

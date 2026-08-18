@@ -72,6 +72,7 @@ brupy new my-api \
   -o database=sqlite -o orm=sqlmodel \
   --docker --git --install --yes            # fully non-interactive, for scripts/CI
 brupy list-templates                       # what's available, without generating anything
+brupy install-skill                        # add the brupy skill to an existing project
 brupy --version
 brupy --help
 ```
@@ -87,7 +88,10 @@ is a portable agent skill that teaches an agent how to invoke the CLI
 to scaffold a project. It's symlinked at `.claude/skills/brupy/` for
 Claude Code's own discovery path. Separate from the `.agents/skills/`
 catalog described below, which covers using the *generated* project's
-own stack.
+own stack. Every generated project gets it automatically; run `brupy
+install-skill` (`--scope project`, the default, or `--scope user` for
+every project at once) to add it to a repo that wasn't scaffolded with
+brupy in the first place.
 
 ## What brupy ships
 
@@ -128,7 +132,9 @@ my-api/
   tests/
   alembic/                 migrations (only if migrations is on)
   .agents/skills/          library-specific reference material for AI agents
+  .claude/skills/          same skills, symlinked for Claude Code's own discovery path
   AGENTS.md
+  CLAUDE.md                one line, @AGENTS.md — Claude Code loads it automatically
   Dockerfile               (only if --docker)
 ```
 
