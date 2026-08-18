@@ -179,6 +179,21 @@ def test_render_symlinks_claude_skills_to_agents_skills(tmp_path: Path):
     assert link.resolve() == (target / ".agents/skills/fastapi").resolve()
 
 
+def test_render_force_leaves_unrelated_claude_skills_content_alone(tmp_path: Path):
+    # Regression test: render(..., force=True) regenerating into an
+    # existing project directory must not silently delete real content
+    # a user happens to have at .claude/skills/<id> for an id that also
+    # matches one of this template's skills.
+    target = tmp_path / "my-api"
+    real_dir = target / ".claude" / "skills" / "fastapi"
+    real_dir.mkdir(parents=True)
+    (real_dir / "my_real_notes.md").write_text("not brupy's to delete")
+
+    render("fastapi", "hello-world", target, make_answers(), force=True)
+
+    assert (real_dir / "my_real_notes.md").read_text() == "not brupy's to delete"
+
+
 def test_render_skips_claude_skill_symlinks_it_cannot_create(tmp_path: Path, monkeypatch):
     # Mirrors prefs.py's best-effort philosophy: a platform that refuses
     # symlink creation without elevated privileges (Windows without
@@ -197,16 +212,39 @@ def test_render_skips_claude_skill_symlinks_it_cannot_create(tmp_path: Path, mon
     assert (target / ".agents/skills/fastapi/SKILL.md").is_file()
 
 
-def test_write_claude_skill_symlink_replaces_existing_real_directory(tmp_path: Path):
+def test_write_claude_skill_symlink_default_leaves_existing_content_alone(tmp_path: Path):
+    # Per-project generation (_write_claude_skill_symlinks) calls this
+    # without replace_existing, and relies on the resulting OSError to
+    # skip the symlink rather than clobber whatever's already there —
+    # render(..., force=True) only overwrites files it's actually
+    # rendering, never arbitrary pre-existing content under
+    # .claude/skills/. Regression test: this used to unconditionally
+    # rmtree a real directory before creating the symlink.
+    claude_skills_dir = tmp_path / ".claude" / "skills"
+    real_dir = claude_skills_dir / "fastapi"
+    real_dir.mkdir(parents=True)
+    (real_dir / "my_real_notes.md").write_text("not brupy's to delete")
+
+    with pytest.raises(OSError):
+        generator_module.write_claude_skill_symlink(claude_skills_dir, "fastapi")
+
+    assert (real_dir / "my_real_notes.md").read_text() == "not brupy's to delete"
+
+
+def test_write_claude_skill_symlink_replace_existing_replaces_real_directory(tmp_path: Path):
     # write_claude_skill_symlink is shared with skillinstall.install() —
-    # it must replace whatever's already at link_path, including a real
-    # directory left over from something else, not just a stale symlink.
+    # with replace_existing=True (what skillinstall.install() passes,
+    # after its own explicit --force/exists checks), it must replace
+    # whatever's already at link_path, including a real directory left
+    # over from something else, not just a stale symlink.
     claude_skills_dir = tmp_path / ".claude" / "skills"
     stale_dir = claude_skills_dir / "fastapi"
     stale_dir.mkdir(parents=True)
     (stale_dir / "leftover.md").write_text("stale")
 
-    generator_module.write_claude_skill_symlink(claude_skills_dir, "fastapi")
+    generator_module.write_claude_skill_symlink(
+        claude_skills_dir, "fastapi", replace_existing=True
+    )
 
     link = claude_skills_dir / "fastapi"
     assert link.is_symlink()

@@ -66,7 +66,7 @@ def install(scope: str, force: bool = False) -> tuple[Path, list[Path]]:
     written = [agents_target.relative_to(root)]
 
     try:
-        write_claude_skill_symlink(claude_dir, _SKILL_ID)
+        write_claude_skill_symlink(claude_dir, _SKILL_ID, replace_existing=True)
         written.append(claude_link.relative_to(root))
     except OSError:
         pass

@@ -8,6 +8,7 @@ NAME --flags...` skips prompts for anything a flag already answers, and
 
 from __future__ import annotations
 
+import functools
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
@@ -22,6 +23,32 @@ from brupy.errors import BrupyUserError
 
 app = typer.Typer(add_completion=False, no_args_is_help=False)
 console = Console()
+
+
+def _with_error_handling(func):
+    """This CLI's standard command error contract, shared by every
+    command body instead of hand-copied per command: a `BrupyUserError`
+    prints a red one-line message and exits 1 (an expected, user-facing
+    failure); anything else prints a red "Unexpected error" and exits 2
+    (a top-level safety net, see errors.py) — except `typer.Exit`
+    itself, which a command can still raise directly (e.g. `--version`)
+    and have it pass through untouched.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except typer.Exit:
+            raise
+        except BrupyUserError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            raise typer.Exit(1) from None
+        except Exception as exc:  # noqa: BLE001 - top-level safety net, see errors.py
+            console.print(f"[red]Unexpected error:[/red] {exc}")
+            raise typer.Exit(2) from None
+
+    return wrapper
 
 
 @app.callback(invoke_without_command=True)
@@ -160,6 +187,7 @@ def list_templates_cmd() -> None:
 
 
 @app.command("install-skill")
+@_with_error_handling
 def install_skill_cmd(
     scope: Annotated[
         str,
@@ -181,20 +209,14 @@ def install_skill_cmd(
     """Install the `brupy` agent skill (teaches a coding agent how to
     invoke this CLI) at project or user scope — useful when the agent
     working in a repo never scaffolded it with brupy in the first place."""
-    try:
-        root, written = skillinstall.install(scope, force=force)
-    except BrupyUserError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(1) from None
-    except Exception as exc:  # noqa: BLE001 - top-level safety net, see errors.py
-        console.print(f"[red]Unexpected error:[/red] {exc}")
-        raise typer.Exit(2) from None
+    root, written = skillinstall.install(scope, force=force)
 
     console.print(f"[bold green]Installed[/bold green] the brupy skill at {scope} scope:")
     for path in written:
         console.print(f"  [green]✔[/green] {(root / path).as_posix()}")
 
 
+@_with_error_handling
 def _run_new(
     *,
     name: Optional[str],
@@ -211,123 +233,114 @@ def _run_new(
     interactive = sys.stdin.isatty() and not yes
     stored_prefs = prefs.load_prefs() if remember else {}
 
-    try:
-        project_name, slug, package_name = prompts.prompt_project_name(name, interactive)
+    project_name, slug, package_name = prompts.prompt_project_name(name, interactive)
 
-        target_dir = Path.cwd() / slug
-        if target_dir.exists() and any(target_dir.iterdir()):
-            force = prompts.prompt_force_overwrite(slug, force, interactive)
-            if not force:
-                raise BrupyUserError(
-                    f"Directory '{slug}' already exists and is not empty. "
-                    "Use --force to generate into it anyway."
-                )
-
-        frameworks = generator.list_frameworks()
-        framework_id = prompts.prompt_framework(
-            framework,
-            frameworks,
-            interactive,
-            default_id=prefs.get_last_framework(stored_prefs),
-        )
-
-        chosen_framework = generator.get_framework(framework_id)
-
-        templates = generator.list_templates(framework_id)
-        template_id = prompts.prompt_template(
-            template,
-            templates,
-            interactive,
-            default_id=prefs.get_last_template(stored_prefs, framework_id),
-        )
-
-        chosen_template = generator.get_template(framework_id, template_id)
-        remembered = prefs.get_template_prefs(stored_prefs, chosen_template.full_id)
-
-        provided_options = prompts.parse_option_flags(option)
-        resolved_options = prompts.prompt_template_options(
-            chosen_template, provided_options, interactive, last=remembered["options"]
-        )
-
-        docker_requested = prompts.prompt_docker(
-            docker, interactive, remembered=remembered["docker"]
-        )
-        if docker_requested and not chosen_template.supports_docker:
-            console.print(
-                f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
-                "--docker yet. Skipping the Dockerfile."
-            )
-            docker_requested = False
-
-        if interactive:
-            console.print("Using uv to manage dependencies.")
-
-        git_init = prompts.prompt_git_init(git, interactive, remembered=remembered["git_init"])
-        install_now = prompts.prompt_install(install, interactive, remembered=remembered["install"])
-
-        answers = generator.Answers(
-            project_name=project_name,
-            slug=slug,
-            package_name=package_name,
-            framework=framework_id,
-            template=template_id,
-            git_init=git_init,
-            install=install_now,
-            docker=docker_requested,
-            options=resolved_options,
-        )
-        created = generator.render(framework_id, template_id, target_dir, answers, force=force)
-
-        if remember:
-            prefs.save_prefs(
-                prefs.record_run(
-                    stored_prefs,
-                    framework_id=framework_id,
-                    template_id=template_id,
-                    full_id=chosen_template.full_id,
-                    options=resolved_options,
-                    docker=docker_requested,
-                    git_init=git_init,
-                    install=install_now,
-                )
+    target_dir = Path.cwd() / slug
+    if target_dir.exists() and any(target_dir.iterdir()):
+        force = prompts.prompt_force_overwrite(slug, force, interactive)
+        if not force:
+            raise BrupyUserError(
+                f"Directory '{slug}' already exists and is not empty. "
+                "Use --force to generate into it anyway."
             )
 
-        git_ok = postgen.git_init(target_dir) if git_init else False
-        installed_ok = postgen.install_dependencies(target_dir) if install_now else False
-        frontend_installed_ok = (
-            postgen.install_frontend_dependencies(target_dir) if install_now else False
-        )
+    frameworks = generator.list_frameworks()
+    framework_id = prompts.prompt_framework(
+        framework,
+        frameworks,
+        interactive,
+        default_id=prefs.get_last_framework(stored_prefs),
+    )
 
-        postgen.print_summary(
-            project_name=project_name,
-            slug=slug,
-            template_full_id=chosen_template.full_id,
-            target_dir=target_dir,
-            created=created,
-            git_ok=git_ok,
-            installed_ok=installed_ok,
-            installed_requested=install_now,
-            run_command=chosen_framework.run_command.format(package_name=package_name),
-            options=resolved_options,
-            frontend_installed_ok=frontend_installed_ok,
-        )
+    chosen_framework = generator.get_framework(framework_id)
 
-        newer_version = updatecheck.check_for_update(interactive=interactive)
-        if newer_version:
-            console.print()
-            console.print(
-                f"[yellow]A newer brupy is available: {newer_version} "
-                f"(you have {__version__}).[/yellow] Run [bold]uv tool install "
-                "--upgrade brupy[/bold] to update."
+    templates = generator.list_templates(framework_id)
+    template_id = prompts.prompt_template(
+        template,
+        templates,
+        interactive,
+        default_id=prefs.get_last_template(stored_prefs, framework_id),
+    )
+
+    chosen_template = generator.get_template(framework_id, template_id)
+    remembered = prefs.get_template_prefs(stored_prefs, chosen_template.full_id)
+
+    provided_options = prompts.parse_option_flags(option)
+    resolved_options = prompts.prompt_template_options(
+        chosen_template, provided_options, interactive, last=remembered["options"]
+    )
+
+    docker_requested = prompts.prompt_docker(
+        docker, interactive, remembered=remembered["docker"]
+    )
+    if docker_requested and not chosen_template.supports_docker:
+        console.print(
+            f"[yellow]![/yellow] {chosen_template.full_id} doesn't support "
+            "--docker yet. Skipping the Dockerfile."
+        )
+        docker_requested = False
+
+    if interactive:
+        console.print("Using uv to manage dependencies.")
+
+    git_init = prompts.prompt_git_init(git, interactive, remembered=remembered["git_init"])
+    install_now = prompts.prompt_install(install, interactive, remembered=remembered["install"])
+
+    answers = generator.Answers(
+        project_name=project_name,
+        slug=slug,
+        package_name=package_name,
+        framework=framework_id,
+        template=template_id,
+        git_init=git_init,
+        install=install_now,
+        docker=docker_requested,
+        options=resolved_options,
+    )
+    created = generator.render(framework_id, template_id, target_dir, answers, force=force)
+
+    if remember:
+        prefs.save_prefs(
+            prefs.record_run(
+                stored_prefs,
+                framework_id=framework_id,
+                template_id=template_id,
+                full_id=chosen_template.full_id,
+                options=resolved_options,
+                docker=docker_requested,
+                git_init=git_init,
+                install=install_now,
             )
-    except BrupyUserError as exc:
-        console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(1) from None
-    except typer.Exit:
-        raise
-    except Exception as exc:  # noqa: BLE001 - top-level safety net, see errors.py
-        console.print(f"[red]Unexpected error:[/red] {exc}")
-        raise typer.Exit(2) from None
+        )
+
+    git_ok = postgen.git_init(target_dir) if git_init else False
+    installed_ok = postgen.install_dependencies(target_dir) if install_now else False
+    frontend_installed_ok = (
+        postgen.install_frontend_dependencies(target_dir) if install_now else False
+    )
+
+    postgen.print_summary(
+        project_name=project_name,
+        slug=slug,
+        template_full_id=chosen_template.full_id,
+        target_dir=target_dir,
+        created=created,
+        git_ok=git_ok,
+        installed_ok=installed_ok,
+        installed_requested=install_now,
+        run_command=chosen_framework.run_command.format(package_name=package_name),
+        options=resolved_options,
+        frontend_installed_ok=frontend_installed_ok,
+    )
+
+    newer_version = updatecheck.check_for_update(interactive=interactive)
+    if newer_version:
+        console.print()
+        console.print(
+            f"[yellow]A newer brupy is available: {newer_version} "
+            f"(you have {__version__}).[/yellow] Run [bold]uv tool install "
+            "--upgrade brupy[/bold] to update."
+        )
 
 
 def main() -> None:

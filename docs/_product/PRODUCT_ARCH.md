@@ -564,18 +564,23 @@ authored content, just an index over what actually got included, since
 does this project have."
 
 **`.claude/skills/` and `CLAUDE.md` (since v0.20.0).** Two more things
-`render()` writes unconditionally, after the skills/index step:
-`_write_claude_skill_symlinks` symlinks `.claude/skills/<id>` to
-`../../.agents/skills/<id>` for every matched skill (only if there are
-any — same guard as the README index), and `_write_claude_md` writes a
-one-line `CLAUDE.md` (`@AGENTS.md`) unconditionally (every template's
-base layer ships `AGENTS.md`, so this always has something to point
-at). Both mirror the `.agents/`-is-canonical/`.claude/`-symlinks-to-it
+`render()` writes after the skills/index step: `_write_claude_skill_symlinks`
+symlinks `.claude/skills/<id>` to `../../.agents/skills/<id>` for every
+matched skill (only if there are any — same guard as the README index),
+via the shared `generator.write_claude_skill_symlink()` helper (also
+used by `skillinstall.install()`, see §5.2) called with its conservative
+default (`replace_existing=False`) — real, unrelated content a user
+happens to have at that path (e.g. regenerating with `--force` into a
+directory that already has something under `.claude/skills/<id>`) is
+left alone rather than deleted; the resulting `OSError` is caught by
+the existing `except OSError: continue` per skill. `_write_claude_md`
+writes a one-line `CLAUDE.md` (`@AGENTS.md`) only once `AGENTS.md` is
+confirmed present in `target_dir` — every currently-shipped template's
+base layer does ship it, so this is a no-op guard today, but it means a
+future minimal/stub template without `AGENTS.md` doesn't get a dangling
+import. Both mirror the `.agents/`-is-canonical/`.claude/`-symlinks-to-it
 pattern this repo's own `flint`/`brupy` skill has used since v0.17.1 —
 generated projects now get the identical structure, not just this repo.
-The symlink step is best-effort (`except OSError: continue` per skill,
-same rationale as `skillinstall.py`'s — see §5.2 above); `CLAUDE.md`
-itself is a plain file write and can't fail the same way.
 
 **Bootstrapping**: the `fastapi` skill was hand-built first and used to
 validate the whole mechanism end-to-end (rendering, substitution,
@@ -966,22 +971,35 @@ installed from PyPI. `.claude/skills/brupy` still symlinks to
 `.agents/skills/brupy` as before; it just resolves through one extra
 hop now.
 
-`skillinstall.install(scope, force=False)` copies `AGENT_SKILL_DIR`
-(`src/brupy/agent_skill/`) into `<root>/.agents/skills/brupy/` via
-`shutil.copytree` (a plain copy — this content has no per-project
-Jinja context, unlike `generator.py`'s templates) and symlinks
-`<root>/.claude/skills/brupy` to it, where `<root>` is `Path.cwd()` for
-`scope="project"` or `Path.home()` for `scope="user"` — resolved at
-call time, not cached at import time, so both are actually
-monkeypatchable in tests (an earlier draft cached them in a
-module-level dict and silently ignored test patches — see the
-`_VALID_SCOPES` comment in the source). Refuses to overwrite either
+`skillinstall.install(scope, force=False) -> (root, written)` copies
+`AGENT_SKILL_DIR` (`src/brupy/agent_skill/`) into
+`<root>/.agents/skills/brupy/` via `shutil.copytree` (a plain copy —
+this content has no per-project Jinja context, unlike `generator.py`'s
+templates) and symlinks `<root>/.claude/skills/brupy` to it, where
+`<root>` is `Path.cwd()` for `scope="project"` or `Path.home()` for
+`scope="user"` — resolved at call time, not cached at import time, so
+both are actually monkeypatchable in tests (an earlier draft cached
+them in a module-level dict and silently ignored test patches — see
+the `_VALID_SCOPES` comment in the source). `install()` returns `root`
+alongside `written` so `cli.py` never has to re-derive it itself — one
+function owns what a scope resolves to. Refuses to overwrite either
 target without `force`, matching `generator.render()`'s non-empty-
-directory refusal. The `.claude/skills/` symlink is best-effort, same
-`except OSError: continue` shape as `generator.py`'s per-skill
-symlinks (§4.5) — `AGENT_SKILL_DIR` itself never fails to copy, so
-`install-skill` always leaves *something* behind even on a platform
-that can't symlink.
+directory refusal — checked as two separate conditions (`.agents/`
+target, then `.claude/` link) so the error names whichever path
+actually conflicts, not always `.agents/skills/brupy` regardless. The
+symlink step itself goes through `generator.write_claude_skill_symlink()`
+— the same helper `generator.py`'s per-project generation uses (§4.5)
+— but with `replace_existing=True`, since `install()` has already done
+its own `--force`/exists checks by the time it's called; per-project
+generation calls it with the conservative default (`replace_existing=
+False`) instead, so a real, unrelated directory a user happens to have
+at `.claude/skills/<id>` is left alone rather than deleted. Best-effort
+either way — `except OSError: continue`/`pass` around the symlink call
+— `AGENT_SKILL_DIR` itself never fails to copy, so `install-skill`
+always leaves *something* behind even on a platform that can't
+symlink. `cli.install_skill_cmd` also has a top-level `except Exception`
+safety net, matching `_run_new`'s, so an unexpected `OSError` (e.g.
+disk full mid-copy) fails gracefully instead of with a raw traceback.
 
 ## 6. CLI flow → code mapping
 

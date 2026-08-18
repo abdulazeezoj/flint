@@ -9,6 +9,16 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.21.3 — 2026-08-18
+
+### Fixed
+
+- **`brupy new --force`, regenerating into an existing project directory, could silently delete real content a user had at `.claude/skills/<id>`** — a regression from v0.21.2's shared `write_claude_skill_symlink()` helper, which unconditionally removed whatever was at that path before creating the symlink. The old code only ever *attempted* the symlink and skipped it on any conflict (`except OSError: continue`), leaving unrelated existing content untouched; `--force` on `render()` only overwrites files it's actually rendering, never arbitrary pre-existing directories under `.claude/skills/`. Fixed by giving the helper a `replace_existing` flag, defaulting to `False` (the safe, original per-project-generation behavior) — only `skillinstall.install()` (which has already done its own `--force`/exists checks) passes `replace_existing=True`. Found by a follow-up `/code-review` pass on the v0.21.2 fix itself, with a local repro confirming real data loss before the fix.
+- **`CLAUDE.md`'s AGENTS.md-presence check used fragile list membership** (`Path("AGENTS.md") in created`) instead of checking the filesystem directly — now `(target_dir / "AGENTS.md").is_file()`, decoupled from the exact shape of the `created` bookkeeping list.
+- **`install_skill_cmd`'s error-handling block was a near-verbatim copy of `_run_new`'s**, introduced by v0.21.2's own fix for the same class of duplication elsewhere. Extracted a shared `_with_error_handling` decorator (`BrupyUserError` → red error + exit 1, anything else → red "Unexpected error" + exit 2) now applied to both command bodies instead of hand-copied.
+
+`docs/_product/PRODUCT_ARCH.md` updated to match (§4.5, §5.2).
+
 ## v0.21.2 — 2026-08-18
 
 ### Fixed

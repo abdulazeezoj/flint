@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-18 (v0.21.2: fixes 6 issues from a `/code-review` pass — install-skill crash/error-message/exception-handling, dev.py orphaned process, stale tailwind skill wording, CLAUDE.md without AGENTS.md — see §11)
+**Last updated:** 2026-08-18 (v0.21.3: fixes a v0.21.2 regression where `--force` regeneration could silently delete real content at `.claude/skills/<id>` — see §11)
 
 ## 1. Vision
 
@@ -503,6 +503,21 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   unfixed — brupy's template system has no mechanism for sharing a
   literal project-root file across two separate framework template
   trees, so a real fix is generator-level work, not a minimal patch.
+- `v0.21.3` — fixes a regression from v0.21.2's own fix: `brupy new
+  --force` regenerating into an existing project could silently
+  `shutil.rmtree` real content a user had at `.claude/skills/<id>`,
+  because the new shared symlink helper unconditionally cleared
+  whatever was at that path first, unlike the old code's "attempt the
+  symlink, skip on any conflict" behavior. Fixed with a
+  `replace_existing` flag on the helper, defaulting to the safe
+  original behavior; only `skillinstall.install()` opts into the
+  destructive path, since it's already confirmed via its own
+  `--force`/exists checks that overwriting is intended. Found by a
+  follow-up `/code-review` pass on the v0.21.2 diff itself, verified
+  with a local repro before and after the fix. Also makes the
+  `CLAUDE.md`/`AGENTS.md` guard check the filesystem directly instead
+  of list membership, and extracts a shared `_with_error_handling`
+  decorator for `cli.py`'s two command bodies.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

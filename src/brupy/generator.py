@@ -358,7 +358,7 @@ def render(
         if matched_skills:
             created.append(_write_skills_index(target_dir, matched_skills))
             created.extend(_write_claude_skill_symlinks(target_dir, matched_skills))
-        if Path("AGENTS.md") in created:
+        if (target_dir / "AGENTS.md").is_file():
             created.append(_write_claude_md(target_dir))
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
@@ -437,24 +437,35 @@ def _write_skills_index(target_dir: Path, skills: list[SkillMeta]) -> Path:
 _CLAUDE_SKILLS_DIR = Path(".claude", "skills")
 
 
-def write_claude_skill_symlink(claude_skills_dir: Path, skill_id: str) -> None:
-    """Create (or replace) `<claude_skills_dir>/<skill_id>` as a symlink
-    to `../../.agents/skills/<skill_id>` — the one place this "`.agents/`
+def write_claude_skill_symlink(
+    claude_skills_dir: Path, skill_id: str, *, replace_existing: bool = False
+) -> None:
+    """Create `<claude_skills_dir>/<skill_id>` as a symlink to
+    `../../.agents/skills/<skill_id>` — the one place this "`.agents/`
     is canonical, `.claude/` symlinks to it" logic lives, shared by both
     per-project generation (`_write_claude_skill_symlinks` below) and
-    `skillinstall.install()`. Whatever's currently at `link_path` (a
-    stale symlink, a leftover real directory, or a plain file) is removed
-    first, so a repeat call always ends with a fresh, correct symlink
-    rather than raising "file exists". Raises `OSError` on a platform
-    that refuses symlink creation — callers decide whether that's fatal
-    or best-effort.
+    `skillinstall.install()`. Raises `OSError` if `link_path` already
+    exists in any form and `replace_existing` isn't set, or on a
+    platform that refuses symlink creation either way.
+
+    `replace_existing=False` (the default) is what per-project
+    generation wants: leave real, unrelated content at that path alone
+    and just skip the symlink (its caller already wraps this in
+    `except OSError: continue`) — `render(..., force=True)` only
+    overwrites files it's actually rendering, never arbitrary existing
+    directories under `.claude/skills/`. Pass `replace_existing=True`
+    only when the caller has already confirmed it's safe to overwrite
+    whatever's there (a stale symlink, a leftover real directory, or a
+    plain file) — `skillinstall.install()` does, via its own explicit
+    `--force`/exists checks before ever reaching this call.
     """
     link_path = claude_skills_dir / skill_id
     link_target = Path("..", "..", ".agents", "skills", skill_id)
-    if link_path.is_symlink() or link_path.is_file():
-        link_path.unlink()
-    elif link_path.is_dir():
-        shutil.rmtree(link_path)
+    if replace_existing:
+        if link_path.is_symlink() or link_path.is_file():
+            link_path.unlink()
+        elif link_path.is_dir():
+            shutil.rmtree(link_path)
     claude_skills_dir.mkdir(parents=True, exist_ok=True)
     os.symlink(link_target, link_path, target_is_directory=True)
 
