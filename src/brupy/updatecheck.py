@@ -91,8 +91,6 @@ def check_for_update(*, interactive: bool) -> str | None:
         if fetched is not None:
             latest = fetched
             _write_cache(latest, now)
-        elif not isinstance(latest, str):
-            return None
 
     if not isinstance(latest, str):
         return None

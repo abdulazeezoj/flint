@@ -182,11 +182,13 @@ def install_skill_cmd(
     invoke this CLI) at project or user scope — useful when the agent
     working in a repo never scaffolded it with brupy in the first place."""
     try:
-        root = Path.cwd() if scope == "project" else Path.home()
-        written = skillinstall.install(scope, force=force)
+        root, written = skillinstall.install(scope, force=force)
     except BrupyUserError as exc:
         console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(1) from None
+    except Exception as exc:  # noqa: BLE001 - top-level safety net, see errors.py
+        console.print(f"[red]Unexpected error:[/red] {exc}")
+        raise typer.Exit(2) from None
 
     console.print(f"[bold green]Installed[/bold green] the brupy skill at {scope} scope:")
     for path in written:

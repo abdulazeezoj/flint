@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-18 (v0.21.1: fixes stale standalone-CLI wording left over from v0.21.0 in the `brupy` skill/`template.json`, adds a full daisyUI component-catalog reference to the generated `tailwind` skill — see §11)
+**Last updated:** 2026-08-18 (v0.21.2: fixes 6 issues from a `/code-review` pass — install-skill crash/error-message/exception-handling, dev.py orphaned process, stale tailwind skill wording, CLAUDE.md without AGENTS.md — see §11)
 
 ## 1. Vision
 
@@ -484,6 +484,25 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   the ~4 components this project's own templates use, a discovery
   protocol, and component-specific gotchas — adapted from daisyUI's own
   official skill into this project's shape.
+- `v0.21.2` — fixes six issues found by a `/code-review` pass across the
+  v0.21.0/v0.21.1 diff: `install-skill --force` could crash with a raw
+  traceback if `.claude/skills/brupy` pre-existed as a real directory
+  (`Path.unlink()` can't remove one); its "already exists" error always
+  blamed `.agents/skills/brupy` even when only the `.claude/` side
+  conflicted; `install-skill` had no catch-all exception handler unlike
+  `brupy new`; `uv run dev.py` could orphan an already-started dev
+  server if `bun` wasn't on `PATH`; the `tailwind` skill's `skill.json`
+  and `docs/agent-skills.md` still described the pre-pivot standalone-
+  CLI approach; and `CLAUDE.md` was written even for a template that
+  doesn't ship `AGENTS.md`. Also extracts shared helpers that had been
+  duplicated (`generator.write_claude_skill_symlink()`, now used by both
+  `install-skill` and per-project generation; `postgen._run_install()`,
+  shared by `uv sync`/`bun install`). Two duplication findings from the
+  same review (`package.json.jinja`/`dev.py.jinja` byte-for-byte
+  duplicated across `fastapi`/`flask` full-stack) were deliberately left
+  unfixed — brupy's template system has no mechanism for sharing a
+  literal project-root file across two separate framework template
+  trees, so a real fix is generator-level work, not a minimal patch.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

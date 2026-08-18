@@ -21,8 +21,10 @@ _COMMANDS = [
 
 
 def main() -> None:
-    processes = [subprocess.Popen(cmd) for cmd in _COMMANDS]
+    processes: list[subprocess.Popen] = []
     try:
+        for cmd in _COMMANDS:
+            processes.append(subprocess.Popen(cmd))
         while True:
             for process in processes:
                 if process.poll() is not None:
@@ -31,6 +33,9 @@ def main() -> None:
             time.sleep(0.2)
     except KeyboardInterrupt:
         _stop(processes)
+    except Exception:
+        _stop(processes)
+        raise
 
 
 def _stop(processes: list[subprocess.Popen]) -> None:

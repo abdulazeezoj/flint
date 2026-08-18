@@ -50,22 +50,35 @@ def git_init(target_dir: Path) -> bool:
         return False
 
 
-def install_dependencies(target_dir: Path) -> bool:
-    """Run `uv sync` in the generated project. Returns success."""
-    if shutil.which("uv") is None:
-        console.print("[yellow]![/yellow] uv not found — skipping dependency install.")
+def _run_install(
+    target_dir: Path, *, binary: str, cmd: list[str], status: str, failure_label: str
+) -> bool:
+    """Shared shape for `install_dependencies`/`install_frontend_dependencies`:
+    check the binary exists, run `cmd` under a status spinner, and treat
+    any failure as best-effort (warn, never raise). Returns success."""
+    if shutil.which(binary) is None:
+        console.print(f"[yellow]![/yellow] {binary} not found — skipping {failure_label}.")
         return False
     try:
-        with console.status("Installing dependencies (uv sync)..."):
-            subprocess.run(
-                ["uv", "sync"], cwd=target_dir, check=True, capture_output=True
-            )
+        with console.status(status):
+            subprocess.run(cmd, cwd=target_dir, check=True, capture_output=True)
         return True
     except subprocess.CalledProcessError as exc:
         console.print(
-            f"[yellow]![/yellow] uv sync failed: {exc.stderr.decode().strip()}"
+            f"[yellow]![/yellow] {' '.join(cmd)} failed: {exc.stderr.decode().strip()}"
         )
         return False
+
+
+def install_dependencies(target_dir: Path) -> bool:
+    """Run `uv sync` in the generated project. Returns success."""
+    return _run_install(
+        target_dir,
+        binary="uv",
+        cmd=["uv", "sync"],
+        status="Installing dependencies (uv sync)...",
+        failure_label="dependency install",
+    )
 
 
 def install_frontend_dependencies(target_dir: Path) -> bool:
@@ -76,22 +89,13 @@ def install_frontend_dependencies(target_dir: Path) -> bool:
     that's not a failure worth warning about. Returns success."""
     if not (target_dir / "package.json").is_file():
         return False
-    if shutil.which("bun") is None:
-        console.print(
-            "[yellow]![/yellow] bun not found — skipping frontend dependency install."
-        )
-        return False
-    try:
-        with console.status("Installing frontend dependencies (bun install)..."):
-            subprocess.run(
-                ["bun", "install"], cwd=target_dir, check=True, capture_output=True
-            )
-        return True
-    except subprocess.CalledProcessError as exc:
-        console.print(
-            f"[yellow]![/yellow] bun install failed: {exc.stderr.decode().strip()}"
-        )
-        return False
+    return _run_install(
+        target_dir,
+        binary="bun",
+        cmd=["bun", "install"],
+        status="Installing frontend dependencies (bun install)...",
+        failure_label="frontend dependency install",
+    )
 
 
 def print_summary(

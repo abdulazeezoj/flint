@@ -9,6 +9,25 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.21.2 — 2026-08-18
+
+### Fixed
+
+- **`brupy install-skill --force` crashed with a raw traceback if `.claude/skills/brupy` already existed as a real directory** instead of a symlink — `Path.unlink()` can't remove a directory. Fixed by extracting a shared `generator.write_claude_skill_symlink()` helper (now used by both `install-skill` and per-project generation) that replaces whatever's at that path first, symlink, directory, or plain file.
+- **`brupy install-skill`'s "already exists" error always blamed `.agents/skills/brupy`**, even when only `.claude/skills/brupy` was actually in the way — the message now names whichever path really conflicts.
+- **`install-skill` had no catch-all exception handler**, unlike `brupy new` — an unexpected `OSError` (permission denied, disk full) surfaced as a raw traceback instead of this CLI's normal `[red]Error:[/red]` messaging. Fixed with the same top-level safety net `_run_new` already has.
+- **`uv run dev.py` (the `css=tailwind` dev-server + Tailwind-watcher runner) could orphan an already-started dev server** if `bun` wasn't on `PATH` — the second process's `Popen()` call sat outside the cleanup `try/except`, so a `FileNotFoundError` left the first process running, bound to the port, with nothing to stop it. Fixed in both `fastapi/full-stack` and `flask/full-stack`'s `dev.py.jinja`.
+- **The `tailwind` skill's `skill.json` and `docs/agent-skills.md` still described the pre-pivot standalone-CLI/no-Node.js approach** — missed by the v0.21.1 sweep that specifically targeted this. `skill.json`'s description (which `generator.py` writes verbatim into every generated project's `.agents/skills/README.md`) now correctly describes the Bun + daisyUI stack.
+- **`CLAUDE.md` was written even for a template that doesn't ship `AGENTS.md`**, producing a dangling `@AGENTS.md` import — `render()` now only writes it once `AGENTS.md` is confirmed among that generation's output.
+
+### Changed
+
+- `skillinstall.install()` now returns `(root, written)` instead of just `written`, so `cli.py` no longer re-derives `root` itself — one function owns what a scope resolves to.
+- `postgen.py`'s `install_dependencies` (`uv sync`) and `install_frontend_dependencies` (`bun install`) now share one `_run_install()` helper instead of two copy-pasted implementations.
+- Removed a redundant, behaviorally-dead `isinstance` check in `updatecheck.check_for_update`.
+
+Found via a `/code-review` pass across the v0.21.0/v0.21.1 diff (8 independent reviewer angles); `package.json.jinja` and `dev.py.jinja`'s cross-framework duplication were also flagged but intentionally left as-is — brupy's template system has no mechanism for sharing a literal project-root file across two separate framework template trees (the shared-skills catalog only covers `.agents/skills/` content), so a real fix there is generator-level work, not a minimal patch.
+
 ## v0.21.1 — 2026-08-18
 
 ### Fixed

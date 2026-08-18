@@ -12,11 +12,11 @@ you're reading brupy's source or a `pip`/`uv`-installed wheel.
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
 from brupy.errors import BrupyUserError
+from brupy.generator import write_claude_skill_symlink
 
 AGENT_SKILL_DIR = Path(__file__).parent / "agent_skill"
 _SKILL_ID = "brupy"
@@ -24,14 +24,15 @@ _SKILL_ID = "brupy"
 _VALID_SCOPES = ("project", "user")
 
 
-def install(scope: str, force: bool = False) -> list[Path]:
+def install(scope: str, force: bool = False) -> tuple[Path, list[Path]]:
     """Copy the bundled `brupy` skill into `<root>/.agents/skills/brupy/`
     and symlink `<root>/.claude/skills/brupy` to it — `<root>` is the
     current directory for ``scope="project"``, the user's home directory
-    for ``scope="user"``. Returns the paths written, relative to `<root>`
-    (the `.claude/skills/` symlink is best-effort and may be absent from
-    the returned list on a platform that refuses it, same as
-    `generator.py`'s per-project symlinks).
+    for ``scope="user"``. Returns `(root, written)`, where `written` is
+    the paths written relative to `root` (the `.claude/skills/` symlink
+    is best-effort and may be absent from the list on a platform that
+    refuses it, same as `generator.py`'s per-project symlinks) — callers
+    never need to re-derive `root` themselves.
 
     Raises `BrupyUserError` for an unknown scope, or if either target
     already exists and `force` isn't set.
@@ -49,9 +50,13 @@ def install(scope: str, force: bool = False) -> list[Path]:
     claude_dir = root / ".claude" / "skills"
     claude_link = claude_dir / _SKILL_ID
 
-    if not force and (agents_target.exists() or claude_link.exists() or claude_link.is_symlink()):
+    if not force and agents_target.exists():
         raise BrupyUserError(
             f"'{agents_target}' already exists. Use --force to overwrite it."
+        )
+    if not force and (claude_link.exists() or claude_link.is_symlink()):
+        raise BrupyUserError(
+            f"'{claude_link}' already exists. Use --force to overwrite it."
         )
 
     if agents_target.exists():
@@ -60,14 +65,10 @@ def install(scope: str, force: bool = False) -> list[Path]:
     shutil.copytree(AGENT_SKILL_DIR, agents_target)
     written = [agents_target.relative_to(root)]
 
-    if claude_link.exists() or claude_link.is_symlink():
-        claude_link.unlink()
-    link_target = Path("..", "..", ".agents", "skills", _SKILL_ID)
     try:
-        claude_dir.mkdir(parents=True, exist_ok=True)
-        os.symlink(link_target, claude_link, target_is_directory=True)
+        write_claude_skill_symlink(claude_dir, _SKILL_ID)
         written.append(claude_link.relative_to(root))
     except OSError:
         pass
 
-    return written
+    return root, written

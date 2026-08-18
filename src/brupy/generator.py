@@ -358,7 +358,8 @@ def render(
         if matched_skills:
             created.append(_write_skills_index(target_dir, matched_skills))
             created.extend(_write_claude_skill_symlinks(target_dir, matched_skills))
-        created.append(_write_claude_md(target_dir))
+        if Path("AGENTS.md") in created:
+            created.append(_write_claude_md(target_dir))
     except Exception as exc:  # noqa: BLE001 - deliberately broad, see rollback below
         if not created_before:
             shutil.rmtree(target_dir, ignore_errors=True)
@@ -436,6 +437,28 @@ def _write_skills_index(target_dir: Path, skills: list[SkillMeta]) -> Path:
 _CLAUDE_SKILLS_DIR = Path(".claude", "skills")
 
 
+def write_claude_skill_symlink(claude_skills_dir: Path, skill_id: str) -> None:
+    """Create (or replace) `<claude_skills_dir>/<skill_id>` as a symlink
+    to `../../.agents/skills/<skill_id>` — the one place this "`.agents/`
+    is canonical, `.claude/` symlinks to it" logic lives, shared by both
+    per-project generation (`_write_claude_skill_symlinks` below) and
+    `skillinstall.install()`. Whatever's currently at `link_path` (a
+    stale symlink, a leftover real directory, or a plain file) is removed
+    first, so a repeat call always ends with a fresh, correct symlink
+    rather than raising "file exists". Raises `OSError` on a platform
+    that refuses symlink creation — callers decide whether that's fatal
+    or best-effort.
+    """
+    link_path = claude_skills_dir / skill_id
+    link_target = Path("..", "..", ".agents", "skills", skill_id)
+    if link_path.is_symlink() or link_path.is_file():
+        link_path.unlink()
+    elif link_path.is_dir():
+        shutil.rmtree(link_path)
+    claude_skills_dir.mkdir(parents=True, exist_ok=True)
+    os.symlink(link_target, link_path, target_is_directory=True)
+
+
 def _write_claude_skill_symlinks(target_dir: Path, skills: list[SkillMeta]) -> list[Path]:
     """Symlink `.claude/skills/<id>` -> `../../.agents/skills/<id>` for every
     matched skill, mirroring exactly how this repo's own `flint`/`brupy`
@@ -450,11 +473,8 @@ def _write_claude_skill_symlinks(target_dir: Path, skills: list[SkillMeta]) -> l
     created: list[Path] = []
     claude_skills_dir = target_dir / _CLAUDE_SKILLS_DIR
     for skill in skills:
-        link_path = claude_skills_dir / skill.id
-        link_target = Path("..", "..", ".agents", "skills", skill.id)
         try:
-            claude_skills_dir.mkdir(parents=True, exist_ok=True)
-            os.symlink(link_target, link_path, target_is_directory=True)
+            write_claude_skill_symlink(claude_skills_dir, skill.id)
         except OSError:
             continue
         created.append(_CLAUDE_SKILLS_DIR / skill.id)
@@ -467,9 +487,9 @@ _CLAUDE_MD_PATH = Path("CLAUDE.md")
 def _write_claude_md(target_dir: Path) -> Path:
     """`CLAUDE.md` is a one-line pointer at `AGENTS.md`
     (`@AGENTS.md`, Claude Code's own file-import syntax), not a second
-    copy of it — every template's base layer already ships `AGENTS.md`,
-    so this makes Claude Code load the exact same content instead of
-    requiring a separately-maintained Claude-specific file."""
+    copy of it. Only called once `render()` has confirmed `AGENTS.md`
+    is actually among the files this template produced, so Claude Code
+    always loads real content instead of a dangling import."""
     dest = target_dir / _CLAUDE_MD_PATH
     dest.write_text("@AGENTS.md\n", encoding="utf-8")
     return _CLAUDE_MD_PATH

@@ -115,7 +115,8 @@ Here's the (trimmed) list from `fastapi/rest-api`'s `template.json`:
 `rest-api` list above and add two more, always: `jinja2` and `htmx` — the
 templating and interactivity this template's server-rendered pages are
 built on. `css=tailwind` adds a third, `tailwind`, covering the
-`@theme`-based build step; `css=vanilla` (the default) doesn't need it.
+Bun-based Tailwind v4 + daisyUI build step; `css=vanilla` (the default)
+doesn't need it.
 
 So in practice:
 
@@ -177,7 +178,7 @@ you picked.
 | `pytest` | FastAPI + Flask | Fixtures, async test setup, the isolated-test-database pattern, and parametrize — how this project's test suite is built and how to extend it. |
 | `jinja2` | FastAPI + Flask, `full-stack` | Template inheritance, includes, autoescaping, and whitespace control — how this project's server-rendered pages use Jinja2. |
 | `htmx` | FastAPI + Flask, `full-stack` | hx-post/hx-target/hx-swap/hx-trigger, out-of-band swaps, and the fragment-response contract — how this project's Todo list updates in place without a client-side JS framework. |
-| `tailwind` | FastAPI + Flask, `full-stack` with `css=tailwind` | The `@theme` directive, utility classes, and the standalone-CLI build step — how this project's `css=tailwind` option styles pages without Node.js. |
+| `tailwind` | FastAPI + Flask, `full-stack` with `css=tailwind` | Tailwind CSS v4 + daisyUI component classes, built via Bun (a separate `package.json`, not `pyproject.toml`) — how this project's `css=tailwind` option styles pages and runs the dev-time CSS watcher. |
 
 ## Retrofitting the `brupy` skill into an existing project
 

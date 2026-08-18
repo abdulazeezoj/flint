@@ -685,3 +685,19 @@ def test_install_skill_cmd_force_overwrites(tmp_path: Path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert "Installed" in result.stdout
+
+
+def test_install_skill_cmd_reports_unexpected_error(tmp_path: Path, monkeypatch):
+    # A plain OSError (e.g. disk full mid-copy) isn't a BrupyUserError —
+    # install_skill_cmd must still fail gracefully, not with a raw
+    # traceback, same contract as _run_new's top-level safety net.
+    monkeypatch.chdir(tmp_path)
+
+    def _raise(*args, **kwargs):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(cli.skillinstall, "install", _raise)
+    result = runner.invoke(app, ["install-skill"])
+
+    assert result.exit_code == 2
+    assert "Unexpected error" in result.stdout
