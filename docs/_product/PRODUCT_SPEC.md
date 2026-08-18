@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Product
-**Last updated:** 2026-08-18 (v0.20.0: CLAUDE.md/.claude/skills for generated projects, `install-skill`, update-check — see §8/§9/§11)
+**Last updated:** 2026-08-18 (v0.21.0: `full-stack`'s `css=tailwind` moves to Bun + daisyUI, replacing the standalone Tailwind CLI — see §11)
 
 ## 1. Vision
 
@@ -456,6 +456,23 @@ as of v0.15: `full-stack`, a server-rendered (Jinja2 + HTMX) sibling of
   Also confirms (no code change, `full-stack` already did this): `css=
   tailwind` uses the standalone Tailwind CLI via `pytailwindcss`, never
   the Tailwind Play CDN `<script>` tag — see §4.8 in PRODUCT_ARCH.md.
+- `v0.21.0` — `full-stack`'s `css=tailwind` option (both frameworks)
+  reverses v0.17's standalone-CLI decision: the frontend stack is now
+  FastAPI/Flask + Jinja2 + HTMX + Tailwind CSS v4 + **daisyUI**, built
+  via **Bun** rather than `pytailwindcss`. `pytailwindcss` was dropped
+  because the standalone Tailwind binary it wraps cannot load
+  third-party plugins, and daisyUI — the whole reason for the switch —
+  is one; frontend dependencies (`tailwindcss`, `@tailwindcss/cli`,
+  `daisyui`) now live in a new `package.json`, installed with `bun
+  install`, fully separate from `pyproject.toml`/`uv sync`. A new
+  project-root `dev.py` (`uv run dev.py`) runs the framework's dev
+  server and the Tailwind watcher together — the practical equivalent
+  of a bare `uv run dev`, which isn't reachable without changing every
+  template's `[tool.uv] package = false`. `--docker` gains a whole extra
+  `oven/bun` build stage; only the compiled CSS crosses into the final
+  image. `css=vanilla` remains the default — this is an opt-in
+  presentation choice, not a new baseline dependency for every generated
+  project. See PRODUCT_ARCH.md §4.8 for the full design.
 - `CHANGELOG.md` is updated in the same commit as any user-facing change,
   and the version is bumped accordingly.
 

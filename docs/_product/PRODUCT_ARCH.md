@@ -2,7 +2,7 @@
 
 **Status:** Draft for v0
 **Owner:** Engineering
-**Last updated:** 2026-08-18 (v0.20.0: CLAUDE.md/.claude/skills for generated projects, `install-skill`, update-check — see §2/§3/§4.5/§5.1/§5.2)
+**Last updated:** 2026-08-18 (v0.21.0: `full-stack`'s `css=tailwind` moves from the standalone Tailwind CLI to a Bun + daisyUI toolchain — see §4.8)
 
 Implements `PRODUCT_SPEC.md` / `PRODUCT_FLOW.md`. This is the technical
 design for the `brupy` CLI itself (not the projects it generates).
@@ -718,73 +718,113 @@ between the two values:
   exactly what serves in production.
 - **`css=tailwind`**: `style.css` is a **build artifact**. The checked-in
   source is `static/css/input.css` (a few lines: `@import "tailwindcss"`
-  plus an `@theme` block for custom design tokens — Tailwind v4's
-  CSS-first config, no `tailwind.config.js`). `style.css` is produced by
-  actually *running* the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
-  against `input.css` — brupy never writes it, and it's `.gitignore`d in
-  the generated project. This mirrors a pattern already established for
+  plus an `@plugin "daisyui" { ... }` block — Tailwind v4's CSS-first
+  config, no `tailwind.config.js`, and no separate daisyUI config file
+  either). `style.css` is produced by actually *running* a build against
+  `input.css` — brupy never writes it, and it's `.gitignore`d in the
+  generated project. This mirrors a pattern already established for
   `migrations=true` (schema comes from running a migration, not from
   `brupy new`) and the worker option (a worker process brupy doesn't
   start) — a real "one command you must run before this works" step,
   not something to fake at generation time.
 
-**Why the standalone CLI, not a Node.js build pipeline**: every other
-tool this project depends on installs through `uv`. A `package.json` +
-`npm install` + Tailwind's PostCSS plugin would introduce Node.js as a
-second toolchain into an otherwise Python-only generated project — a
-real cost for a CSS framework. Tailwind v4's standalone CLI removes
-that tradeoff entirely: it's a self-contained platform binary with no
-Node runtime dependency. [`pytailwindcss`](https://pypi.org/project/pytailwindcss/)
-wraps it as an ordinary `pyproject.toml` dependency — `uv sync` installs
-the wrapper, and the wrapper downloads/caches the actual binary the
-first time `uv run tailwindcss ...` executes. The design (source CSS in,
-built CSS out, binary managed transparently, `init`/`watch`/`build`-
-shaped commands) is modeled directly on
-[`litestar-tailwind-cli`](https://github.com/Tobi-De/litestar-tailwind-cli),
-the reference implementation of this pattern for a Python web framework
-— brupy doesn't reimplement binary-downloading logic itself, just
-depends on the already-published wrapper.
+**v0.21 pivot: from the standalone CLI to Bun + daisyUI.** v0.17
+deliberately chose the [Tailwind standalone CLI](https://tailwindcss.com/blog/standalone-cli)
+via [`pytailwindcss`](https://pypi.org/project/pytailwindcss/) *to avoid
+Node.js entirely* — every other tool this project depends on installs
+through `uv`, and a `package.json` + `npm install` pipeline would have
+been a second toolchain for a CSS framework alone. That tradeoff held
+right up until the shape of the components this template needed to
+render (buttons, inputs, cards, alerts — genuine UI, not just utility
+classes) made a component library the obvious next step, and
+[daisyUI](https://daisyui.com) is a Tailwind *plugin*: it hooks into
+Tailwind's own build via `@plugin "daisyui"`, not a bundled binary. The
+standalone CLI can run Tailwind itself but **cannot load third-party
+plugins** — there is no supported way to get daisyUI working through
+`pytailwindcss`. Rather than keep reaching for that at the cost of
+never having real components, v0.21 reverses the v0.17 decision: the
+frontend build now runs through [Bun](https://bun.sh) — a single binary
+that's both a JS runtime and a package manager, not `npm`/`node`
+separately — with `tailwindcss`, `@tailwindcss/cli`, and `daisyui` as
+ordinary `package.json` devDependencies. Python dependencies stay
+exactly where they were, in `pyproject.toml`, installed by `uv sync`;
+the two dependency worlds never touch each other, and `uv`/`uv sync`
+remain the *only* thing required for every template that isn't
+`css=tailwind` — this is still an opt-in cost, not a new default
+dependency on every generated project.
 
-**Layer structure**: `static/css/style.css` moved *out* of the base
-`files/` layer entirely and into two new peer layers, `css-vanilla/`
-(the pre-existing hand-written CSS, relocated unchanged) and
-`css-tailwind/` (`input.css` + Tailwind-utility-class rewrites of
-`templates/index.html` and `templates/partials/{todo_item,empty_state}.html`),
-gated the same `when`-mechanism as `db-*`/`worker-*`. This is the
-"layer, not inline `{% if %}`" choice from §4.2 applied to CSS: the two
-variants' `templates/index.html` are genuinely different files (custom
-class names vs. Tailwind utility classes), not one file with a
-conditional class-name mapping, and forcing that into `{% if %}`
-branches would make an already-verbose runtime-Jinja template (§4.7)
-far harder to read. One consequence worth flagging for future template
-authors: because neither `css-vanilla` nor `css-tailwind` has a
-fallback, **`render()` called with `css` absent from `options` ships no
-`static/css/style.css` and no `static/css/input.css` at all** — neither
-layer's `when` matches a missing key. This is consistent with every
-other option (`render()` never applies `template.json`'s declared
-defaults; that's `prompts.py`'s job — see §4), but it was a real gap
-caught during this release: `test_generator.py`'s
-`make_full_stack_answers()` helper predates the `css` option and didn't
-set it, so several existing tests silently stopped generating any CSS
-file the moment the layers were split. Fixed by adding `css="vanilla"`
-to the helper's defaults, matching how every other option already has
-an explicit default there.
+**The generated project gains two new project-root files, only with
+`css=tailwind`:**
+- `package.json` — the three frontend devDependencies above, plus a
+  `scripts` block (`build:css`, `watch:css`, and `dev` as a `bun run
+  dev` alias for `uv run dev.py` below).
+- `dev.py` — a small, dependency-free stdlib script (`subprocess.Popen`
+  × 2, a poll loop, `KeyboardInterrupt` → terminate-then-kill cleanup)
+  that starts the framework's dev server and `bun run watch:css`
+  together, so `uv run dev.py` is the one command a developer needs
+  while working. It lives at the **project root**, not under
+  `src/{package_name}/`, and is invoked as `uv run dev.py`, not `uv run
+  dev` — every generated project sets `[tool.uv] package = false`
+  (deliberately: none of these apps need to be an installable package),
+  so `[project.scripts]` entry points never register, and a bare `uv
+  run dev` has nothing to resolve to. `uv run <file>.py` runs a script
+  file directly with no packaging involved, which is the practical
+  equivalent and the one actually documented — flipping `package =
+  true` just to get a bare-word command would be a much bigger, riskier
+  change than this dev-convenience script is worth.
 
-**A real bug this caught**: `tests/test_main.py.jinja` — shared by
-`files/`, so shared by every `css` variant — had
-`assert 'class="todo-item done"' in toggle_response.text` to check that
-toggling a todo marks it done. That string is `css-vanilla`-only markup;
-it doesn't exist in `css-tailwind`'s rewritten `todo_item.html`. Every
-static check (`ast.parse()`, `tomllib.loads()`, the leftover-Jinja
-sweep) passed regardless, because the test file itself is syntactically
-fine — the failure only appeared when a generated `css=tailwind`
-project's `uv run pytest` actually ran the assertion against real
-Tailwind markup. Fixed by asserting the checkbox's `checked` attribute
-instead, which is identical markup in both variants — the general
-lesson (documented in both `full-stack` maintainer `README.md`s as a
-standing rule) is that a test file shared across variants of a template
-option must never assert against variant-specific presentation, only
-behavior.
+**Layer structure, mostly unchanged from v0.17**: `static/css/style.css`
+still lives in two peer layers, `css-vanilla/` (untouched) and
+`css-tailwind/` — but `css-tailwind/` now also owns `package.json.jinja`
+and `dev.py.jinja` at the layer root (project-root files, not under
+`src/{package_name}/`), and overrides `templates/base.html` (via the
+same later-layer-wins overlay mechanism as §4.2, adding daisyUI-specific
+body/main wrapper classes) in addition to the pre-existing
+`templates/index.html` and `templates/partials/{todo_item,empty_state}.html`
+overrides. The "no fallback, so `css` absent from `options` ships no
+CSS files at all" gap flagged in v0.17 is unchanged and still applies.
+
+**Docker changed shape entirely.** v0.17's Dockerfile ran one `RUN uv
+run tailwindcss ... --minify` line inline, since the standalone binary
+needed nothing else. Bun does need something else — `bun install` has
+to resolve against `package.json`, and the CLI has to scan the actual
+`templates/`/`static/` source trees for class usage — so `css=tailwind`
+now adds a whole extra build stage:
+
+```dockerfile
+FROM oven/bun:1 AS css-builder
+WORKDIR /app
+COPY package.json bun.lock* ./
+RUN bun install
+COPY src/{package_name}/templates src/{package_name}/templates
+COPY src/{package_name}/static src/{package_name}/static
+RUN bun run build:css
+```
+
+The final stage (still `ghcr.io/astral-sh/uv:...`) only ever `COPY
+--from=css-builder`'s the single compiled `style.css` file — Bun,
+`node_modules`, and the frontend source never cross into the production
+image. `.dockerignore` and `.gitignore` both gained a `node_modules/`
+entry alongside the pre-existing `static/css/style.css` ignore.
+
+**`postgen.py` gained a matching best-effort step.** Just as `uv sync`
+already ran automatically after generation when `--install` was passed,
+`install_frontend_dependencies()` now runs `bun install` under the same
+conditions — but only when the generated project actually has a
+`package.json` (a no-op for `css=vanilla`), and following the
+established best-effort pattern for external tools: `shutil.which("bun")
+is None` → warn and skip, `subprocess.CalledProcessError` → warn and
+continue, never raises, never blocks the rest of generation. The "Next
+steps" summary suggests `bun install` when it wasn't run automatically,
+same as it already did for `uv sync`.
+
+**A real bug this caught, still true after the pivot**:
+`tests/test_main.py.jinja` — shared by `files/`, so shared by every
+`css` variant — must never assert against a CSS class name (see v0.17's
+note below); the fix (asserting the checkbox's `checked` attribute
+instead of a `css-vanilla`-only class string) still holds unchanged
+under the new daisyUI markup, since `checked` is present in both
+variants regardless of what styles the class names carry.
 
 ## 5. Remembered preferences (`prefs.py`)
 

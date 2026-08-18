@@ -27,40 +27,43 @@ the backend stack:
 
 | Option | Choices | Default |
 |---|---|---|
-| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4, standalone CLI) | `vanilla` |
+| `css` | `vanilla` (hand-written CSS, no build step), `tailwind` (Tailwind CSS v4 + daisyUI, via Bun) | `vanilla` |
 
 See [Styling](#styling-cssvanilla-vs-csstailwind) below.
 
 ## What gets generated
 
 ```text
-src/{{ package_name }}/
-  main.py              FastAPI entrypoint — app, lifespan, mounted routers, /static mount
-  worker.py            worker entrypoint (iff a worker is chosen)
-  routes/               one module per HTTP resource
-    todos.py              returns HTML/fragments, not JSON
-  templates/             Jinja2 templates, rendered via core/templates.py
-    base.html              shell — HTMX script tag, stylesheet link
-    index.html              the Todo page
-    partials/               HTMX-swapped fragments
-      todo_item.html          one <li>
-      empty_state.html         the "nothing to do yet" message
-      todo_created.html        todo_item.html + an out-of-band delete of empty_state
-  static/               served at /static
-    css/style.css          the whole UI (css=vanilla), or...
-    css/input.css          ...the Tailwind source, style.css built + git-ignored (css=tailwind)
-  tasks/                 one module per background job (iff a worker is chosen)
-    example.py
-  core/                   shared infrastructure
-    config.py               settings (pydantic-settings) — always
-    templates.py             the shared Jinja2Templates instance — always
-    db.py                    async engine/session (iff a database is chosen)
-    redis.py                 Redis client (iff redis resolves true)
-  models.py               {orm} models (iff a database is chosen)
-tests/
-alembic/                 migrations (iff migrations is on)
-AGENTS.md
-Dockerfile               (iff --docker)
+{package_name-project-root}/
+  package.json           frontend deps: tailwindcss, @tailwindcss/cli, daisyui (iff css=tailwind)
+  dev.py                  uv run dev.py — runs the dev server + Tailwind watcher together (iff css=tailwind)
+  src/{{ package_name }}/
+    main.py              FastAPI entrypoint — app, lifespan, mounted routers, /static mount
+    worker.py            worker entrypoint (iff a worker is chosen)
+    routes/               one module per HTTP resource
+      todos.py              returns HTML/fragments, not JSON
+    templates/             Jinja2 templates, rendered via core/templates.py
+      base.html              shell — HTMX script tag, stylesheet link
+      index.html              the Todo page
+      partials/               HTMX-swapped fragments
+        todo_item.html          one <li>
+        empty_state.html         the "nothing to do yet" message
+        todo_created.html        todo_item.html + an out-of-band delete of empty_state
+    static/               served at /static
+      css/style.css          the whole UI (css=vanilla), or...
+      css/input.css          ...the Tailwind + daisyUI source, style.css built + git-ignored (css=tailwind)
+    tasks/                 one module per background job (iff a worker is chosen)
+      example.py
+    core/                   shared infrastructure
+      config.py               settings (pydantic-settings) — always
+      templates.py             the shared Jinja2Templates instance — always
+      db.py                    async engine/session (iff a database is chosen)
+      redis.py                 Redis client (iff redis resolves true)
+    models.py               {orm} models (iff a database is chosen)
+  tests/
+  alembic/                 migrations (iff migrations is on)
+  AGENTS.md
+  Dockerfile               (iff --docker)
 ```
 
 No `schemas.py`: there's no separate request/response contract to
@@ -140,47 +143,56 @@ gotcha below.
 hand-written `static/css/style.css`, no build step, no dependency —
 open it and edit it directly.
 
-`css=tailwind` swaps in [Tailwind CSS v4](https://tailwindcss.com)
-instead, via the [standalone CLI](https://tailwindcss.com/blog/standalone-cli)
-([`pytailwindcss`](https://pypi.org/project/pytailwindcss/), a
-`pyproject.toml` dependency, downloads and manages the platform binary
-on first run) — **no Node.js or npm required**, matching the rest of
-this template's "everything through `uv`" story. The source of truth
-becomes `static/css/input.css`:
+`css=tailwind` swaps in [Tailwind CSS v4](https://tailwindcss.com) +
+[daisyUI](https://daisyui.com) instead, via a small
+[Bun](https://bun.sh)-based frontend toolchain, kept entirely separate
+from the Python side: frontend dependencies (`tailwindcss`,
+`@tailwindcss/cli`, `daisyui`) live in `package.json`, installed with
+`bun install`, while Python dependencies stay in `pyproject.toml`,
+installed with `uv sync` — neither tool touches the other's
+dependency file. daisyUI is the reason for the switch away from the
+standalone CLI: it's a Tailwind *plugin*, and the standalone binary
+(previously used via `pytailwindcss`) can't load third-party plugins,
+only Tailwind itself.
+
+The source of truth becomes `static/css/input.css`:
 
 ```css
 @import "tailwindcss";
-
-@theme {
-  --color-accent: #e8622c;
-  --color-accent-dark: #f27a44;
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
 }
 ```
 
-That `@theme` block is Tailwind v4's CSS-first configuration — no
-`tailwind.config.js` needed to define custom design tokens like the
-accent color, which then become ordinary utility classes
-(`bg-accent`, `text-accent-dark`, ...) usable straight in templates.
-`templates/index.html` and `templates/partials/todo_item.html` are
-rewritten to use Tailwind utility classes in this mode; `static/css/style.css`
-becomes a **build artifact**, git-ignored, produced by actually running
-the CLI:
+No `tailwind.config.js` and no separate daisyUI config file — Tailwind
+v4 is CSS-first, and daisyUI's theme selection lives right in the
+`@plugin` block. `templates/index.html` and
+`templates/partials/todo_item.html` are rewritten to use daisyUI
+component classes in this mode (`btn btn-primary`, `input
+input-bordered`, `card`/`card-body`, `checkbox checkbox-primary`, ...)
+rather than hand-composed utilities. `static/css/style.css` becomes a
+**build artifact**, git-ignored, produced by actually running the CLI:
 
 ```bash
 # One-off build:
-uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css
+bun run build:css
 
 # Watch and rebuild on every change, while developing:
-uv run tailwindcss -i src/my_app/static/css/input.css -o src/my_app/static/css/style.css --watch
+bun run watch:css
 ```
 
 This means a freshly generated `css=tailwind` project has **no styling
-at all** until you run the build once — the same "one required setup
-step before first run" shape as `migrations=true` needing a migration
-applied first. `--docker` covers this automatically: the Dockerfile
-runs the one-off build (with `--minify`) as part of the image, so a
-container always ships current, correctly-styled CSS regardless of
-whether you remembered to build it locally.
+at all** until `bun install` + a build have run once — the same "one
+required setup step before first run" shape as `migrations=true`
+needing a migration applied first. `--docker` covers this
+automatically: the Dockerfile's build gets a whole extra stage (`FROM
+oven/bun:1 AS css-builder`) that runs `bun install` + `bun run
+build:css`, and only the compiled `style.css` is copied into the final
+image — `node_modules` and the Bun toolchain itself never ship.
+
+For day-to-day development, `uv run dev.py` starts the FastAPI dev
+server and the Tailwind watcher together, in one command — see
+[A full example](#a-full-example) below.
 
 ## A full example
 
@@ -214,9 +226,18 @@ returning a small HTML fragment instead of a full page or JSON.
 Drop `--docker` and any `-o` flags you don't want; every one of them,
 plus `--framework fastapi --template full-stack`, has an interactive
 equivalent if you just run `brupy new my-app` and answer the prompts
-instead. Add `-o css=tailwind` to any of these to get Tailwind CSS
-instead of the vanilla stylesheet — see [Styling](#styling-cssvanilla-vs-csstailwind)
-above.
+instead. Add `-o css=tailwind` to any of these to get Tailwind CSS +
+daisyUI instead of the vanilla stylesheet — see
+[Styling](#styling-cssvanilla-vs-csstailwind) above. With `css=tailwind`,
+there's one extra one-time step (`bun install`, alongside `uv sync`),
+and `uv run dev.py` replaces `uv run fastapi dev ...` as the run
+command — it starts the dev server and the Tailwind watcher together:
+
+```bash
+uv sync
+bun install
+uv run dev.py
+```
 
 ## Gotchas worth knowing before you edit the generated code
 
@@ -269,7 +290,7 @@ plus two `full-stack` always adds for the presentation layer:
 |---|---|
 | `jinja2` | Always — template inheritance, includes, autoescaping. |
 | `htmx` | Always — hx-swap/hx-target/hx-trigger, out-of-band swaps. |
-| `tailwind` | Only with `css=tailwind` — the `@theme` directive and the standalone-CLI build step. |
+| `tailwind` | Only with `css=tailwind` — the Bun toolchain, the `@plugin "daisyui"` config, and the component classes this project uses. |
 
 ## Docker
 
@@ -277,9 +298,11 @@ Pass `--docker` and brupy adds a `Dockerfile` (plus a matching
 `.dockerignore`) to the project root — identical to `rest-api`'s, since
 containerizing an HTML-rendering FastAPI app needs nothing different
 from containerizing a JSON one. The one addition specific to this
-template: with `css=tailwind`, the Dockerfile has one extra `RUN uv run
-tailwindcss ... --minify` step so the built image always has current CSS
-(see [Styling](#styling-cssvanilla-vs-csstailwind) above).
+template: with `css=tailwind`, the Dockerfile gains a whole extra build
+stage (`FROM oven/bun:1 AS css-builder`) that runs `bun install` + `bun
+run build:css`, and only the compiled `style.css` is copied into the
+final image — Bun and `node_modules` never end up in it (see
+[Styling](#styling-cssvanilla-vs-csstailwind) above).
 
 ```bash
 docker build -t my-app .

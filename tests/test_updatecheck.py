@@ -22,8 +22,12 @@ def _allow_network(monkeypatch):
     # The autouse fixture in conftest.py sets this globally so the rest
     # of the suite never makes a real network call — these tests are
     # the deliberate exception, and mock urlopen instead of ever
-    # actually reaching pypi.org.
+    # actually reaching pypi.org. Also clear CI: GitHub Actions (and
+    # most other CI providers) sets this env var for every job, which
+    # would otherwise make check_for_update's own CI opt-out short-
+    # circuit these tests before urlopen is ever mocked-in.
     monkeypatch.delenv("BRUPY_NO_UPDATE_CHECK", raising=False)
+    monkeypatch.delenv("CI", raising=False)
 
 
 def test_noninteractive_never_checks(monkeypatch):

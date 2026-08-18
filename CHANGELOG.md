@@ -9,6 +9,48 @@ Versions follow `v{release}.{feature}.{fixes}` (see
 (starting at `0`), `feature` bumps for new user-facing capability,
 `fixes` bumps for patches with no new capability.
 
+## v0.21.0 — 2026-08-18
+
+### Changed
+
+- **`full-stack`'s `css=tailwind` option (both frameworks) moves from
+  the standalone Tailwind CLI to a Bun + daisyUI toolchain.** v0.17
+  chose the standalone CLI (via `pytailwindcss`) specifically to avoid
+  a Node.js dependency — but the standalone binary can't load
+  third-party Tailwind plugins, and [daisyUI](https://daisyui.com) (the
+  reason for this change) is one. The new stack: FastAPI/Flask + Jinja2
+  + HTMX + Tailwind CSS v4 + daisyUI, built with
+  [Bun](https://bun.sh). Frontend dependencies (`tailwindcss`,
+  `@tailwindcss/cli`, `daisyui`) now live in a new `package.json`,
+  installed via `bun install` — fully separate from `pyproject.toml`/
+  `uv sync`; Python tooling is untouched. `templates/index.html` and
+  its partials are restyled with daisyUI component classes (`btn
+  btn-primary`, `input input-bordered`, `card`/`card-body`, `checkbox
+  checkbox-primary`) instead of hand-composed utilities.
+- **New `dev.py` (project root) — `uv run dev.py` runs the dev server
+  and the Tailwind watcher together.** Every `css=tailwind` project
+  gets this one-command dev flow. It's deliberately `uv run dev.py`,
+  not `uv run dev`: every generated project sets `[tool.uv] package =
+  false`, so `[project.scripts]` entry points never register and a bare
+  `uv run dev` has nothing to resolve to — `uv run <file>.py` is the
+  practical equivalent. `package.json` also gets a `"dev": "uv run
+  dev.py"` script, so `bun run dev` works as a one-word alias.
+- **`--docker` gains a whole extra build stage for `css=tailwind`.** A
+  `FROM oven/bun:1 AS css-builder` stage runs `bun install` + `bun run
+  build:css` against the real `templates/`/`static/` source (Tailwind
+  v4's CLI scans actual class usage); only the compiled `style.css` is
+  copied into the final image — Bun and `node_modules` never ship.
+- **`brupy new --install` now also runs `bun install`** when the
+  generated project has a `package.json` — the same best-effort pattern
+  as `uv sync` (skipped with a warning if `bun` isn't installed or the
+  install fails, never fatal). The "Next steps" summary suggests `bun
+  install` manually when it wasn't run automatically.
+- `css=vanilla` remains the default — this is still an opt-in
+  presentation choice, not a new baseline dependency for every
+  generated project.
+
+See `docs/_product/PRODUCT_ARCH.md` §4.8 for the full design rationale.
+
 ## v0.20.0 — 2026-08-18
 
 ### Added

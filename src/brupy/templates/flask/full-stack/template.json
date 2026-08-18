@@ -72,7 +72,7 @@
       "default": "vanilla",
       "choices": [
         { "value": "vanilla", "label": "Plain CSS (no build step)" },
-        { "value": "tailwind", "label": "Tailwind CSS (standalone CLI, no Node.js)" }
+        { "value": "tailwind", "label": "Tailwind CSS + daisyUI (via Bun)" }
       ]
     }
   ],

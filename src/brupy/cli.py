@@ -292,6 +292,9 @@ def _run_new(
 
         git_ok = postgen.git_init(target_dir) if git_init else False
         installed_ok = postgen.install_dependencies(target_dir) if install_now else False
+        frontend_installed_ok = (
+            postgen.install_frontend_dependencies(target_dir) if install_now else False
+        )
 
         postgen.print_summary(
             project_name=project_name,
@@ -304,6 +307,7 @@ def _run_new(
             installed_requested=install_now,
             run_command=chosen_framework.run_command.format(package_name=package_name),
             options=resolved_options,
+            frontend_installed_ok=frontend_installed_ok,
         )
 
         newer_version = updatecheck.check_for_update(interactive=interactive)

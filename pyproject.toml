@@ -1,6 +1,6 @@
 [project]
 name = "brupy"
-version = "0.20.0"
+version = "0.21.0"
 description = "Strike a spark, get a running project. Instant scaffolding for popular unopinionated Python web frameworks (FastAPI, Flask, and friends)."
 readme = "README.md"
 license = "MIT"

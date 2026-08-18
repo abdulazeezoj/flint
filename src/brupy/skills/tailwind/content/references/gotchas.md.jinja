@@ -2,16 +2,32 @@
 
 ## A fresh generation (or fresh clone) has no styling until you build once
 
-`static/css/style.css` — the file `base.html` actually links — is build output, not a source file: it's gitignored, and doesn't exist until `uv run tailwindcss -i .../input.css -o .../style.css --minify` has run at least once. Cloning the repo, or generating the project for the first time, and opening it in a browser before running that command shows completely unstyled HTML — expected, not a broken template. (If `--docker` was chosen, the image build runs this step for you; running the app outside Docker still needs the manual build, or `--watch` while developing.)
+`static/css/style.css` — the file `base.html` actually links — is build output, not a source file: it's gitignored, and doesn't exist until `bun run build:css` (or `bun run watch:css`, or `uv run dev.py`, which runs the watcher for you) has run at least once. Cloning the repo, or generating the project for the first time, and opening it in a browser before running one of those shows completely unstyled HTML — expected, not a broken template. (If `--docker` was chosen, the image build runs this step for you; running the app outside Docker still needs `bun install` + a build.)
+
+## `bun install` and `uv sync` are two separate steps — neither substitutes for the other
+
+Python dependencies (`pyproject.toml`) and frontend dependencies (`package.json`) are independent: `uv sync` never installs `tailwindcss`/`daisyui`, and `bun install` never installs `fastapi`/`flask`/anything Python. A fresh clone (or a fresh generate) needs **both** `uv sync` and `bun install` before anything works — if `bun run build:css`/`uv run dev.py` fails with something like "command not found" or missing packages, check whether `bun install` was actually run, not just `uv sync`.
 
 ## Edit `input.css`, never `style.css`
 
-`style.css` is regenerated wholesale on every build and is gitignored specifically because it's disposable — hand-editing it is real work that silently disappears the next time anyone runs the build (including CI, or a Docker image rebuild). Every style change belongs in `input.css` (the `@theme` block for tokens, or a small custom rule for anything utilities genuinely can't express) or in a template's `class="..."` attributes.
+`style.css` is regenerated wholesale on every build and is gitignored specifically because it's disposable — hand-editing it is real work that silently disappears the next time anyone runs the build (including CI, or a Docker image rebuild). Every style change belongs in `input.css` (the `@plugin "daisyui"` block for theme config) or in a template's `class="..."` attributes — reaching for a daisyUI/Tailwind class first, a custom rule only for what neither can express.
+
+## A daisyUI class that "doesn't look like daisyUI" usually means daisyUI isn't loaded, not a typo
+
+If `btn-primary`/`card`/etc. render as plain, unstyled HTML instead of daisyUI's actual component look, check `input.css` still has the `@plugin "daisyui" { ... }` block (not just `@import "tailwindcss";` alone) *before* double-checking the class name itself — a missing or accidentally-removed `@plugin` line compiles fine (Tailwind alone doesn't know what `btn-primary` means, so it's simply dropped, not an error) and is easy to miss versus a typo.
 
 ## Deleting `style.css` is safe; forgetting to rebuild after is the actual mistake
 
 Because `style.css` is pure build output, deleting it (or a `git clean` picking it up) never loses work — it regenerates identically from `input.css` on the next build. The failure mode isn't the deletion, it's forgetting the rebuild step afterward and being confused why styling vanished. If a page looks suddenly unstyled, check whether `style.css` exists and is current before suspecting the templates or classes themselves.
 
-## A new utility class not "working" is usually a stale build, not a wrong class name
+## A new utility/component class not "working" is usually a stale build, not a wrong class name
 
-Since the CLI has to actually re-run to pick up new classes typed into a template, a class that "does nothing" after adding it is, far more often than not, a stale `style.css` from before the class was added — not a typo'd class name. Confirm `--watch` is actually running (or rebuild manually) before spending time double-checking the class name itself.
+Since the CLI has to actually re-run to pick up new classes typed into a template, a class that "does nothing" after adding it is, far more often than not, a stale `style.css` from before the class was added — not a typo'd class name. Confirm `uv run dev.py` (or a standalone `bun run watch:css`) is actually running before spending time double-checking the class name itself.
+
+## `uv run dev.py` interleaves two processes' output in one terminal
+
+`dev.py` runs the {% if framework == "fastapi" %}FastAPI dev server{% else %}Flask dev server{% endif %} and the Tailwind watcher as two subprocesses sharing this one terminal's stdout/stderr — their log lines can interleave, which is expected, not a sign one of them crashed. If you genuinely suspect one process died, Ctrl-C `dev.py` (it stops both) and run the two commands in separate terminals to isolate which one's actually failing:
+```
+{% if framework == "fastapi" %}uv run fastapi dev src/{{ package_name }}/main.py{% else %}uv run flask --app src/{{ package_name }}/main.py run --debug{% endif %}
+bun run watch:css
+```

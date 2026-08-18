@@ -68,6 +68,32 @@ def install_dependencies(target_dir: Path) -> bool:
         return False
 
 
+def install_frontend_dependencies(target_dir: Path) -> bool:
+    """Run `bun install` in the generated project, if it has a
+    `package.json` (e.g. `full-stack`'s `css=tailwind` Tailwind CSS +
+    daisyUI toolchain). A no-op returning `False` if there's no
+    `package.json` at all — most generated projects don't have one, and
+    that's not a failure worth warning about. Returns success."""
+    if not (target_dir / "package.json").is_file():
+        return False
+    if shutil.which("bun") is None:
+        console.print(
+            "[yellow]![/yellow] bun not found — skipping frontend dependency install."
+        )
+        return False
+    try:
+        with console.status("Installing frontend dependencies (bun install)..."):
+            subprocess.run(
+                ["bun", "install"], cwd=target_dir, check=True, capture_output=True
+            )
+        return True
+    except subprocess.CalledProcessError as exc:
+        console.print(
+            f"[yellow]![/yellow] bun install failed: {exc.stderr.decode().strip()}"
+        )
+        return False
+
+
 def print_summary(
     *,
     project_name: str,
@@ -80,6 +106,7 @@ def print_summary(
     installed_requested: bool,
     run_command: str,
     options: dict[str, object] | None = None,
+    frontend_installed_ok: bool = False,
 ) -> None:
     console.print()
     if options:
@@ -89,10 +116,13 @@ def print_summary(
     for path in created:
         console.print(f"  [green]✔[/green] {path.as_posix()}")
 
+    has_frontend = Path("package.json") in created
     if git_ok:
         console.print("[green]✔[/green] Initialized git repository")
     if installed_requested and installed_ok:
         console.print("[green]✔[/green] Installed dependencies (uv sync)")
+    if installed_requested and has_frontend and frontend_installed_ok:
+        console.print("[green]✔[/green] Installed frontend dependencies (bun install)")
 
     console.print()
     console.print(f"[bold green]Success![/bold green] Created {project_name} at ./{slug}")
@@ -101,7 +131,12 @@ def print_summary(
     console.print(f"  cd {slug}")
     if not installed_ok:
         console.print("  uv sync")
-    console.print(f"  {run_command}")
+    if has_frontend and not frontend_installed_ok:
+        console.print("  bun install")
+    if Path("dev.py") in created:
+        console.print("  uv run dev.py")
+    else:
+        console.print(f"  {run_command}")
     console.print()
     console.print("Then open [link]http://127.0.0.1:8000[/link]")
 
